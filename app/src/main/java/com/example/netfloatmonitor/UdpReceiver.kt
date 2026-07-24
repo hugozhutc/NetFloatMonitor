@@ -10,8 +10,6 @@ import kotlin.concurrent.thread
 
 class UdpReceiver(
 
-    private val ip:String,
-
     private val port:Int,
 
     private val onData:(String)->Unit
@@ -29,7 +27,6 @@ class UdpReceiver(
 
 
         if(running)
-
             return
 
 
@@ -43,21 +40,35 @@ class UdpReceiver(
             try {
 
 
-                socket = DatagramSocket()
+
+                socket = DatagramSocket(
+                    null
+                )
 
 
 
-                // 绑定本机监听端口
-                socket?.reuseAddress = true
+                socket!!.reuseAddress = true
 
 
 
-                socket?.bind(
+                //监听 UDP 16789
+
+                socket!!.bind(
 
                     InetSocketAddress(
+
+                        "0.0.0.0",
+
                         port
+
                     )
 
+                )
+
+
+
+                println(
+                    "UDP LISTEN:$port"
                 )
 
 
@@ -83,8 +94,19 @@ class UdpReceiver(
 
 
 
+                    socket!!.receive(
 
-                    socket?.receive(packet)
+                        packet
+
+                    )
+
+
+
+
+                    val sourceIP =
+
+                        packet.address
+                            .hostAddress
 
 
 
@@ -104,11 +126,17 @@ class UdpReceiver(
 
 
 
-                    // 调试输出
 
                     println(
-                        "UDP RX:$data"
+
+                        "UDP RX FROM:$sourceIP"
+
                     )
+
+
+
+                    println(data)
+
 
 
 
@@ -125,7 +153,9 @@ class UdpReceiver(
 
 
                 println(
+
                     "UDP ERROR:${e.message}"
+
                 )
 
 
@@ -135,8 +165,9 @@ class UdpReceiver(
         }
 
 
-
     }
+
+
 
 
 
@@ -150,9 +181,7 @@ class UdpReceiver(
 
         try{
 
-
             socket?.close()
-
 
         }
         catch(_:Exception){}
@@ -160,7 +189,6 @@ class UdpReceiver(
 
 
     }
-
 
 
 }
