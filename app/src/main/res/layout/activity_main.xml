@@ -1,81 +1,105 @@
 <?xml version="1.0" encoding="utf-8"?>
 
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout
 
-    android:layout_width="match_parent"
+xmlns:android="http://schemas.android.com/apk/res/android"
 
-    android:layout_height="match_parent"
+android:layout_width="match_parent"
 
-    android:orientation="vertical"
+android:layout_height="match_parent"
 
-    android:padding="20dp">
+android:orientation="vertical"
 
-
-    <TextView
-
-        android:layout_width="wrap_content"
-
-        android:layout_height="wrap_content"
-
-        android:text="NetFloat Monitor"
-
-        android:textSize="22sp"/>
+android:padding="20dp">
 
 
+<TextView
 
-    <EditText
+android:layout_width="wrap_content"
 
-        android:id="@+id/editIp"
+android:layout_height="wrap_content"
 
-        android:layout_width="match_parent"
+android:text="NetFloat Monitor"
 
-        android:layout_height="wrap_content"
-
-        android:hint="目标IP地址"
-
-        android:inputType="text"
-
-        android:text="192.168.1.100"/>
+android:textSize="24sp"/>
 
 
 
-    <EditText
+<EditText
 
-        android:id="@+id/editPort"
+android:id="@+id/editIp"
 
-        android:layout_width="match_parent"
+android:layout_width="match_parent"
 
-        android:layout_height="wrap_content"
+android:layout_height="wrap_content"
 
-        android:hint="UDP端口"
+android:hint="目标IP"
 
-        android:inputType="number"
-
-        android:text="14550"/>
+android:text="192.168.1.100"/>
 
 
 
-    <Button
+<EditText
 
-        android:id="@+id/startBtn"
+android:id="@+id/editPort"
 
-        android:layout_width="match_parent"
+android:layout_width="match_parent"
 
-        android:layout_height="wrap_content"
+android:layout_height="wrap_content"
 
-        android:text="启动悬浮窗"/>
+android:hint="UDP端口"
+
+android:inputType="number"
+
+android:text="14550"/>
 
 
 
-    <Button
+<Button
 
-        android:id="@+id/stopBtn"
+android:id="@+id/startBtn"
 
-        android:layout_width="match_parent"
+android:layout_width="match_parent"
 
-        android:layout_height="wrap_content"
+android:layout_height="wrap_content"
 
-        android:text="停止监听"/>
+android:text="启动监控"/>
+
+
+
+<Button
+
+android:id="@+id/stopBtn"
+
+android:layout_width="match_parent"
+
+android:layout_height="wrap_content"
+
+android:text="停止监控"/>
+
+
+
+<Button
+
+android:id="@+id/clearBtn"
+
+android:layout_width="match_parent"
+
+android:layout_height="wrap_content"
+
+android:text="清除日志"/>
+
+
+
+<TextView
+
+android:id="@+id/logPath"
+
+android:layout_width="match_parent"
+
+android:layout_height="wrap_content"
+
+android:textSize="12sp"/>
 
 
 </LinearLayout>
