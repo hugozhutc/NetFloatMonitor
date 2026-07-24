@@ -35,6 +35,10 @@ class FloatService : Service() {
 
 
         logger = LogManager(this)
+        
+        logger.save(
+            "SERVICE START TEST"
+        )
 
 
 
