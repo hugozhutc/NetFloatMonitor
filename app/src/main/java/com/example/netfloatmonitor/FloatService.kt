@@ -116,15 +116,22 @@ class FloatService:Service(){
 
 
 
-        receiver =
-            UdpReceiver(port){data->
+        val logger =
+    LogManager(this)
 
 
-                floatView.update(data)
+
+receiver =
+UdpReceiver(port){data->
 
 
-            }
+    floatView.update(data)
 
+
+    logger.save(data)
+
+
+}
 
 
         receiver?.start()
