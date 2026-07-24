@@ -15,65 +15,96 @@ class MainActivity : AppCompatActivity(){
 
 
 
-    private lateinit var ipEdit:EditText
+    private lateinit var ipEdit: EditText
 
-    private lateinit var portEdit:EditText
+    private lateinit var portEdit: EditText
 
-    private lateinit var logPath:TextView
-
+    private lateinit var logPath: TextView
 
 
 
 
     override fun onCreate(
+
         savedInstanceState: Bundle?
+
     ) {
+
 
         super.onCreate(savedInstanceState)
 
 
+
         setContentView(
+
             R.layout.activity_main
+
         )
 
 
 
+
         ipEdit =
+
             findViewById(
+
                 R.id.editIp
+
             )
+
 
 
         portEdit =
+
             findViewById(
+
                 R.id.editPort
+
             )
+
 
 
         logPath =
+
             findViewById(
+
                 R.id.logPath
+
             )
+
+
 
 
 
         val startBtn =
+
             findViewById<Button>(
+
                 R.id.startBtn
+
             )
 
 
+
         val stopBtn =
+
             findViewById<Button>(
+
                 R.id.stopBtn
+
             )
 
 
 
         val clearBtn =
+
             findViewById<Button>(
+
                 R.id.clearBtn
+
             )
+
+
 
 
 
@@ -81,9 +112,18 @@ class MainActivity : AppCompatActivity(){
 
 
 
+        showLogPath()
 
 
-        startBtn.setOnClickListener{
+
+
+
+
+        /**
+         * 启动监听
+         */
+        startBtn.setOnClickListener {
+
 
 
             saveConfig()
@@ -93,24 +133,37 @@ class MainActivity : AppCompatActivity(){
             //检查悬浮窗权限
 
             if(
+
                 !Settings.canDrawOverlays(this)
+
             ){
 
 
-                val intent =
+                val intent = Intent(
 
-                    Intent(
+                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
 
-                        Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    Uri.parse(
 
-                        Uri.parse(
-                            "package:$packageName"
-                        )
+                        "package:$packageName"
 
                     )
 
+                )
+
 
                 startActivity(intent)
+
+
+                Toast.makeText(
+
+                    this,
+
+                    "请开启悬浮窗权限",
+
+                    Toast.LENGTH_SHORT
+
+                ).show()
 
 
                 return@setOnClickListener
@@ -120,38 +173,71 @@ class MainActivity : AppCompatActivity(){
 
 
 
-
-            val serviceIntent =
-
-                Intent(
-                    this,
-                    FloatService::class.java
-                )
+            val port =
 
 
+                portEdit.text
+                    .toString()
+                    .toIntOrNull()
 
-            
+                    ?:16789
+
+
+
+
+
+            val serviceIntent = Intent(
+
+                this,
+
+                FloatService::class.java
+
+            )
 
 
 
             serviceIntent.putExtra(
+
                 "PORT",
-                portEdit.text.toString()
-                    .toInt()
+
+                port
+
             )
+
+
+
+            serviceIntent.putExtra(
+
+                "IP",
+
+                ipEdit.text
+                    .toString()
+
+            )
+
+
 
 
 
             startForegroundService(
+
                 serviceIntent
+
             )
 
 
+
+
             Toast.makeText(
+
                 this,
-                "监听启动",
+
+                "UDP监听启动 端口:$port",
+
                 Toast.LENGTH_SHORT
+
             ).show()
+
 
 
         }
@@ -161,24 +247,38 @@ class MainActivity : AppCompatActivity(){
 
 
 
-        stopBtn.setOnClickListener{
+
+        /**
+         * 停止监听
+         */
+        stopBtn.setOnClickListener {
+
 
 
             stopService(
 
                 Intent(
+
                     this,
+
                     FloatService::class.java
+
                 )
 
             )
 
 
+
             Toast.makeText(
+
                 this,
-                "已停止",
+
+                "监听已停止",
+
                 Toast.LENGTH_SHORT
+
             ).show()
+
 
 
         }
@@ -189,7 +289,12 @@ class MainActivity : AppCompatActivity(){
 
 
 
-        clearBtn.setOnClickListener{
+
+
+        /**
+         * 清除日志
+         */
+        clearBtn.setOnClickListener {
 
 
             clearLog()
@@ -199,12 +304,8 @@ class MainActivity : AppCompatActivity(){
 
 
 
-
-        showLogPath()
-
-
-
     }
+
 
 
 
@@ -220,19 +321,29 @@ class MainActivity : AppCompatActivity(){
 
 
         getSharedPreferences(
+
             "net_config",
+
             Context.MODE_PRIVATE
+
         )
+
             .edit()
 
             .putString(
+
                 "ip",
+
                 ipEdit.text.toString()
+
             )
 
             .putString(
+
                 "port",
+
                 portEdit.text.toString()
+
             )
 
             .apply()
@@ -247,37 +358,54 @@ class MainActivity : AppCompatActivity(){
 
 
 
+
     /**
      * 读取配置
      */
     private fun loadConfig(){
 
 
+
         val sp =
 
+
             getSharedPreferences(
+
                 "net_config",
+
                 Context.MODE_PRIVATE
+
             )
+
 
 
 
         ipEdit.setText(
 
+
             sp.getString(
+
                 "ip",
+
                 "192.168.144.33"
+
             )
 
         )
 
 
 
+
+
         portEdit.setText(
 
+
             sp.getString(
+
                 "port",
+
                 "16789"
+
             )
 
         )
@@ -293,17 +421,26 @@ class MainActivity : AppCompatActivity(){
 
 
 
+    /**
+     * 显示日志路径
+     */
     private fun showLogPath(){
+
 
 
         val path =
 
+
             LogManager(this)
+
                 .getLogPath()
 
 
 
+
+
         logPath.text =
+
 
             "日志目录:\n$path"
 
@@ -318,29 +455,36 @@ class MainActivity : AppCompatActivity(){
 
 
 
+
     /**
-     * 删除日志
+     * 清除日志
      */
     private fun clearLog(){
 
 
-        val dir =
 
-            java.io.File(
-
-                LogManager(this)
-                    .getLogPath()
-
-            )
+        val dir = java.io.File(
 
 
+            LogManager(this)
 
-        dir.listFiles()?.forEach {
+                .getLogPath()
+
+
+        )
+
+
+
+
+        dir.listFiles()?.forEach{
 
 
             it.delete()
 
+
         }
+
+
 
 
 
@@ -355,7 +499,9 @@ class MainActivity : AppCompatActivity(){
         ).show()
 
 
+
     }
+
 
 
 
