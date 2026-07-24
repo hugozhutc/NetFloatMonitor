@@ -33,7 +33,7 @@
 
         android:label="NetFloatMonitor"
 
-        android:theme="@style/Theme.AppCompat.Light">
+        android:theme="@style/AppTheme">
 
 
         <activity
