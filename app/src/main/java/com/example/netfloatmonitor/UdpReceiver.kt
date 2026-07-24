@@ -10,7 +10,6 @@ import kotlin.concurrent.thread
 
 class UdpReceiver(
 
-    private val targetIp:String,
 
     private val port:Int,
 
@@ -93,15 +92,7 @@ class UdpReceiver(
 
 
 
-                    if(
-                        targetIp.isNotEmpty()
-                        &&
-                        ip != targetIp
-                    ){
-
-                        continue
-
-                    }
+                    
 
 
 
