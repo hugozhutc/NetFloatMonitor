@@ -3,11 +3,10 @@ package com.example.netfloatmonitor
 
 import android.content.Context
 import android.graphics.Color
-import android.graphics.PixelFormat
 import android.view.*
-import android.widget.TextView
-import android.widget.LinearLayout
+import android.widget.*
 import android.graphics.drawable.GradientDrawable
+import org.json.JSONObject
 
 
 
@@ -19,17 +18,14 @@ class FloatView(
 
     private val params: WindowManager.LayoutParams
 
-
 ) : LinearLayout(context) {
 
 
+    private val airLayout = LinearLayout(context)
 
-    private val textView: TextView
+    private val gndLayout = LinearLayout(context)
 
 
-
-    private var lastX = 0f
-    private var lastY = 0f
 
     private var startWidth = 0
     private var startHeight = 0
@@ -39,14 +35,14 @@ class FloatView(
     init {
 
 
-        orientation = VERTICAL
+        orientation = HORIZONTAL
 
 
         setPadding(
             8,
-            6,
             8,
-            6
+            8,
+            8
         )
 
 
@@ -54,70 +50,60 @@ class FloatView(
 
         bg.setColor(
             Color.argb(
-                170,
+                180,
                 0,
                 0,
                 0
             )
         )
 
-        bg.cornerRadius = 8f
-
+        bg.cornerRadius = 10f
 
         background = bg
 
 
 
-
-        textView = TextView(context)
-
-
-
-        textView.setTextColor(
-            Color.WHITE
-        )
+        airLayout.orientation =
+            VERTICAL
 
 
-        textView.textSize = 11f
-
-
-
-        textView.setLineSpacing(
-            0f,
-            0.85f
-        )
+        gndLayout.orientation =
+            VERTICAL
 
 
 
         addView(
 
-            textView,
+            createPanel(
+                "AIR",
+                airLayout
+            )
 
-            LayoutParams(
+        )
 
-                360,
 
-                500
+        addView(
 
+            createPanel(
+                "GND",
+                gndLayout
             )
 
         )
 
 
 
-        //拖动悬浮窗
+        //拖动+缩放
 
         setOnTouchListener(
 
-            object: OnTouchListener {
-
+            object: OnTouchListener{
 
 
                 var downX=0f
                 var downY=0f
 
-                var mode = 0
-
+                var resize=false
 
 
                 override fun onTouch(
@@ -126,8 +112,7 @@ class FloatView(
 
                     event:MotionEvent
 
-                ):Boolean {
-
+                ):Boolean{
 
 
                     when(event.action){
@@ -139,37 +124,13 @@ class FloatView(
                             downX =
                                 event.rawX
 
-
                             downY =
                                 event.rawY
 
 
-
-                            mode =
-
-                                if(
-
+                            resize =
                                     event.x >
-
                                     width-50
-
-                                )
-
-                                    1
-
-                                else
-
-                                    0
-
-
-
-                            lastX =
-                                event.rawX
-
-
-                            lastY =
-                                event.rawY
-
 
 
                             startWidth =
@@ -179,8 +140,6 @@ class FloatView(
                             startHeight =
                                 height
 
-
-
                         }
 
 
@@ -189,32 +148,45 @@ class FloatView(
 
 
 
-                            if(mode==0){
+                            if(resize){
+
+
+                                params.width =
+
+                                    (
+                                    startWidth+
+                                    event.rawX-downX
+                                    ).toInt()
+                                    .coerceAtLeast(300)
+
+
+
+                                params.height =
+
+                                    (
+                                    startHeight+
+                                    event.rawY-downY
+                                    ).toInt()
+                                    .coerceAtLeast(200)
+
+
+
+                            }
+                            else{
 
 
                                 params.x +=
 
-                                    (
-                                        event.rawX-downX
-                                    ).toInt()
-
+                                (
+                                event.rawX-downX
+                                ).toInt()
 
 
                                 params.y +=
 
-                                    (
-                                        event.rawY-downY
-                                    ).toInt()
-
-
-
-                                windowManager.updateViewLayout(
-
-                                    this@FloatView,
-
-                                    params
-
-                                )
+                                (
+                                event.rawY-downY
+                                ).toInt()
 
 
                                 downX =
@@ -223,57 +195,20 @@ class FloatView(
                                 downY =
                                     event.rawY
 
-
-
-                            }
-                            else{
-
-
-                                val w =
-
-                                    startWidth +
-
-                                    (
-                                        event.rawX-lastX
-                                    ).toInt()
-
-
-
-                                val h =
-
-                                    startHeight +
-
-                                    (
-                                        event.rawY-lastY
-                                    ).toInt()
-
-
-
-                                params.width =
-                                    w.coerceAtLeast(200)
-
-
-                                params.height =
-                                    h.coerceAtLeast(250)
-
-
-
-                                windowManager.updateViewLayout(
-
-                                    this@FloatView,
-
-                                    params
-
-                                )
-
-
                             }
 
+
+
+                            windowManager.updateViewLayout(
+
+                                this@FloatView,
+
+                                params
+
+                            )
 
 
                         }
-
-
 
                     }
 
@@ -281,7 +216,6 @@ class FloatView(
                     return true
 
                 }
-
 
 
             }
@@ -295,79 +229,137 @@ class FloatView(
 
 
 
+    private fun createPanel(
 
-    fun updateStatus(
+        title:String,
 
-        status: LinkStatus
+        layout:LinearLayout
+
+    ):View{
+
+
+        val box =
+            LinearLayout(context)
+
+
+        box.orientation =
+            VERTICAL
+
+
+        val tv =
+            TextView(context)
+
+
+        tv.text =
+            title
+
+
+        tv.setTextColor(
+            Color.GREEN
+        )
+
+        tv.textSize =
+            14f
+
+
+        box.addView(tv)
+
+
+        box.addView(
+
+            ScrollView(context).apply{
+
+
+                addView(layout)
+
+            },
+
+            LayoutParams(
+
+                0,
+
+                MATCH_PARENT,
+
+                1f
+
+            )
+
+        )
+
+
+        return box
+
+    }
+
+
+
+
+    /**
+     * V2.0 JSON显示入口
+     *
+     */
+
+    fun updateJson(
+
+        json:String
 
     ){
 
 
-
-        val airNoise =
-            formatNoise(
-                status.airNoise
-            )
-
-
-        val gndNoise =
-            formatNoise(
-                status.gndNoise
-            )
+        val obj =
+            JSONObject(json)
 
 
 
+        airLayout.removeAllViews()
 
-        textView.text = """
-
-
-          AIR                 GND
-
-
-RSSI1  ${status.airRssi1}       RSSI1  ${status.gndRssi1}
-
-RSSI2  ${status.airRssi2}       RSSI2  ${status.gndRssi2}
-
-
-SNR    ${status.airSnr}dB       SNR    ${status.gndSnr}dB
-
-
-PASS   ${status.airPass}        PASS   ${status.gndPass}
-
-
-FAIL   ${status.airFailed}      FAIL   ${status.gndFailed}
-
-
-ANT    ${status.airAnt}         ANT    ${status.gndAnt}
+        gndLayout.removeAllViews()
 
 
 
-FREQ   ${status.freq}
+        obj.keys().forEach{
 
 
-MCS    ${status.mcs}
+            val key = it
 
-
-POWER  ${status.power}
-
-
-DIST   ${status.distance} m
-
-
-RATE   TX:${status.txRate}
-
-       RX:${status.rxRate}
+            val value =
+                obj.get(key).toString()
 
 
 
-$airNoise
+            when{
 
 
-$gndNoise
+                key.endsWith("_a") ->
+
+                    addItem(
+                        airLayout,
+                        key,
+                        value
+                    )
 
 
-        """.trimIndent()
+                key.endsWith("_g") ->
 
+                    addItem(
+                        gndLayout,
+                        key,
+                        value
+                    )
+
+
+                else ->
+
+                    addItem(
+                        airLayout,
+                        key,
+                        value
+                    )
+
+            }
+
+
+        }
 
 
     }
@@ -375,51 +367,46 @@ $gndNoise
 
 
 
-    private fun formatNoise(
 
-        data:Array<String>
+    private fun addItem(
 
-    ):String{
+        layout:LinearLayout,
 
+        key:String,
 
-        if(data.isEmpty())
+        value:String
 
-            return ""
-
-
-
-        val sb =
-            StringBuilder()
+    ){
 
 
-
-        data.forEachIndexed{
-
-                index,
-                value ->
+        val tv =
+            TextView(context)
 
 
+        tv.text =
 
-            val freq =
+            String.format(
 
-                2412 +
+                "%-12s %s",
 
-                index*8
+                key,
 
-
-
-            sb.append(
-
-                "[ ] $freq $value\n"
+                value
 
             )
 
 
-        }
+        tv.setTextColor(
+            Color.WHITE
+        )
 
 
+        tv.textSize =
+            12f
 
-        return sb.toString()
+
+        layout.addView(tv)
+
 
     }
 
