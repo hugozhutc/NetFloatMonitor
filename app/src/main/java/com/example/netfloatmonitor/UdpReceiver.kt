@@ -3,30 +3,59 @@ package com.example.netfloatmonitor
 
 import java.net.DatagramPacket
 import java.net.DatagramSocket
+import java.net.InetSocketAddress
+import java.util.concurrent.atomic.AtomicBoolean
+
 
 
 class UdpReceiver(
-    private val port:Int,
+
+    private val targetIp:String,
+
+    private val targetPort:Int,
+
     private val callback:(String)->Unit
+
 ){
 
 
-    private var running = false
+    private var socket:DatagramSocket? = null
+
+
+    private val running =
+        AtomicBoolean(false)
+
+
+
+    private var packetCount = 0
+
+
+    private var byteCount = 0L
+
+
+    private var startTime =
+        System.currentTimeMillis()
+
 
 
     fun start(){
 
-        running = true
+
+        running.set(true)
 
 
-        Thread {
+
+        Thread{
 
 
-            try {
+            try{
 
 
-                val socket =
-                    DatagramSocket(port)
+                socket =
+                    DatagramSocket(
+                        targetPort
+                    )
+
 
 
                 val buffer =
@@ -34,7 +63,8 @@ class UdpReceiver(
 
 
 
-                while(running){
+
+                while(running.get()){
 
 
                     val packet =
@@ -44,58 +74,153 @@ class UdpReceiver(
                         )
 
 
-                    socket.receive(packet)
+
+                    socket!!.receive(
+                        packet
+                    )
+
+
+
+                    val sourceIp =
+                        packet.address.hostAddress
+
+
+
+
+                    // IP过滤
+
+                    if(
+                        targetIp.isNotEmpty()
+                        &&
+                        sourceIp != targetIp
+                    ){
+
+                        continue
+
+                    }
+
 
 
 
                     val data =
-                        packet.data.copyOf(
+
+                        String(
+                            packet.data,
+                            0,
                             packet.length
                         )
 
 
-                    val hex =
-                        data.joinToString(" "){
 
-                            String.format(
-                                "%02X",
-                                it
-                            )
 
-                        }
+                    packetCount++
+
+
+                    byteCount +=
+                        packet.length
 
 
 
-                    callback(hex)
+
+                    val now =
+                        System.currentTimeMillis()
+
+
+
+                    val second =
+                        (now-startTime)/1000.0
+
+
+
+
+                    val kbps =
+
+                        if(second>0)
+
+                            byteCount*8/
+                            second/
+                            1000
+
+                        else
+
+                            0.0
+
+
+
+
+                    val info =
+
+"""
+$data
+
+
+----------------
+
+RX:
+$packetCount
+
+Rate:
+${String.format("%.2f",kbps)} kbps
+
+SRC:
+$sourceIp
+
+""".trimIndent()
+
+
+
+
+                    callback(
+                        info
+                    )
+
+
 
                 }
 
 
-                socket.close()
-
-
-            }catch(e:Exception){
+            }
+            catch(e:Exception){
 
 
                 callback(
-                    "ERROR:${e.message}"
+                    "UDP ERROR:${e.message}"
                 )
 
 
             }
 
 
+
         }.start()
 
+
     }
+
+
+
 
 
 
     fun stop(){
 
-        running=false
+
+        running.set(false)
+
+
+        try{
+
+
+            socket?.close()
+
+
+        }
+        catch(e:Exception){}
+
+
 
     }
+
 
 
 }
