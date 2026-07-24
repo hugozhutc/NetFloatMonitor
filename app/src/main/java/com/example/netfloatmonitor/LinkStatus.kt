@@ -3,39 +3,72 @@ package com.example.netfloatmonitor
 
 data class LinkStatus(
 
-    // AIR天空端
-    var airRssi1:String = "-0",
-    var airRssi2:String = "-0",
-    var airSnr:String = "0",
+
+    // =================
+    // AIR 天空端
+    // =================
+
+    var airRssi1:String = "--",
+
+    var airRssi2:String = "--",
+
+    var airSnr:String = "--",
+
     var airPass:String = "0",
+
     var airFailed:String = "0",
-    var airAnt:String = "",
+
+    var airAnt:String = "--",
 
 
-    // Ground地面端
-    var gndRssi1:String = "-0",
-    var gndRssi2:String = "-0",
-    var gndSnr:String = "0",
+
+
+    // =================
+    // GROUND 地面端
+    // =================
+
+    var gndRssi1:String = "--",
+
+    var gndRssi2:String = "--",
+
+    var gndSnr:String = "--",
+
     var gndPass:String = "0",
+
     var gndFailed:String = "0",
-    var gndAnt:String = "",
+
+    var gndAnt:String = "--",
 
 
+
+
+    // =================
     // 公共链路
-    var freq:String = "",
-    var mcs:String = "",
-    var power:String = "",
-    var distance:String = "",
+    // =================
 
-    var txRate:String = "",
-    var rxRate:String = "",
+    var freq:String = "--",
+
+    var mcs:String = "--",
+
+    var power:String = "--",
+
+    var distance:String = "0",
 
 
-    // 噪声
+    var txRate:String = "0",
 
-    var airNoise:Array<String> = arrayOf(),
+    var rxRate:String = "0",
 
-    var gndNoise:Array<String> = arrayOf()
+
+
+
+    // =================
+    // 底噪
+    // =================
+
+    var airNoise:Array<String> = emptyArray(),
+
+    var gndNoise:Array<String> = emptyArray()
 
 
 )
