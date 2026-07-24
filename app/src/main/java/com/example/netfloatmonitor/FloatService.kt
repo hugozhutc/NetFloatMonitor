@@ -168,16 +168,11 @@ class FloatService : Service() {
 
                 catch(e:Exception){
 
+    logger.save(
+        "JSON ERROR:${e.message}"
+    )
 
-
-                    floatView?.updateStatus(
-
-                        "JSON ERROR\n${e.message}"
-
-                    )
-
-
-                }
+}
 
 
 
