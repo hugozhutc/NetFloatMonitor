@@ -4,56 +4,55 @@ package com.example.netfloatmonitor
 import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.InetSocketAddress
-import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.concurrent.thread
+
 
 
 class UdpReceiver(
 
+    private val ip:String,
 
     private val port:Int,
 
-    private val callback:(String)->Unit
+    private val onData:(String)->Unit
 
 ){
 
 
+    private var running = false
+
     private var socket:DatagramSocket? = null
-
-
-    private val running =
-        AtomicBoolean(false)
 
 
 
     fun start(){
 
 
-        if(running.get()){
+        if(running)
+
             return
-        }
 
 
-        running.set(true)
+        running = true
 
 
 
         thread {
 
 
-            try{
+            try {
 
 
-                socket =
-                    DatagramSocket(
-                        null
-                    )
+                socket = DatagramSocket()
 
 
-                socket!!.reuseAddress = true
+
+                // 绑定本机监听端口
+                socket?.reuseAddress = true
 
 
-                socket!!.bind(
+
+                socket?.bind(
 
                     InetSocketAddress(
                         port
@@ -68,35 +67,29 @@ class UdpReceiver(
 
 
 
+                while(running){
 
-                while(running.get()){
 
 
                     val packet =
+
                         DatagramPacket(
+
                             buffer,
+
                             buffer.size
+
                         )
 
 
 
-                    socket!!.receive(
-                        packet
-                    )
 
-
-
-                    val ip =
-                        packet.address.hostAddress
-                            ?: ""
-
-
-
-                    
+                    socket?.receive(packet)
 
 
 
                     val data =
+
                         String(
 
                             packet.data,
@@ -111,9 +104,15 @@ class UdpReceiver(
 
 
 
-                    callback(
-                        data
+                    // 调试输出
+
+                    println(
+                        "UDP RX:$data"
                     )
+
+
+
+                    onData(data)
 
 
 
@@ -125,30 +124,16 @@ class UdpReceiver(
             catch(e:Exception){
 
 
-                if(running.get()){
-
-
-                    callback(
-
-                        "UDP ERROR:${e.message}"
-
-                    )
-
-
-                }
-
-
-            }
-            finally{
-
-
-                socket?.close()
+                println(
+                    "UDP ERROR:${e.message}"
+                )
 
 
             }
 
 
         }
+
 
 
     }
@@ -160,13 +145,22 @@ class UdpReceiver(
     fun stop(){
 
 
-        running.set(false)
+        running=false
 
 
-        socket?.close()
+        try{
+
+
+            socket?.close()
+
+
+        }
+        catch(_:Exception){}
+
 
 
     }
+
 
 
 }
