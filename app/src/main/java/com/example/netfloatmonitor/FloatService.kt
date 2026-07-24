@@ -27,6 +27,7 @@ class FloatService : Service() {
 
 
 
+
     override fun onCreate() {
 
 
@@ -34,11 +35,21 @@ class FloatService : Service() {
 
 
         logger = LogManager(this)
+
+
+
+        //启动日志
+
         logger.save(
-            "SERVICE CREATE"
+
+            "========== SERVICE CREATE =========="
+
         )
 
+
+
         createNotificationChannel()
+
 
 
         startForeground(
@@ -98,7 +109,7 @@ class FloatService : Service() {
 
 
 
-        return START_STICKY
+        return START_NOT_STICKY
 
     }
 
@@ -122,6 +133,8 @@ class FloatService : Service() {
 
 
 
+
+
         receiver = UdpReceiver(
 
             port
@@ -130,16 +143,21 @@ class FloatService : Service() {
 
 
 
-
             try {
 
 
 
-                //保存日志
+                //保存UDP原始数据
 
                 logger.save(
 
-                    "UDP RX:\n$data"
+                    """
+                    
+UDP RECEIVE
+
+$data
+
+""".trimIndent()
 
                 )
 
@@ -147,9 +165,8 @@ class FloatService : Service() {
 
 
 
-                //V2.0
 
-                //JSON直接显示
+                //刷新悬浮窗
 
                 floatView?.post{
 
@@ -173,13 +190,18 @@ class FloatService : Service() {
 
                 logger.save(
 
-                    "DISPLAY ERROR:${e.message}"
+                    """
+                    
+DISPLAY ERROR
+
+${e.stackTraceToString()}
+
+""".trimIndent()
 
                 )
 
 
             }
-
 
 
         }
@@ -194,7 +216,7 @@ class FloatService : Service() {
 
         logger.save(
 
-            "UDP START:$port"
+            "UDP LISTEN START PORT:$port"
 
         )
 
@@ -221,6 +243,7 @@ class FloatService : Service() {
 
 
 
+
         val wm =
 
             getSystemService(
@@ -228,6 +251,7 @@ class FloatService : Service() {
                 WINDOW_SERVICE
 
             ) as WindowManager
+
 
 
 
@@ -255,13 +279,17 @@ class FloatService : Service() {
 
 
 
+
         params.type =
 
             if(Build.VERSION.SDK_INT >= 26)
 
+
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
 
+
             else
+
 
                 WindowManager.LayoutParams.TYPE_PHONE
 
@@ -270,7 +298,10 @@ class FloatService : Service() {
 
 
 
+
+
         params.flags =
+
 
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
 
@@ -278,7 +309,11 @@ class FloatService : Service() {
 
 
 
+
+
+
         params.format =
+
 
             PixelFormat.TRANSLUCENT
 
@@ -286,9 +321,14 @@ class FloatService : Service() {
 
 
 
+
+
+
         params.x = 50
 
+
         params.y = 200
+
 
 
 
@@ -309,6 +349,9 @@ class FloatService : Service() {
 
 
 
+
+
+
         wm.addView(
 
             floatView,
@@ -316,6 +359,7 @@ class FloatService : Service() {
             params
 
         )
+
 
 
     }
@@ -336,22 +380,31 @@ class FloatService : Service() {
 
 
 
+        logger.save(
+
+            "========== SERVICE DESTROY =========="
+
+        )
+
+
+
         receiver?.stop()
 
 
 
-        receiver=null
+        receiver = null
 
 
 
 
 
 
-        if(floatView!=null){
+
+        if(floatView != null){
 
 
 
-            try{
+            try {
 
 
 
@@ -362,6 +415,7 @@ class FloatService : Service() {
                         WINDOW_SERVICE
 
                     ) as WindowManager
+
 
 
 
@@ -379,7 +433,7 @@ class FloatService : Service() {
 
 
 
-            floatView=null
+            floatView = null
 
 
         }
@@ -420,7 +474,7 @@ class FloatService : Service() {
 
 
 
-        if(Build.VERSION.SDK_INT >=26){
+        if(Build.VERSION.SDK_INT >= 26){
 
 
 
@@ -436,6 +490,8 @@ class FloatService : Service() {
 
 
 
+
+
             val manager =
 
                 getSystemService(
@@ -446,11 +502,15 @@ class FloatService : Service() {
 
 
 
+
+
             manager.createNotificationChannel(
 
                 channel
 
             )
+
+
 
         }
 
@@ -477,11 +537,13 @@ class FloatService : Service() {
 
         )
 
+
             .setContentTitle(
 
                 "NetFloat Monitor"
 
             )
+
 
             .setContentText(
 
@@ -489,11 +551,13 @@ class FloatService : Service() {
 
             )
 
+
             .setSmallIcon(
 
                 android.R.drawable.ic_menu_info_details
 
             )
+
 
             .build()
 
