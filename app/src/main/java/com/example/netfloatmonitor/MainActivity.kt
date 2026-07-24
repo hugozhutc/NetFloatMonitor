@@ -130,10 +130,7 @@ class MainActivity : AppCompatActivity(){
 
 
 
-            serviceIntent.putExtra(
-                "IP",
-                ipEdit.text.toString()
-            )
+            
 
 
 
