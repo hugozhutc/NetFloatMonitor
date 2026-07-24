@@ -2,10 +2,12 @@ package com.example.netfloatmonitor
 
 
 import android.content.Context
-import android.graphics.*
+import android.graphics.Color
+import android.graphics.PixelFormat
 import android.view.*
 import android.widget.TextView
-import kotlin.math.max
+import android.widget.LinearLayout
+import android.graphics.drawable.GradientDrawable
 
 
 
@@ -17,59 +19,275 @@ class FloatView(
 
     private val params: WindowManager.LayoutParams
 
-) : TextView(context) {
+
+) : LinearLayout(context) {
 
 
 
-    private var downRawX = 0f
-    private var downRawY = 0f
+    private val textView: TextView
 
+
+
+    private var lastX = 0f
+    private var lastY = 0f
 
     private var startWidth = 0
     private var startHeight = 0
-
-
-    private var resize = false
-
-
-    private val resizeArea = 80
 
 
 
     init {
 
 
-        textSize = 13f
+        orientation = VERTICAL
 
 
-        typeface =
-            Typeface.MONOSPACE
-
-
-        setTextColor(
-            Color.WHITE
+        setPadding(
+            8,
+            6,
+            8,
+            6
         )
 
 
-        setBackgroundColor(
+        val bg = GradientDrawable()
+
+        bg.setColor(
             Color.argb(
-                210,
+                170,
                 0,
                 0,
                 0
             )
         )
 
+        bg.cornerRadius = 8f
 
-        setPadding(
-            20,
-            20,
-            20,
-            20
+
+        background = bg
+
+
+
+
+        textView = TextView(context)
+
+
+
+        textView.setTextColor(
+            Color.WHITE
         )
 
 
-        isClickable = true
+        textView.textSize = 11f
+
+
+
+        textView.setLineSpacing(
+            0f,
+            0.85f
+        )
+
+
+
+        addView(
+
+            textView,
+
+            LayoutParams(
+
+                360,
+
+                500
+
+            )
+
+        )
+
+
+
+        //拖动悬浮窗
+
+        setOnTouchListener(
+
+            object: OnTouchListener {
+
+
+
+                var downX=0f
+                var downY=0f
+
+                var mode = 0
+
+
+
+                override fun onTouch(
+
+                    v:View?,
+
+                    event:MotionEvent
+
+                ):Boolean {
+
+
+
+                    when(event.action){
+
+
+                        MotionEvent.ACTION_DOWN->{
+
+
+                            downX =
+                                event.rawX
+
+
+                            downY =
+                                event.rawY
+
+
+
+                            mode =
+
+                                if(
+
+                                    event.x >
+
+                                    width-50
+
+                                )
+
+                                    1
+
+                                else
+
+                                    0
+
+
+
+                            lastX =
+                                event.rawX
+
+
+                            lastY =
+                                event.rawY
+
+
+
+                            startWidth =
+                                width
+
+
+                            startHeight =
+                                height
+
+
+
+                        }
+
+
+
+                        MotionEvent.ACTION_MOVE->{
+
+
+
+                            if(mode==0){
+
+
+                                params.x +=
+
+                                    (
+                                        event.rawX-downX
+                                    ).toInt()
+
+
+
+                                params.y +=
+
+                                    (
+                                        event.rawY-downY
+                                    ).toInt()
+
+
+
+                                windowManager.updateViewLayout(
+
+                                    this@FloatView,
+
+                                    params
+
+                                )
+
+
+                                downX =
+                                    event.rawX
+
+                                downY =
+                                    event.rawY
+
+
+
+                            }
+                            else{
+
+
+                                val w =
+
+                                    startWidth +
+
+                                    (
+                                        event.rawX-lastX
+                                    ).toInt()
+
+
+
+                                val h =
+
+                                    startHeight +
+
+                                    (
+                                        event.rawY-lastY
+                                    ).toInt()
+
+
+
+                                params.width =
+                                    w.coerceAtLeast(200)
+
+
+                                params.height =
+                                    h.coerceAtLeast(250)
+
+
+
+                                windowManager.updateViewLayout(
+
+                                    this@FloatView,
+
+                                    params
+
+                                )
+
+
+                            }
+
+
+
+                        }
+
+
+
+                    }
+
+
+                    return true
+
+                }
+
+
+
+            }
+
+
+        )
 
 
     }
@@ -78,117 +296,78 @@ class FloatView(
 
 
 
-
-
-    /**
-     * 更新链路数据
-     */
     fun updateStatus(
-        s:LinkStatus
+
+        status: LinkStatus
+
     ){
 
 
 
-        post {
+        val airNoise =
+            formatNoise(
+                status.airNoise
+            )
+
+
+        val gndNoise =
+            formatNoise(
+                status.gndNoise
+            )
 
 
 
-            text = """
 
-╔ NetFloat Monitor
-
-========== GROUND ==========
-
-LDPC:
-PASS ${s.passG}
-FAIL ${s.failG}
+        textView.text = """
 
 
-RSSI:
-ANT1 ${s.rssiG1}
-ANT2 ${s.rssiG2}
+          AIR                 GND
 
 
-SNR:
-${s.snrG} dB
+RSSI1  ${status.airRssi1}       RSSI1  ${status.gndRssi1}
+
+RSSI2  ${status.airRssi2}       RSSI2  ${status.gndRssi2}
 
 
-LQI:
-${s.lqiG}% ${quality(s.lqiG)}
+SNR    ${status.airSnr}dB       SNR    ${status.gndSnr}dB
 
 
-TEMP:
-RF ${s.tempG} ℃
+PASS   ${status.airPass}        PASS   ${status.gndPass}
+
+
+FAIL   ${status.airFailed}      FAIL   ${status.gndFailed}
+
+
+ANT    ${status.airAnt}         ANT    ${status.gndAnt}
 
 
 
-========== AIR ============
+FREQ   ${status.freq}
 
 
-LDPC:
-PASS ${s.passA}
-FAIL ${s.failA}
+MCS    ${status.mcs}
 
 
-RSSI:
-ANT1 ${s.rssiA1}
-ANT2 ${s.rssiA2}
+POWER  ${status.power}
 
 
-SNR:
-${s.snrA} dB
+DIST   ${status.distance} m
 
 
-LQI:
-${s.lqiA}% ${quality(s.lqiA)}
+RATE   TX:${status.txRate}
 
-
-TEMP:
-RF ${s.tempA} ℃
+       RX:${status.rxRate}
 
 
 
-========== LINK ===========
+$airNoise
 
 
-MCS:
-${s.mcs}
+$gndNoise
 
 
-RX:
-${s.rxFreq}
+        """.trimIndent()
 
-
-TX:
-${s.txFreq}
-
-
-POWER:
-${s.power} dBm
-
-
-DIST:
-${s.distance} m
-
-
-
-========== NETWORK ========
-
-
-ETH RX:
-${s.ethRx} kbps
-
-
-ETH TX:
-${s.ethTx} kbps
-
-
-============================
-
-""".trimIndent()
-
-
-        }
 
 
     }
@@ -196,301 +375,54 @@ ${s.ethTx} kbps
 
 
 
+    private fun formatNoise(
 
+        data:Array<String>
 
-
-
-    /**
-     * 链路质量判断
-     */
-    private fun quality(
-        value:String
     ):String{
 
 
-        val v =
-            value.toIntOrNull()
-            ?:0
+        if(data.isEmpty())
+
+            return ""
 
 
 
-        return when{
-
-
-            v >= 80 ->
-                "GOOD"
-
-
-            v >=50 ->
-                "NORMAL"
-
-
-            else ->
-                "BAD"
-
-
-        }
-
-
-    }
+        val sb =
+            StringBuilder()
 
 
 
+        data.forEachIndexed{
+
+                index,
+                value ->
 
 
 
+            val freq =
+
+                2412 +
+
+                index*8
 
 
-    /**
-     * 更新错误信息
-     */
-    fun updateText(
-        msg:String
-    ){
 
+            sb.append(
 
-        post{
+                "[ ] $freq $value\n"
 
-
-            text =
-                msg
+            )
 
 
         }
 
 
-    }
 
-
-
-
-
-
-
-
-
-    /**
-     * 拖动 + 缩放
-     */
-    override fun onTouchEvent(
-        event:MotionEvent
-    ):Boolean {
-
-
-
-        when(event.action){
-
-
-
-            MotionEvent.ACTION_DOWN -> {
-
-
-
-                downRawX =
-                    event.rawX
-
-
-                downRawY =
-                    event.rawY
-
-
-
-                startWidth =
-                    width
-
-
-                startHeight =
-                    height
-
-
-
-                resize =
-
-                    event.x >
-                    width-resizeArea
-                    &&
-                    event.y >
-                    height-resizeArea
-
-
-
-                return true
-
-            }
-
-
-
-
-            MotionEvent.ACTION_MOVE -> {
-
-
-
-                val dx =
-                    event.rawX-downRawX
-
-
-                val dy =
-                    event.rawY-downRawY
-
-
-
-
-                if(resize){
-
-
-
-                    params.width =
-
-                        max(
-                            300,
-                            startWidth+
-                            dx.toInt()
-                        )
-
-
-                    params.height =
-
-                        max(
-                            300,
-                            startHeight+
-                            dy.toInt()
-                        )
-
-
-
-                }
-
-                else{
-
-
-
-                    params.x +=
-                        dx.toInt()
-
-
-                    params.y +=
-                        dy.toInt()
-
-
-
-                    downRawX =
-                        event.rawX
-
-
-                    downRawY =
-                        event.rawY
-
-
-                }
-
-
-
-
-                windowManager.updateViewLayout(
-
-                    this,
-
-                    params
-
-                )
-
-
-
-                return true
-
-
-            }
-
-
-
-
-            MotionEvent.ACTION_UP -> {
-
-
-                resize=false
-
-
-                return true
-
-
-            }
-
-
-        }
-
-
-
-        return true
-
+        return sb.toString()
 
     }
 
-
-
-
-
-
-
-
-    /**
-     * 绘制缩放角标
-     */
-    override fun onDraw(
-        canvas:Canvas
-    ){
-
-
-        super.onDraw(canvas)
-
-
-
-        val paint =
-            Paint()
-
-
-
-        paint.color =
-            Color.WHITE
-
-
-
-        paint.strokeWidth =
-            3f
-
-
-
-        canvas.drawLine(
-
-            width-45f,
-
-            height-10f,
-
-            width-10f,
-
-            height-45f,
-
-            paint
-
-        )
-
-
-
-        canvas.drawLine(
-
-            width-30f,
-
-            height-10f,
-
-            width-10f,
-
-            height-30f,
-
-            paint
-
-        )
-
-
-    }
 
 
 }
