@@ -2,6 +2,7 @@ package com.example.netfloatmonitor
 
 
 import android.content.Context
+import android.os.Environment
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -11,24 +12,25 @@ import java.util.Locale
 
 class LogManager(
 
-    private val context:Context
+    private val context: Context
 
 ){
 
 
 
-    private val logDir:File
+    private val logDir: File
 
 
 
-    init{
+    init {
+
 
 
         logDir = File(
 
-            context.getExternalFilesDir(null),
+            Environment.getExternalStorageDirectory(),
 
-            "NetFloat/log"
+            "NetFloatMonitor/log"
 
         )
 
@@ -58,15 +60,13 @@ class LogManager(
         try{
 
 
-            val file =
+            val file = File(
 
-                File(
+                logDir,
 
-                    logDir,
+                getFileName()
 
-                    getFileName()
-
-                )
+            )
 
 
 
@@ -75,12 +75,12 @@ class LogManager(
             val record =
 
                 """
-                {
-                "time":"${getTime()}",
-                "data":$json
-                }
+{
+"time":"${getTime()}",
+"data":$json
+}
 
-                """.trimIndent()
+""".trimIndent()
 
 
 
@@ -94,10 +94,12 @@ class LogManager(
 
 
 
-
         }
+
         catch(e:Exception){
 
+
+            e.printStackTrace()
 
 
         }
@@ -112,28 +114,25 @@ class LogManager(
 
 
 
-    /**
-     * 当前日志文件
-     */
+
     private fun getFileName():String{
 
 
         return SimpleDateFormat(
 
-            "yyyyMMdd"
-
-            + "_link.jsonl",
+            "yyyyMMdd'_link.jsonl'",
 
             Locale.getDefault()
 
         )
 
-        .format(
-            Date()
-        )
+        .format(Date())
 
 
     }
+
+
+
 
 
 
@@ -151,9 +150,7 @@ class LogManager(
 
         )
 
-        .format(
-            Date()
-        )
+        .format(Date())
 
 
     }
@@ -163,9 +160,9 @@ class LogManager(
 
 
 
-    /**
-     * 获取日志目录
-     */
+
+
+
     fun getLogPath():String{
 
 
