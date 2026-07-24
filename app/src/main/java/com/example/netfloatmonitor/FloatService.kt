@@ -4,15 +4,14 @@ package com.example.netfloatmonitor
 import android.app.*
 import android.content.Intent
 import android.graphics.PixelFormat
-import android.os.IBinder
 import android.os.Build
+import android.os.IBinder
 import android.view.WindowManager
 import androidx.core.app.NotificationCompat
 
 
 
 class FloatService : Service() {
-
 
 
     private var floatView: FloatView? = null
@@ -24,30 +23,27 @@ class FloatService : Service() {
 
 
 
-
-
     override fun onCreate() {
 
         super.onCreate()
 
 
-        logger =
-            LogManager(this)
-
+        logger = LogManager(this)
 
 
         createNotificationChannel()
 
 
-
         startForeground(
+
             1001,
+
             createNotification()
+
         )
 
+
     }
-
-
 
 
 
@@ -57,11 +53,11 @@ class FloatService : Service() {
 
         intent: Intent?,
 
-        flags:Int,
+        flags: Int,
 
-        startId:Int
+        startId: Int
 
-    ):Int {
+    ): Int {
 
 
 
@@ -73,9 +69,7 @@ class FloatService : Service() {
 
                 16789
 
-            )
-            ?:16789
-
+            ) ?: 16789
 
 
 
@@ -101,7 +95,6 @@ class FloatService : Service() {
 
 
 
-
     private fun startUdpReceive(
 
         port:Int
@@ -114,25 +107,34 @@ class FloatService : Service() {
 
 
 
-        receiver =
+        receiver = UdpReceiver(
 
-            UdpReceiver(
+            port
 
-    "192.168.144.33",
-
-    16789
-
-){ data ->
+        ){ data ->
 
 
 
-                try {
+            try {
 
 
 
-                    //保存原始JSON
+                //保存原始JSON
 
-                    logger.save(
+                logger.save(
+
+                    data
+
+                )
+
+
+
+
+                //解析JSON
+
+                val status =
+
+                    JsonParser.parse(
 
                         data
 
@@ -141,45 +143,34 @@ class FloatService : Service() {
 
 
 
+                //刷新悬浮窗
 
-                    //解析JSON
+                floatView?.updateStatus(
 
-                    val status =
+                    status
 
-                        JsonParser.parse(
-
-                            data
-
-                        )
-
-
-
-
-
-                    //刷新悬浮窗
-
-                    floatView?.updateStatus(
-
-                        status
-
-                    )
-
-
-
-                }
-
-                catch(e:Exception){
-
-    logger.save(
-        "JSON ERROR:${e.message}"
-    )
-
-}
+                )
 
 
 
             }
 
+            catch(e:Exception){
+
+
+
+                logger.save(
+
+                    "JSON ERROR:${e.message}"
+
+                )
+
+
+            }
+
+
+
+        }
 
 
 
@@ -188,8 +179,14 @@ class FloatService : Service() {
 
 
 
-    }
+        logger.save(
 
+            "UDP START LISTEN:$port"
+
+        )
+
+
+    }
 
 
 
@@ -202,78 +199,87 @@ class FloatService : Service() {
     private fun showFloatWindow(){
 
 
-    if(floatView != null){
 
-        return
+        if(floatView != null)
 
-    }
-
-
-
-    val wm =
-
-        getSystemService(
-            WINDOW_SERVICE
-        ) as WindowManager
-
-
-
-
-    val params =
-
-        WindowManager.LayoutParams()
-
-
-
-    params.width =
-
-        WindowManager.LayoutParams.WRAP_CONTENT
-
-
-    params.height =
-
-        WindowManager.LayoutParams.WRAP_CONTENT
-
-
-
-
-    params.type =
-
-        if(Build.VERSION.SDK_INT >= 26)
-
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-
-        else
-
-            WindowManager.LayoutParams.TYPE_PHONE
-
-
-
-
-    params.flags =
-
-        WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
-
-
-
-    params.format =
-
-        PixelFormat.TRANSLUCENT
-
-
-
-
-    params.x = 50
-
-    params.y = 200
+            return
 
 
 
 
 
-    floatView =
+        val wm =
 
-        FloatView(
+            getSystemService(
+
+                WINDOW_SERVICE
+
+            ) as WindowManager
+
+
+
+
+
+
+        val params =
+
+            WindowManager.LayoutParams()
+
+
+
+        params.width =
+
+            360
+
+
+
+        params.height =
+
+            500
+
+
+
+
+
+        params.type =
+
+            if(Build.VERSION.SDK_INT >= 26)
+
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+
+            else
+
+                WindowManager.LayoutParams.TYPE_PHONE
+
+
+
+
+
+        params.flags =
+
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+
+
+
+
+
+        params.format =
+
+            PixelFormat.TRANSLUCENT
+
+
+
+
+
+        params.x = 50
+
+        params.y = 200
+
+
+
+
+
+        floatView = FloatView(
 
             this,
 
@@ -286,16 +292,18 @@ class FloatService : Service() {
 
 
 
-    wm.addView(
 
-        floatView,
+        wm.addView(
 
-        params
+            floatView,
 
-    )
+            params
+
+        )
 
 
-}
+
+    }
 
 
 
@@ -316,28 +324,48 @@ class FloatService : Service() {
 
 
 
+        receiver=null
+
+
+
+
+
         if(floatView != null){
 
 
-            val wm =
 
-                getSystemService(
-
-                    WINDOW_SERVICE
-
-                ) as WindowManager
+            try {
 
 
 
-            wm.removeView(
+                val wm =
 
-                floatView
+                    getSystemService(
 
-            )
+                        WINDOW_SERVICE
+
+                    ) as WindowManager
+
+
+
+
+
+                wm.removeView(
+
+                    floatView
+
+                )
+
+
+
+            }
+
+            catch(_:Exception){}
 
 
 
             floatView=null
+
 
 
         }
@@ -379,6 +407,7 @@ class FloatService : Service() {
         if(Build.VERSION.SDK_INT >=26){
 
 
+
             val channel =
 
                 NotificationChannel(
@@ -393,6 +422,8 @@ class FloatService : Service() {
 
 
 
+
+
             val manager =
 
                 getSystemService(
@@ -400,6 +431,7 @@ class FloatService : Service() {
                     NotificationManager::class.java
 
                 )
+
 
 
             manager.createNotificationChannel(
@@ -423,6 +455,7 @@ class FloatService : Service() {
 
 
     private fun createNotification():Notification{
+
 
 
         return NotificationCompat.Builder(
@@ -455,7 +488,6 @@ class FloatService : Service() {
 
 
     }
-
 
 
 
