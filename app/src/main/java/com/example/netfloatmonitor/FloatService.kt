@@ -43,7 +43,11 @@ class FloatService:Service(){
 
 
         floatView =
-            FloatView(this)
+            FloatView(
+        this,
+        windowManager,
+        params
+    )
 
 
 
