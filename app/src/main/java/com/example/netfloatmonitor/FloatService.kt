@@ -34,7 +34,9 @@ class FloatService : Service() {
 
 
         logger = LogManager(this)
-
+        logger.save(
+            "SERVICE CREATE"
+        )
 
         createNotificationChannel()
 
