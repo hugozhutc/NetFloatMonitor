@@ -207,24 +207,72 @@ class FloatService : Service() {
 
 
 
-        floatView =
-
-            FloatView(
-
-                this
-
-            )
-
-
-
-
         val wm =
 
-            getSystemService(
+    getSystemService(
+        WINDOW_SERVICE
+    ) as WindowManager
 
-                WINDOW_SERVICE
 
-            ) as WindowManager
+
+val params =
+
+    WindowManager.LayoutParams()
+
+
+
+params.width =
+
+    WindowManager.LayoutParams.WRAP_CONTENT
+
+
+params.height =
+
+    WindowManager.LayoutParams.WRAP_CONTENT
+
+
+
+params.type =
+
+    if(Build.VERSION.SDK_INT >= 26)
+
+        WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+
+    else
+
+        WindowManager.LayoutParams.TYPE_PHONE
+
+
+
+params.flags =
+
+    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+
+
+
+params.format =
+
+    PixelFormat.TRANSLUCENT
+
+
+
+
+floatView =
+
+    FloatView(
+
+        this,
+
+        wm,
+
+        params
+
+    )
+
+
+
+
+         as WindowManager
 
 
 
