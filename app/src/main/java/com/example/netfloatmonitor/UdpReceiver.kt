@@ -5,6 +5,7 @@ import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.InetSocketAddress
 import kotlin.concurrent.thread
+import org.json.JSONObject
 
 
 
@@ -17,9 +18,9 @@ class UdpReceiver(
 ){
 
 
-    private var running = false
+    private var running=false
 
-    private var socket:DatagramSocket? = null
+    private var socket:DatagramSocket?=null
 
 
 
@@ -30,7 +31,7 @@ class UdpReceiver(
             return
 
 
-        running = true
+        running=true
 
 
 
@@ -41,17 +42,13 @@ class UdpReceiver(
 
 
 
-                socket = DatagramSocket(
-                    null
-                )
+                socket = DatagramSocket(null)
 
 
 
-                socket!!.reuseAddress = true
+                socket!!.reuseAddress=true
 
 
-
-                //监听 UDP 16789
 
                 socket!!.bind(
 
@@ -73,8 +70,10 @@ class UdpReceiver(
 
 
 
+
                 val buffer =
                     ByteArray(8192)
+
 
 
 
@@ -94,19 +93,16 @@ class UdpReceiver(
 
 
 
-                    socket!!.receive(
-
-                        packet
-
-                    )
+                    socket!!.receive(packet)
 
 
 
-
-                    val sourceIP =
+                    val ip =
 
                         packet.address
                             .hostAddress
+                            ?: ""
+
 
 
 
@@ -122,25 +118,36 @@ class UdpReceiver(
 
                             Charsets.UTF_8
 
-                        )
+                        ).trim()
 
 
 
 
                     println(
-
-                        "UDP RX FROM:$sourceIP"
-
+                        "RX $ip : $data"
                     )
 
 
 
-                    println(data)
+
+                    //JSON检查
+
+                    if(isJson(data)){
 
 
+                        onData(data)
 
 
-                    onData(data)
+                    }
+                    else{
+
+
+                        println(
+                            "DROP NON JSON"
+                        )
+
+
+                    }
 
 
 
@@ -149,6 +156,7 @@ class UdpReceiver(
 
 
             }
+
             catch(e:Exception){
 
 
@@ -162,10 +170,45 @@ class UdpReceiver(
             }
 
 
+
+        }
+
+
+
+    }
+
+
+
+
+
+
+
+    private fun isJson(
+
+        text:String
+
+    ):Boolean{
+
+
+        return try{
+
+
+            JSONObject(text)
+
+            true
+
+
+        }
+
+        catch(e:Exception){
+
+            false
+
         }
 
 
     }
+
 
 
 
@@ -184,11 +227,12 @@ class UdpReceiver(
             socket?.close()
 
         }
+
         catch(_:Exception){}
 
 
-
     }
+
 
 
 }
