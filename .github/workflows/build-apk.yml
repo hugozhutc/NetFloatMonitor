@@ -15,24 +15,25 @@ jobs:
     runs-on: ubuntu-latest
 
 
+
     steps:
 
 
-    - name: Checkout source
+    - name: Checkout
 
       uses: actions/checkout@v4
 
 
 
-    - name: Setup JDK 17
+    - name: Setup JDK
 
       uses: actions/setup-java@v4
 
       with:
 
-        java-version: '17'
+        java-version: 17
 
-        distribution: 'temurin'
+        distribution: temurin
 
 
 
@@ -42,13 +43,15 @@ jobs:
 
 
 
+    - name: Install Gradle
+
+      uses: gradle/actions/setup-gradle@v3
+
+
+
     - name: Build APK
 
-      run: |
-
-        chmod +x gradlew
-
-        ./gradlew assembleRelease
+      run: gradle assembleRelease
 
 
 
@@ -58,6 +61,6 @@ jobs:
 
       with:
 
-        name: NetFloatMonitor-apk
+        name: NetFloatMonitor
 
         path: app/build/outputs/apk/release/*.apk
