@@ -4,13 +4,17 @@ package com.example.netfloatmonitor
 import android.content.Context
 import java.io.File
 import java.text.SimpleDateFormat
-import java.util.*
+import java.util.Date
+import java.util.Locale
 
 
 
 class LogManager(
-    private val context: Context
+
+    private val context:Context
+
 ){
+
 
 
     private val logDir:File
@@ -20,11 +24,14 @@ class LogManager(
     init{
 
 
-        logDir =
-            File(
-                context.getExternalFilesDir(null),
-                "log"
-            )
+        logDir = File(
+
+            context.getExternalFilesDir(null),
+
+            "NetFloat/log"
+
+        )
+
 
 
         if(!logDir.exists()){
@@ -38,46 +45,59 @@ class LogManager(
 
 
 
-    fun save(data:String){
+
+
+
+
+    /**
+     * 保存JSON数据
+     */
+    fun save(json:String){
 
 
         try{
 
 
-            val time =
-                SimpleDateFormat(
-                    "yyyy-MM-dd HH:mm:ss.SSS",
-                    Locale.getDefault()
-                )
-                .format(Date())
-
-
-
             val file =
+
                 File(
+
                     logDir,
-                    "monitor_${date()}.txt"
+
+                    getFileName()
+
                 )
+
+
+
+
+
+            val record =
+
+                """
+                {
+                "time":"${getTime()}",
+                "data":$json
+                }
+
+                """.trimIndent()
+
+
 
 
 
             file.appendText(
 
-                """
-                
-                $time
-                
-                RX:
-                $data
-                
-                ----------------
-                
-                """.trimIndent()
+                record + "\n"
 
             )
 
 
-        }catch(e:Exception){
+
+
+        }
+        catch(e:Exception){
+
 
 
         }
@@ -87,17 +107,73 @@ class LogManager(
 
 
 
-    private fun date():String{
+
+
+
+
+
+    /**
+     * 当前日志文件
+     */
+    private fun getFileName():String{
 
 
         return SimpleDateFormat(
-            "yyyyMMdd",
+
+            "yyyyMMdd"
+
+            + "_link.jsonl",
+
             Locale.getDefault()
+
         )
-        .format(Date())
+
+        .format(
+            Date()
+        )
 
 
     }
+
+
+
+
+
+
+    private fun getTime():String{
+
+
+        return SimpleDateFormat(
+
+            "yyyy-MM-dd HH:mm:ss.SSS",
+
+            Locale.getDefault()
+
+        )
+
+        .format(
+            Date()
+        )
+
+
+    }
+
+
+
+
+
+
+    /**
+     * 获取日志目录
+     */
+    fun getLogPath():String{
+
+
+        return logDir.absolutePath
+
+
+    }
+
 
 
 }
