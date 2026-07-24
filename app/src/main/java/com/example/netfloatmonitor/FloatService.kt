@@ -2,55 +2,33 @@ package com.example.netfloatmonitor
 
 
 import android.app.*
-import android.content.Context
 import android.content.Intent
 import android.graphics.PixelFormat
-import android.os.Build
 import android.os.IBinder
-import android.view.Gravity
+import android.os.Build
 import android.view.WindowManager
 import androidx.core.app.NotificationCompat
 
 
 
-
-class FloatService : Service(){
-
-
-
-    private lateinit var wm:WindowManager
-
-
-    private lateinit var floatView:FloatView
-
-
-    private lateinit var params:
-            WindowManager.LayoutParams
+class FloatService : Service() {
 
 
 
-    private var receiver:
-            UdpReceiver? = null
+    private var floatView: FloatView? = null
+
+    private var receiver: UdpReceiver? = null
 
 
-
-    private lateinit var logger:
-            LogManager
+    private lateinit var logger: LogManager
 
 
 
 
 
-
-    override fun onCreate(){
-
+    override fun onCreate() {
 
         super.onCreate()
-
-
-
-        createNotification()
-
 
 
         logger =
@@ -58,14 +36,158 @@ class FloatService : Service(){
 
 
 
-        wm =
-            getSystemService(
-                Context.WINDOW_SERVICE
-            ) as WindowManager
+        createNotificationChannel()
 
 
 
-        createFloat()
+        startForeground(
+            1001,
+            createNotification()
+        )
+
+    }
+
+
+
+
+
+
+
+    override fun onStartCommand(
+
+        intent: Intent?,
+
+        flags:Int,
+
+        startId:Int
+
+    ):Int {
+
+
+
+        val port =
+
+            intent?.getIntExtra(
+
+                "PORT",
+
+                16789
+
+            )
+            ?:16789
+
+
+
+
+        showFloatWindow()
+
+
+
+        startUdpReceive(
+
+            port
+
+        )
+
+
+
+        return START_STICKY
+
+    }
+
+
+
+
+
+
+
+
+    private fun startUdpReceive(
+
+        port:Int
+
+    ){
+
+
+
+        receiver?.stop()
+
+
+
+        receiver =
+
+            UdpReceiver(
+
+                port
+
+            ){ data ->
+
+
+
+                try {
+
+
+
+                    //保存原始JSON
+
+                    logger.save(
+
+                        data
+
+                    )
+
+
+
+
+
+                    //解析JSON
+
+                    val status =
+
+                        JsonParser.parse(
+
+                            data
+
+                        )
+
+
+
+
+
+                    //刷新悬浮窗
+
+                    floatView?.updateStatus(
+
+                        status
+
+                    )
+
+
+
+                }
+
+                catch(e:Exception){
+
+
+
+                    floatView?.updateStatus(
+
+                        "JSON ERROR\n${e.message}"
+
+                    )
+
+
+                }
+
+
+
+            }
+
+
+
+
+
+        receiver?.start()
 
 
 
@@ -76,46 +198,59 @@ class FloatService : Service(){
 
 
 
-    private fun createFloat(){
 
 
 
-        params =
+
+    private fun showFloatWindow(){
+
+
+
+        if(floatView != null)
+
+            return
+
+
+
+        floatView =
+
+            FloatView(
+
+                this
+
+            )
+
+
+
+
+        val wm =
+
+            getSystemService(
+
+                WINDOW_SERVICE
+
+            ) as WindowManager
+
+
+
+
+
+        val params =
+
             WindowManager.LayoutParams()
 
 
 
         params.width =
-            600
+
+            WindowManager.LayoutParams.WRAP_CONTENT
 
 
 
         params.height =
-            800
 
+            WindowManager.LayoutParams.WRAP_CONTENT
 
-
-        params.x =
-            100
-
-
-        params.y =
-            200
-
-
-
-        params.gravity =
-            Gravity.TOP or Gravity.LEFT
-
-
-
-        params.format =
-            PixelFormat.TRANSLUCENT
-
-
-
-        params.flags =
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
 
 
 
@@ -134,225 +269,42 @@ class FloatService : Service(){
 
 
 
+        params.flags =
+
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
 
 
-        floatView =
-            FloatView(
-                this,
-                wm,
-                params
-            )
+
+
+
+        params.format =
+
+            PixelFormat.TRANSLUCENT
+
+
+
+
+
+        params.x = 50
+
+        params.y = 200
+
+
 
 
 
         wm.addView(
+
             floatView,
+
             params
-        )
 
-
-    }
-
-
-
-
-
-
-
-
-    override fun onStartCommand(
-        intent:Intent?,
-        flags:Int,
-        startId:Int
-    ):Int {
-
-
-
-        val ip =
-
-            intent?.getStringExtra(
-                "IP"
-            )
-            ?: ""
-
-
-
-        val port =
-
-            intent?.getIntExtra(
-                "PORT",
-                14550
-            )
-            ?:14550
-
-
-
-
-        startReceive(
-            ip,
-            port
         )
 
 
 
-        return START_STICKY
-
     }
 
-
-
-
-
-
-
-    private fun startReceive(
-
-        ip:String,
-
-        port:Int
-
-    ){
-
-
-
-        receiver?.stop()
-
-
-
-        receiver =
-
-            UdpReceiver(
-
-                ip,
-
-                port
-
-            ){data->
-
-
-
-
-                try{
-
-
-                    logger.save(data)
-
-
-
-                    val status =
-
-                        JsonParser.parse(
-                            data
-                        )
-
-
-
-                    floatView.updateStatus(
-                        status
-                    )
-
-
-
-                }
-
-                catch(e:Exception){
-
-
-
-                    floatView.updateText(
-                        data
-                    )
-
-
-                }
-
-
-
-            }
-
-
-
-
-
-        receiver?.start()
-
-
-    }
-
-
-
-
-
-
-
-    private fun createNotification(){
-
-
-
-        val channelId =
-            "netfloat"
-
-
-
-        if(Build.VERSION.SDK_INT >=26){
-
-
-            val channel =
-
-                NotificationChannel(
-
-                    channelId,
-
-                    "NetFloat Monitor",
-
-                    NotificationManager.IMPORTANCE_LOW
-
-                )
-
-
-            getSystemService(
-                NotificationManager::class.java
-            )
-            .createNotificationChannel(
-                channel
-            )
-
-
-        }
-
-
-
-
-        val notification =
-
-            NotificationCompat.Builder(
-                this,
-                channelId
-            )
-
-            .setContentTitle(
-                "NetFloat运行中"
-            )
-
-            .setContentText(
-                "UDP Link Monitor"
-            )
-
-            .setSmallIcon(
-                android.R.drawable.ic_menu_info_details
-            )
-
-            .build()
-
-
-
-        startForeground(
-            1,
-            notification
-        )
-
-
-    }
 
 
 
@@ -364,26 +316,45 @@ class FloatService : Service(){
     override fun onDestroy(){
 
 
+        super.onDestroy()
+
+
 
         receiver?.stop()
 
 
 
-        try{
+        if(floatView != null){
+
+
+            val wm =
+
+                getSystemService(
+
+                    WINDOW_SERVICE
+
+                ) as WindowManager
+
+
 
             wm.removeView(
+
                 floatView
+
             )
 
-        }catch(e:Exception){}
 
 
+            floatView=null
 
 
-        super.onDestroy()
+        }
 
 
     }
+
+
+
 
 
 
@@ -391,13 +362,109 @@ class FloatService : Service(){
 
 
     override fun onBind(
+
         intent:Intent?
-    ):IBinder?{
+
+    ):IBinder? {
 
 
         return null
 
     }
+
+
+
+
+
+
+
+
+
+    private fun createNotificationChannel(){
+
+
+
+        if(Build.VERSION.SDK_INT >=26){
+
+
+            val channel =
+
+                NotificationChannel(
+
+                    "net_monitor",
+
+                    "NetFloat Monitor",
+
+                    NotificationManager.IMPORTANCE_LOW
+
+                )
+
+
+
+            val manager =
+
+                getSystemService(
+
+                    NotificationManager::class.java
+
+                )
+
+
+            manager.createNotificationChannel(
+
+                channel
+
+            )
+
+
+        }
+
+
+    }
+
+
+
+
+
+
+
+
+
+    private fun createNotification():Notification{
+
+
+        return NotificationCompat.Builder(
+
+            this,
+
+            "net_monitor"
+
+        )
+
+            .setContentTitle(
+
+                "NetFloat Monitor"
+
+            )
+
+            .setContentText(
+
+                "UDP 16789监听中"
+
+            )
+
+            .setSmallIcon(
+
+                android.R.drawable.ic_menu_info_details
+
+            )
+
+            .build()
+
+
+    }
+
+
 
 
 }
