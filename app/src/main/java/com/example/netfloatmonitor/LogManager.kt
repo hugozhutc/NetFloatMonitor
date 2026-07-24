@@ -9,7 +9,6 @@ import java.util.Date
 import java.util.Locale
 
 
-
 class LogManager(
 
     private val context: Context
@@ -17,73 +16,35 @@ class LogManager(
 ){
 
 
-    private val logDir: File
+    private val logDir: File = File(
+
+        context.filesDir,
+
+        "NetFloat/log"
+
+    )
 
 
 
     init {
 
 
-        logDir = File(
-
-            context.getExternalFilesDir(null),
-
-            "NetFloat/log"
-
-        )
-
-
-
         if(!logDir.exists()){
 
-
-            val result = logDir.mkdirs()
-
-
-            Log.d(
-
-                "LogManager",
-
-                "mkdir result:$result"
-
-            )
+            logDir.mkdirs()
 
         }
 
 
-
         Log.d(
 
             "LogManager",
 
-            "LOG PATH:${logDir.absolutePath}"
+            "PATH:${logDir.absolutePath}"
 
         )
-
-
-        Log.d(
-
-            "LogManager",
-
-            "DIR EXISTS:${logDir.exists()}"
-
-        )
-
-
-        Log.d(
-
-            "LogManager",
-
-            "CAN WRITE:${logDir.canWrite()}"
-
-        )
-
 
     }
-
-
-
-
 
 
 
@@ -91,42 +52,34 @@ class LogManager(
     fun save(data:String){
 
 
-
         try {
-
 
 
             val file = File(
 
                 logDir,
 
-                getFileName()
+                "test.log"
 
             )
-
-
-
-
-            val record =
-
-                """
-                
-==============================
-TIME:${getTime()}
-DATA:
-$data
-==============================
-
-""".trimIndent()
 
 
 
             file.appendText(
 
-                record + "\n"
+                """
+                
+====================
+TIME:${getTime()}
+
+$data
+
+====================
+
+""".trimIndent()
+                + "\n"
 
             )
-
 
 
 
@@ -134,23 +87,20 @@ $data
 
                 "LogManager",
 
-                "SAVE OK:${file.absolutePath}"
+                "WRITE OK:${file.absolutePath}"
 
             )
 
 
-
         }
-
         catch(e:Exception){
-
 
 
             Log.e(
 
                 "LogManager",
 
-                "SAVE ERROR:${e.message}",
+                "WRITE ERROR:${e.message}",
 
                 e
 
@@ -167,36 +117,6 @@ $data
 
 
 
-
-
-
-    private fun getFileName():String{
-
-
-        return SimpleDateFormat(
-
-            "yyyyMMdd_link.log",
-
-            Locale.getDefault()
-
-        )
-
-        .format(
-
-            Date()
-
-        )
-
-
-    }
-
-
-
-
-
-
-
-
     private fun getTime():String{
 
 
@@ -207,16 +127,10 @@ $data
             Locale.getDefault()
 
         )
-
-        .format(
-
-            Date()
-
-        )
+        .format(Date())
 
 
     }
-
 
 
 
@@ -230,7 +144,6 @@ $data
 
 
     }
-
 
 
 }
