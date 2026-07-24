@@ -21,33 +21,39 @@ class FloatView(
 
 
 
-    private var downX = 0f
-    private var downY = 0f
+    private var downRawX = 0f
+    private var downRawY = 0f
 
 
     private var startWidth = 0
     private var startHeight = 0
 
 
-    private var resizeMode = false
+    private var resize = false
 
 
-    private val resizeSize = 80
+    private val resizeArea = 80
 
 
 
     init {
 
 
-        textSize = 14f
+        textSize = 13f
 
 
-        setTextColor(Color.WHITE)
+        typeface =
+            Typeface.MONOSPACE
+
+
+        setTextColor(
+            Color.WHITE
+        )
 
 
         setBackgroundColor(
             Color.argb(
-                200,
+                210,
                 0,
                 0,
                 0
@@ -63,8 +69,7 @@ class FloatView(
         )
 
 
-        gravity = Gravity.START
-
+        isClickable = true
 
 
     }
@@ -73,74 +78,112 @@ class FloatView(
 
 
 
+
+
     /**
-     * 更新链路状态
+     * 更新链路数据
      */
     fun updateStatus(
-        status: LinkStatus
+        s:LinkStatus
     ){
 
 
+
         post {
+
 
 
             text = """
 
 ╔ NetFloat Monitor
 
-GROUND
+========== GROUND ==========
+
+LDPC:
+PASS ${s.passG}
+FAIL ${s.failG}
+
 
 RSSI:
-${status.rssiG1} / ${status.rssiG2}
+ANT1 ${s.rssiG1}
+ANT2 ${s.rssiG2}
+
 
 SNR:
-${status.snrG} dB
+${s.snrG} dB
+
 
 LQI:
-${status.lqiG} %
+${s.lqiG}% ${quality(s.lqiG)}
+
 
 TEMP:
-${status.tempG} ℃
+RF ${s.tempG} ℃
 
 
-----------------
+
+========== AIR ============
 
 
-AIR
+LDPC:
+PASS ${s.passA}
+FAIL ${s.failA}
+
 
 RSSI:
-${status.rssiA1} / ${status.rssiA2}
+ANT1 ${s.rssiA1}
+ANT2 ${s.rssiA2}
+
 
 SNR:
-${status.snrA} dB
+${s.snrA} dB
+
 
 LQI:
-${status.lqiA} %
+${s.lqiA}% ${quality(s.lqiA)}
+
 
 TEMP:
-${status.tempA} ℃
+RF ${s.tempA} ℃
 
 
-----------------
 
+========== LINK ===========
 
-LINK
 
 MCS:
-${status.mcs}
+${s.mcs}
+
 
 RX:
-${status.rxFreq}
+${s.rxFreq}
+
 
 TX:
-${status.txFreq}
+${s.txFreq}
+
 
 POWER:
-${status.power} dBm
+${s.power} dBm
+
 
 DIST:
-${status.distance} m
+${s.distance} m
 
+
+
+========== NETWORK ========
+
+
+ETH RX:
+${s.ethRx} kbps
+
+
+ETH TX:
+${s.ethTx} kbps
+
+
+============================
 
 """.trimIndent()
 
@@ -156,17 +199,35 @@ ${status.distance} m
 
 
 
+
     /**
-     * 接收异常信息
+     * 链路质量判断
      */
-    fun updateText(
-        msg:String
-    ){
+    private fun quality(
+        value:String
+    ):String{
 
 
-        post{
+        val v =
+            value.toIntOrNull()
+            ?:0
 
-            text = msg
+
+
+        return when{
+
+
+            v >= 80 ->
+                "GOOD"
+
+
+            v >=50 ->
+                "NORMAL"
+
+
+            else ->
+                "BAD"
+
 
         }
 
@@ -179,8 +240,40 @@ ${status.distance} m
 
 
 
+
+    /**
+     * 更新错误信息
+     */
+    fun updateText(
+        msg:String
+    ){
+
+
+        post{
+
+
+            text =
+                msg
+
+
+        }
+
+
+    }
+
+
+
+
+
+
+
+
+
+    /**
+     * 拖动 + 缩放
+     */
     override fun onTouchEvent(
-        event: MotionEvent
+        event:MotionEvent
     ):Boolean {
 
 
@@ -192,11 +285,12 @@ ${status.distance} m
             MotionEvent.ACTION_DOWN -> {
 
 
-                downX =
+
+                downRawX =
                     event.rawX
 
 
-                downY =
+                downRawY =
                     event.rawY
 
 
@@ -210,13 +304,13 @@ ${status.distance} m
 
 
 
-                resizeMode =
+                resize =
 
                     event.x >
-                    width - resizeSize
+                    width-resizeArea
                     &&
                     event.y >
-                    height - resizeSize
+                    height-resizeArea
 
 
 
@@ -226,23 +320,27 @@ ${status.distance} m
 
 
 
+
             MotionEvent.ACTION_MOVE -> {
 
 
+
                 val dx =
-                    event.rawX-downX
+                    event.rawX-downRawX
 
 
                 val dy =
-                    event.rawY-downY
+                    event.rawY-downRawY
 
 
 
 
-                if(resizeMode){
+                if(resize){
+
 
 
                     params.width =
+
                         max(
                             300,
                             startWidth+
@@ -251,8 +349,9 @@ ${status.distance} m
 
 
                     params.height =
+
                         max(
-                            200,
+                            300,
                             startHeight+
                             dy.toInt()
                         )
@@ -260,7 +359,9 @@ ${status.distance} m
 
 
                 }
+
                 else{
+
 
 
                     params.x +=
@@ -272,11 +373,11 @@ ${status.distance} m
 
 
 
-                    downX =
+                    downRawX =
                         event.rawX
 
 
-                    downY =
+                    downRawY =
                         event.rawY
 
 
@@ -286,24 +387,31 @@ ${status.distance} m
 
 
                 windowManager.updateViewLayout(
+
                     this,
+
                     params
+
                 )
+
 
 
                 return true
 
+
             }
+
 
 
 
             MotionEvent.ACTION_UP -> {
 
 
-                resizeMode=false
+                resize=false
 
 
                 return true
+
 
             }
 
@@ -311,7 +419,9 @@ ${status.distance} m
         }
 
 
+
         return true
+
 
     }
 
@@ -320,8 +430,13 @@ ${status.distance} m
 
 
 
+
+
+    /**
+     * 绘制缩放角标
+     */
     override fun onDraw(
-        canvas: Canvas
+        canvas:Canvas
     ){
 
 
@@ -338,34 +453,44 @@ ${status.distance} m
             Color.WHITE
 
 
+
         paint.strokeWidth =
             3f
 
 
 
-        //右下角缩放标记
-
         canvas.drawLine(
-            width-40f,
+
+            width-45f,
+
             height-10f,
+
             width-10f,
-            height-40f,
+
+            height-45f,
+
             paint
+
         )
 
 
-        canvas.drawLine(
-            width-25f,
-            height-10f,
-            width-10f,
-            height-25f,
-            paint
-        )
 
+        canvas.drawLine(
+
+            width-30f,
+
+            height-10f,
+
+            width-10f,
+
+            height-30f,
+
+            paint
+
+        )
 
 
     }
-
 
 
 }
