@@ -33,9 +33,20 @@ class LogManager(
         )
 
 
+
         if(!logDir.exists()){
 
-            logDir.mkdirs()
+
+            val result = logDir.mkdirs()
+
+
+            Log.d(
+
+                "LogManager",
+
+                "mkdir result:$result"
+
+            )
 
         }
 
@@ -50,7 +61,27 @@ class LogManager(
         )
 
 
+        Log.d(
+
+            "LogManager",
+
+            "DIR EXISTS:${logDir.exists()}"
+
+        )
+
+
+        Log.d(
+
+            "LogManager",
+
+            "CAN WRITE:${logDir.canWrite()}"
+
+        )
+
+
     }
+
+
 
 
 
@@ -60,7 +91,9 @@ class LogManager(
     fun save(data:String){
 
 
+
         try {
+
 
 
             val file = File(
@@ -73,18 +106,27 @@ class LogManager(
 
 
 
-            file.appendText(
+
+            val record =
 
                 """
-====================
+                
+==============================
 TIME:${getTime()}
+DATA:
 $data
-====================
+==============================
 
 """.trimIndent()
-                + "\n"
+
+
+
+            file.appendText(
+
+                record + "\n"
 
             )
+
 
 
 
@@ -97,15 +139,18 @@ $data
             )
 
 
+
         }
+
         catch(e:Exception){
+
 
 
             Log.e(
 
                 "LogManager",
 
-                "SAVE ERROR",
+                "SAVE ERROR:${e.message}",
 
                 e
 
@@ -122,6 +167,9 @@ $data
 
 
 
+
+
+
     private fun getFileName():String{
 
 
@@ -132,10 +180,17 @@ $data
             Locale.getDefault()
 
         )
-        .format(Date())
+
+        .format(
+
+            Date()
+
+        )
 
 
     }
+
+
 
 
 
@@ -152,10 +207,16 @@ $data
             Locale.getDefault()
 
         )
-        .format(Date())
+
+        .format(
+
+            Date()
+
+        )
 
 
     }
+
 
 
 
@@ -169,6 +230,7 @@ $data
 
 
     }
+
 
 
 }
