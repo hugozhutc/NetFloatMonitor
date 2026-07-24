@@ -3,9 +3,9 @@ package com.example.netfloatmonitor
 
 import java.net.DatagramPacket
 import java.net.DatagramSocket
+import java.net.InetSocketAddress
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.concurrent.thread
-
 
 
 class UdpReceiver(
@@ -27,24 +27,12 @@ class UdpReceiver(
 
 
 
-    private var packetCount = 0
-
-    private var byteCount = 0L
-
-
-    private var startTime =
-        System.currentTimeMillis()
-
-
-
-
-
     fun start(){
 
 
-        if(running.get())
+        if(running.get()){
             return
-
+        }
 
 
         running.set(true)
@@ -58,12 +46,27 @@ class UdpReceiver(
 
 
                 socket =
-                    DatagramSocket(port)
+                    DatagramSocket(
+                        null
+                    )
+
+
+                socket!!.reuseAddress = true
+
+
+                socket!!.bind(
+
+                    InetSocketAddress(
+                        port
+                    )
+
+                )
 
 
 
                 val buffer =
                     ByteArray(8192)
+
 
 
 
@@ -77,62 +80,71 @@ class UdpReceiver(
                         )
 
 
-                    socket!!.receive(packet)
 
-
-
-                    val sourceIp =
-                        packet.address.hostAddress ?: ""
-
-
-
-                    // IP过滤
-
-                    if(
-                        targetIp.isNotEmpty()
-                        &&
-                        sourceIp != targetIp
-                    ){
-                        continue
-                    }
-
-
-
-
-                    val data = String(
-
-                        packet.data,
-
-                        0,
-
-                        packet.length,
-
-                        Charsets.UTF_8
-
+                    socket!!.receive(
+                        packet
                     )
 
 
 
-                    packetCount++
+                    val ip =
+                        packet.address.hostAddress
+                            ?: ""
 
-                    byteCount += packet.length
+
+
+                    if(
+                        targetIp.isNotEmpty()
+                        &&
+                        ip != targetIp
+                    ){
+
+                        continue
+
+                    }
 
 
 
-                    callback(data)
+                    val data =
+                        String(
+
+                            packet.data,
+
+                            0,
+
+                            packet.length,
+
+                            Charsets.UTF_8
+
+                        )
+
+
+
+                    callback(
+                        data
+                    )
 
 
 
                 }
 
 
+
             }
             catch(e:Exception){
 
 
-                callback(
-                    "UDP ERROR: ${e.message}"
-                )
+                if(running.get()){
+
+
+                    callback(
+
+                        "UDP ERROR:${e.message}"
+
+                    )
+
+
+                }
 
 
             }
@@ -154,64 +166,13 @@ class UdpReceiver(
 
 
 
-
-    fun getStatistics():String{
-
-
-        val time =
-
-            System.currentTimeMillis()
-            -
-            startTime
-
-
-
-        val rate =
-
-            if(time>0)
-
-                byteCount.toDouble()
-                *
-                8
-                /
-                time
-                *
-                1000
-
-            else
-
-                0.0
-
-
-
-
-        return "PACKET:$packetCount\n" +
-                "DATA:${byteCount/1024} KB\n" +
-                "RATE:${String.format("%.2f",rate)} kbps"
-
-
-    }
-
-
-
-
-
-
     fun stop(){
 
 
         running.set(false)
 
 
-        try{
-
-            socket?.close()
-
-        }
-        catch(e:Exception){
-
-
-        }
+        socket?.close()
 
 
     }
