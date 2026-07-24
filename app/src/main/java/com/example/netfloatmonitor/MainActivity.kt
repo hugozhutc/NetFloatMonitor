@@ -2,153 +2,218 @@ package com.example.netfloatmonitor
 
 
 import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
-import android.widget.*
+import android.net.Uri
 import androidx.appcompat.app.AppCompatActivity
+import android.widget.*
+import android.content.Context
 
 
 
 class MainActivity : AppCompatActivity(){
 
 
-override fun onCreate(savedInstanceState: Bundle?) {
 
-super.onCreate(savedInstanceState)
+    private lateinit var ipEdit:EditText
 
+    private lateinit var portEdit:EditText
 
-setContentView(R.layout.activity_main)
 
 
+    override fun onCreate(
+        savedInstanceState:Bundle?
+    ){
 
-val ipEdit =
-findViewById<EditText>(R.id.ipEdit)
+        super.onCreate(savedInstanceState)
 
 
-val portEdit =
-findViewById<EditText>(R.id.portEdit)
+        setContentView(
+            R.layout.activity_main
+        )
 
 
 
-val start =
-findViewById<Button>(R.id.startBtn)
+        ipEdit =
+            findViewById(
+                R.id.editIp
+            )
 
 
-val stop =
-findViewById<Button>(R.id.stopBtn)
+        portEdit =
+            findViewById(
+                R.id.editPort
+            )
 
 
-val floatBtn =
-findViewById<Button>(R.id.floatBtn)
 
+        val startBtn =
+            findViewById<Button>(
+                R.id.startBtn
+            )
 
-val status =
-findViewById<TextView>(R.id.statusText)
 
+        val stopBtn =
+            findViewById<Button>(
+                R.id.stopBtn
+            )
 
 
-floatBtn.setOnClickListener{
 
+        loadConfig()
 
-if(!Settings.canDrawOverlays(this)){
 
 
-val intent =
-Intent(
-Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-Uri.parse(
-"package:$packageName"
-)
-)
+        startBtn.setOnClickListener{
 
 
-startActivity(intent)
+            saveConfig()
 
 
-}
 
-else{
+            // 检查悬浮窗权限
 
-Toast.makeText(
-this,
-"悬浮窗权限已开启",
-Toast.LENGTH_SHORT
-).show()
+            if(!Settings.canDrawOverlays(this)){
 
-}
 
+                val intent =
+                    Intent(
+                        Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                        Uri.parse(
+                            "package:$packageName"
+                        )
+                    )
 
-}
 
+                startActivity(intent)
 
 
+                return@setOnClickListener
 
-start.setOnClickListener{
+            }
 
 
-val ip =
-ipEdit.text.toString()
 
 
-val port =
-portEdit.text.toString()
 
+            val intent =
+                Intent(
+                    this,
+                    FloatService::class.java
+                )
 
 
-val intent =
-Intent(
-this,
-FloatService::class.java
-)
+            intent.putExtra(
+                "IP",
+                ipEdit.text.toString()
+            )
 
 
-intent.putExtra(
-"IP",
-ip
-)
+            intent.putExtra(
+                "PORT",
+                portEdit.text.toString()
+                    .toInt()
+            )
 
 
-intent.putExtra(
-"PORT",
-port.toInt()
-)
 
+            startForegroundService(
+                intent
+            )
 
 
-startForegroundService(intent)
+        }
 
 
 
-status.text =
-"状态：监听中"
 
 
-}
+        stopBtn.setOnClickListener{
 
 
+            stopService(
+                Intent(
+                    this,
+                    FloatService::class.java
+                )
+            )
 
 
-stop.setOnClickListener{
+        }
 
 
-stopService(
-Intent(
-this,
-FloatService::class.java
-)
-)
+    }
 
 
-status.text =
-"状态：停止"
 
 
-}
 
 
+    private fun saveConfig(){
 
-}
+
+        val sp =
+            getSharedPreferences(
+                "config",
+                Context.MODE_PRIVATE
+            )
+
+
+        sp.edit()
+
+            .putString(
+                "ip",
+                ipEdit.text.toString()
+            )
+
+            .putString(
+                "port",
+                portEdit.text.toString()
+            )
+
+            .apply()
+
+
+    }
+
+
+
+
+
+
+
+    private fun loadConfig(){
+
+
+        val sp =
+            getSharedPreferences(
+                "config",
+                Context.MODE_PRIVATE
+            )
+
+
+        ipEdit.setText(
+
+            sp.getString(
+                "ip",
+                "192.168.1.100"
+            )
+
+        )
+
+
+
+        portEdit.setText(
+
+            sp.getString(
+                "port",
+                "14550"
+            )
+
+        )
+
+
+    }
 
 
 
