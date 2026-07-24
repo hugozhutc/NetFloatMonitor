@@ -3,55 +3,39 @@ package com.example.netfloatmonitor
 
 data class LinkStatus(
 
-
-    // ground
-
-    var passG:String="0",
-    var failG:String="0",
-
-    var rssiG1:String="--",
-    var rssiG2:String="--",
-
-    var snrG:String="--",
-
-    var lqiG:String="--",
-
-    var tempG:String="--",
+    // AIR天空端
+    var airRssi1:String = "-0",
+    var airRssi2:String = "-0",
+    var airSnr:String = "0",
+    var airPass:String = "0",
+    var airFailed:String = "0",
+    var airAnt:String = "",
 
 
-
-    // air
-
-    var passA:String="0",
-    var failA:String="0",
-
-    var rssiA1:String="--",
-    var rssiA2:String="--",
-
-    var snrA:String="--",
-
-    var lqiA:String="--",
-
-    var tempA:String="--",
+    // Ground地面端
+    var gndRssi1:String = "-0",
+    var gndRssi2:String = "-0",
+    var gndSnr:String = "0",
+    var gndPass:String = "0",
+    var gndFailed:String = "0",
+    var gndAnt:String = "",
 
 
+    // 公共链路
+    var freq:String = "",
+    var mcs:String = "",
+    var power:String = "",
+    var distance:String = "",
 
-    // link
-
-    var mcs:String="--",
-
-    var rxFreq:String="--",
-
-    var txFreq:String="--",
-
-    var power:String="--",
-
-    var distance:String="--",
+    var txRate:String = "",
+    var rxRate:String = "",
 
 
+    // 噪声
 
-    var ethRx:String="0",
+    var airNoise:Array<String> = arrayOf(),
 
-    var ethTx:String="0"
+    var gndNoise:Array<String> = arrayOf()
+
 
 )
