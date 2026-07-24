@@ -14,7 +14,9 @@ import androidx.core.app.NotificationCompat
 class FloatService : Service() {
 
 
+
     private var floatView: FloatView? = null
+
 
     private var receiver: UdpReceiver? = null
 
@@ -23,7 +25,10 @@ class FloatService : Service() {
 
 
 
+
+
     override fun onCreate() {
+
 
         super.onCreate()
 
@@ -44,6 +49,10 @@ class FloatService : Service() {
 
 
     }
+
+
+
+
 
 
 
@@ -73,6 +82,8 @@ class FloatService : Service() {
 
 
 
+
+
         showFloatWindow()
 
 
@@ -88,6 +99,8 @@ class FloatService : Service() {
         return START_STICKY
 
     }
+
+
 
 
 
@@ -115,11 +128,12 @@ class FloatService : Service() {
 
 
 
+
             try {
 
 
 
-                //保存原始JSON
+                //保存日志
 
                 logger.save(
 
@@ -130,26 +144,22 @@ class FloatService : Service() {
 
 
 
-                //解析JSON
 
-                val status =
+                //V2.0
 
-                    JsonParser.parse(
+                //JSON直接显示
+
+                floatView?.post{
+
+
+                    floatView?.updateJson(
 
                         data
 
                     )
 
 
-
-
-                //刷新悬浮窗
-
-                floatView?.updateStatus(
-
-                    status
-
-                )
+                }
 
 
 
@@ -161,7 +171,7 @@ class FloatService : Service() {
 
                 logger.save(
 
-                    "JSON ERROR:${e.message}"
+                    "DISPLAY ERROR:${e.message}"
 
                 )
 
@@ -175,13 +185,14 @@ class FloatService : Service() {
 
 
 
+
         receiver?.start()
 
 
 
         logger.save(
 
-            "UDP START LISTEN:$port"
+            "UDP START:$port"
 
         )
 
@@ -221,6 +232,7 @@ class FloatService : Service() {
 
 
 
+
         val params =
 
             WindowManager.LayoutParams()
@@ -229,7 +241,7 @@ class FloatService : Service() {
 
         params.width =
 
-            360
+            600
 
 
 
@@ -250,6 +262,7 @@ class FloatService : Service() {
             else
 
                 WindowManager.LayoutParams.TYPE_PHONE
+
 
 
 
@@ -279,6 +292,7 @@ class FloatService : Service() {
 
 
 
+
         floatView = FloatView(
 
             this,
@@ -302,7 +316,6 @@ class FloatService : Service() {
         )
 
 
-
     }
 
 
@@ -314,6 +327,7 @@ class FloatService : Service() {
 
 
     override fun onDestroy(){
+
 
 
         super.onDestroy()
@@ -330,11 +344,12 @@ class FloatService : Service() {
 
 
 
-        if(floatView != null){
+
+        if(floatView!=null){
 
 
 
-            try {
+            try{
 
 
 
@@ -349,13 +364,11 @@ class FloatService : Service() {
 
 
 
-
                 wm.removeView(
 
                     floatView
 
                 )
-
 
 
             }
@@ -367,8 +380,8 @@ class FloatService : Service() {
             floatView=null
 
 
-
         }
+
 
 
     }
@@ -390,6 +403,7 @@ class FloatService : Service() {
 
         return null
 
+
     }
 
 
@@ -408,19 +422,15 @@ class FloatService : Service() {
 
 
 
-            val channel =
+            val channel = NotificationChannel(
 
-                NotificationChannel(
+                "net_monitor",
 
-                    "net_monitor",
+                "NetFloat Monitor",
 
-                    "NetFloat Monitor",
+                NotificationManager.IMPORTANCE_LOW
 
-                    NotificationManager.IMPORTANCE_LOW
-
-                )
-
-
+            )
 
 
 
@@ -439,7 +449,6 @@ class FloatService : Service() {
                 channel
 
             )
-
 
         }
 
@@ -474,7 +483,7 @@ class FloatService : Service() {
 
             .setContentText(
 
-                "UDP 16789监听中"
+                "UDP监听运行中"
 
             )
 
@@ -485,6 +494,7 @@ class FloatService : Service() {
             )
 
             .build()
+
 
 
     }
