@@ -269,7 +269,7 @@ class MainActivity : AppCompatActivity(){
 
             sp.getString(
                 "ip",
-                "192.168.1.100"
+                "192.168.144.33"
             )
 
         )
@@ -280,7 +280,7 @@ class MainActivity : AppCompatActivity(){
 
             sp.getString(
                 "port",
-                "14550"
+                "16789"
             )
 
         )
