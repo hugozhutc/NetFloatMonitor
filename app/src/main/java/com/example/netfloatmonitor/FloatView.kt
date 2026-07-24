@@ -10,34 +10,33 @@ import kotlin.math.max
 
 
 class FloatView(
-    private val ctx: Context,
+
+    context: Context,
+
     private val windowManager: WindowManager,
+
     private val params: WindowManager.LayoutParams
-) : TextView(ctx) {
+
+) : TextView(context) {
 
 
 
-    private var lastX = 0f
-    private var lastY = 0f
+    private var downX = 0f
+    private var downY = 0f
 
 
     private var startWidth = 0
     private var startHeight = 0
 
 
-    private var resizing = false
+    private var resizeMode = false
 
 
-
-    private val resizeArea = 60
+    private val resizeSize = 80
 
 
 
     init {
-
-
-        text =
-            "NetFloat Monitor\nWaiting..."
 
 
         textSize = 14f
@@ -48,7 +47,7 @@ class FloatView(
 
         setBackgroundColor(
             Color.argb(
-                190,
+                200,
                 0,
                 0,
                 0
@@ -64,10 +63,8 @@ class FloatView(
         )
 
 
-        setLayerType(
-            View.LAYER_TYPE_SOFTWARE,
-            null
-        )
+        gravity = Gravity.START
+
 
 
     }
@@ -77,19 +74,79 @@ class FloatView(
 
 
     /**
-     * 更新显示内容
+     * 更新链路状态
      */
-    fun update(json:String){
+    fun updateStatus(
+        status: LinkStatus
+    ){
 
 
         post {
 
 
-            text =
-                json
+            text = """
+
+╔ NetFloat Monitor
+
+GROUND
+
+RSSI:
+${status.rssiG1} / ${status.rssiG2}
+
+SNR:
+${status.snrG} dB
+
+LQI:
+${status.lqiG} %
+
+TEMP:
+${status.tempG} ℃
+
+
+----------------
+
+
+AIR
+
+RSSI:
+${status.rssiA1} / ${status.rssiA2}
+
+SNR:
+${status.snrA} dB
+
+LQI:
+${status.lqiA} %
+
+TEMP:
+${status.tempA} ℃
+
+
+----------------
+
+
+LINK
+
+MCS:
+${status.mcs}
+
+RX:
+${status.rxFreq}
+
+TX:
+${status.txFreq}
+
+POWER:
+${status.power} dBm
+
+DIST:
+${status.distance} m
+
+
+""".trimIndent()
 
 
         }
+
 
     }
 
@@ -97,7 +154,34 @@ class FloatView(
 
 
 
-    override fun onTouchEvent(event: MotionEvent):Boolean {
+
+
+    /**
+     * 接收异常信息
+     */
+    fun updateText(
+        msg:String
+    ){
+
+
+        post{
+
+            text = msg
+
+        }
+
+
+    }
+
+
+
+
+
+
+
+    override fun onTouchEvent(
+        event: MotionEvent
+    ):Boolean {
 
 
 
@@ -108,11 +192,11 @@ class FloatView(
             MotionEvent.ACTION_DOWN -> {
 
 
-                lastX =
+                downX =
                     event.rawX
 
 
-                lastY =
+                downY =
                     event.rawY
 
 
@@ -126,13 +210,13 @@ class FloatView(
 
 
 
-                // 判断是否进入缩放区域
+                resizeMode =
 
-                resizing =
                     event.x >
-                    width - resizeArea &&
+                    width - resizeSize
+                    &&
                     event.y >
-                    height - resizeArea
+                    height - resizeSize
 
 
 
@@ -142,46 +226,41 @@ class FloatView(
 
 
 
-
             MotionEvent.ACTION_MOVE -> {
 
 
-
                 val dx =
-                    event.rawX-lastX
+                    event.rawX-downX
 
 
                 val dy =
-                    event.rawY-lastY
+                    event.rawY-downY
 
 
 
-                if(resizing){
 
-
-                    // 调整大小
+                if(resizeMode){
 
 
                     params.width =
                         max(
-                            250,
-                            (startWidth+dx).toInt()
+                            300,
+                            startWidth+
+                            dx.toInt()
                         )
 
 
                     params.height =
                         max(
-                            150,
-                            (startHeight+dy).toInt()
+                            200,
+                            startHeight+
+                            dy.toInt()
                         )
 
 
+
                 }
-
                 else{
-
-
-                    // 移动窗口
 
 
                     params.x +=
@@ -193,14 +272,16 @@ class FloatView(
 
 
 
-                    lastX =
+                    downX =
                         event.rawX
 
 
-                    lastY =
+                    downY =
                         event.rawY
 
+
                 }
+
 
 
 
@@ -216,11 +297,10 @@ class FloatView(
 
 
 
-
             MotionEvent.ACTION_UP -> {
 
 
-                resizing=false
+                resizeMode=false
 
 
                 return true
@@ -239,14 +319,15 @@ class FloatView(
 
 
 
-    override fun onDraw(canvas:Canvas){
+
+    override fun onDraw(
+        canvas: Canvas
+    ){
 
 
         super.onDraw(canvas)
 
 
-
-        // 绘制右下角缩放提示
 
         val paint =
             Paint()
@@ -262,24 +343,29 @@ class FloatView(
 
 
 
+        //右下角缩放标记
+
         canvas.drawLine(
-            width-30f,
+            width-40f,
             height-10f,
             width-10f,
-            height-30f,
+            height-40f,
             paint
         )
 
 
         canvas.drawLine(
-            width-20f,
+            width-25f,
             height-10f,
             width-10f,
-            height-20f,
+            height-25f,
             paint
         )
+
+
 
     }
+
 
 
 }
