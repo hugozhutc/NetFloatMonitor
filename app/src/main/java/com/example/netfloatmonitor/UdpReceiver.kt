@@ -3,20 +3,25 @@ package com.example.netfloatmonitor
 
 import java.net.DatagramPacket
 import java.net.DatagramSocket
-import java.net.InetSocketAddress
+import java.net.InetAddress
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.concurrent.thread
 
 
 
 class UdpReceiver(
 
+    // 目标设备IP
     private val targetIp:String,
 
-    private val targetPort:Int,
+    // UDP监听端口
+    private val port:Int,
 
+    // 数据回调
     private val callback:(String)->Unit
 
 ){
+
 
 
     private var socket:DatagramSocket? = null
@@ -26,6 +31,8 @@ class UdpReceiver(
         AtomicBoolean(false)
 
 
+
+    //统计
 
     private var packetCount = 0
 
@@ -38,28 +45,40 @@ class UdpReceiver(
 
 
 
+
+
     fun start(){
+
+
+        if(running.get())
+            return
+
 
 
         running.set(true)
 
 
 
-        Thread{
+        thread {
 
 
-            try{
+            try {
+
 
 
                 socket =
-                    DatagramSocket(
-                        targetPort
-                    )
+                    DatagramSocket(port)
+
+
+
+                socket?.soTimeout =
+                    1000
 
 
 
                 val buffer =
-                    ByteArray(4096)
+                    ByteArray(8192)
+
 
 
 
@@ -67,132 +86,185 @@ class UdpReceiver(
                 while(running.get()){
 
 
-                    val packet =
-                        DatagramPacket(
-                            buffer,
-                            buffer.size
+
+                    try{
+
+
+                        val packet =
+                            DatagramPacket(
+                                buffer,
+                                buffer.size
+                            )
+
+
+
+                        socket?.receive(
+                            packet
                         )
 
 
 
-                    socket!!.receive(
-                        packet
-                    )
+                        val sourceIp =
 
-
-
-                    val sourceIp =
-                        packet.address.hostAddress
+                            packet.address
+                                .hostAddress
+                                ?: ""
 
 
 
 
-                    // IP过滤
 
-                    if(
-                        targetIp.isNotEmpty()
-                        &&
-                        sourceIp != targetIp
-                    ){
+                        /**
+                         * IP过滤
+                         *
+                         * 空IP表示接收全部
+                         */
 
-                        continue
+                        if(
+                            targetIp.isNotEmpty()
+                            &&
+                            sourceIp != targetIp
+                        ){
+
+                            continue
+
+                        }
+
+
+
+
+
+
+                        val data =
+
+                            String(
+
+                                packet.data,
+
+                                0,
+
+                                packet.length,
+
+                                Charsets.UTF_8
+
+                            )
+
+
+
+
+
+                        packetCount++
+
+
+                        byteCount +=
+                            packet.length
+
+
+
+
+
+                        val now =
+                            System.currentTimeMillis()
+
+
+
+                        val duration =
+
+                            (now-startTime)
+                                .coerceAtLeast(1)
+
+
+
+
+
+                        val kbps =
+
+                            byteCount
+                                .toDouble()
+                                *
+                                8
+                                /
+                                duration
+                                *
+                                1000
+                                /
+                                1000
+
+
+
+
+
+                        /**
+                         * 返回原始JSON
+                         *
+                         * 不在这里解析
+                         * 交给JsonParser
+                         */
+
+                        callback(
+                            data
+                        )
+
+
+
+
 
                     }
+                    catch(e:java.net.SocketTimeoutException){
 
 
+                        // 超时继续监听
 
 
-                    val data =
-
-                        String(
-                            packet.data,
-                            0,
-                            packet.length
-                        )
-
-
-
-
-                    packetCount++
-
-
-                    byteCount +=
-                        packet.length
-
-
-
-
-                    val now =
-                        System.currentTimeMillis()
-
-
-
-                    val second =
-                        (now-startTime)/1000.0
-
-
-
-
-                    val kbps =
-
-                        if(second>0)
-
-                            byteCount*8/
-                            second/
-                            1000
-
-                        else
-
-                            0.0
-
-
-
-
-                    val info =
-
-"""
-$data
-
-
-----------------
-
-RX:
-$packetCount
-
-Rate:
-${String.format("%.2f",kbps)} kbps
-
-SRC:
-$sourceIp
-
-""".trimIndent()
-
-
-
-
-                    callback(
-                        info
-                    )
+                    }
 
 
 
                 }
 
 
+
             }
+
             catch(e:Exception){
 
 
+
                 callback(
-                    "UDP ERROR:${e.message}"
+
+                    """
+                    UDP ERROR
+                    
+                    ${e.message}
+                    
+                    """.trimIndent()
+
                 )
+
+
+
+            }
+
+            finally{
+
+
+                try{
+
+
+                    socket?.close()
+
+
+                }
+                catch(_:Exception){}
+
 
 
             }
 
 
 
-        }.start()
+        }
+
 
 
     }
@@ -202,10 +274,69 @@ $sourceIp
 
 
 
+
+    /**
+     * 获取统计信息
+     */
+    fun getStatistics():String{
+
+
+        val time =
+
+            (System.currentTimeMillis()
+                    -
+                    startTime)
+                .coerceAtLeast(1)
+
+
+
+        val rate =
+
+            byteCount
+                .toDouble()
+                *
+                8
+                /
+                time
+                *
+                1000
+                /
+                1000
+
+
+
+
+        return """
+
+PACKET:
+$packetCount
+
+
+DATA:
+${byteCount/1024} KB
+
+
+RATE:
+${String.format("%.2f",rate)} kbps
+
+""".trimIndent()
+
+
+
+    }
+
+
+
+
+
+
+
     fun stop(){
 
 
+
         running.set(false)
+
 
 
         try{
@@ -215,7 +346,7 @@ $sourceIp
 
 
         }
-        catch(e:Exception){}
+        catch(_:Exception){}
 
 
 
