@@ -8,295 +8,151 @@ import org.json.JSONObject
 object JsonParser {
 
 
-
-    fun parse(
-        data:String
-    ):LinkStatus {
+    fun parse(json:String):LinkStatus{
 
 
-        val json =
-            JSONObject(data)
+        val obj =
+            JSONObject(json)
 
 
 
         return LinkStatus(
 
 
-
-            /*
-             * Ground
-             */
-
-            passG =
-                json.optString(
-                    "pass_g",
-                    "0"
+            airRssi1 =
+                obj.optString(
+                    "rssi1_a"
                 ),
 
 
-            failG =
-                json.optString(
-                    "failed_g",
-                    "0"
+            airRssi2 =
+                obj.optString(
+                    "rssi2_a"
                 ),
 
 
-
-            rssiG1 =
-                json.optString(
-                    "rssi1_g",
-                    "--"
+            airSnr =
+                obj.optString(
+                    "snr_a"
                 ),
 
 
-
-            rssiG2 =
-                json.optString(
-                    "rssi2_g",
-                    "--"
+            airPass =
+                obj.optString(
+                    "pass_a"
                 ),
 
 
+            airFailed =
+                obj.optString(
+                    "failed_a"
+                ),
 
-            snrG =
-                json.optString(
-                    "snr_g",
-                    "--"
+
+            airAnt =
+                obj.optString(
+                    "ant_a"
                 ),
 
 
 
-            lqiG =
-                json.optString(
-                    "lqi_g",
-                    "--"
+            gndRssi1 =
+                obj.optString(
+                    "rssi1_g"
+                ),
+
+
+            gndRssi2 =
+                obj.optString(
+                    "rssi2_g"
+                ),
+
+
+            gndSnr =
+                obj.optString(
+                    "snr_g"
+                ),
+
+
+            gndPass =
+                obj.optString(
+                    "pass_g"
+                ),
+
+
+            gndFailed =
+                obj.optString(
+                    "failed_g"
+                ),
+
+
+            gndAnt =
+                obj.optString(
+                    "ant_g"
                 ),
 
 
 
-            tempG =
-                json.optString(
-                    "tempRF_g",
-                    "--"
+            freq =
+                obj.optString(
+                    "freq_tx"
                 ),
 
-
-
-
-
-
-            /*
-             * Air
-             */
-
-
-            passA =
-                json.optString(
-                    "pass_a",
-                    "0"
-                ),
-
-
-
-            failA =
-                json.optString(
-                    "failed_a",
-                    "0"
-                ),
-
-
-
-            rssiA1 =
-                json.optString(
-                    "rssi1_a",
-                    "--"
-                ),
-
-
-
-            rssiA2 =
-                json.optString(
-                    "rssi2_a",
-                    "--"
-                ),
-
-
-
-            snrA =
-                json.optString(
-                    "snr_a",
-                    "--"
-                ),
-
-
-
-            lqiA =
-                json.optString(
-                    "lqi_a",
-                    "--"
-                ),
-
-
-
-            tempA =
-                json.optString(
-                    "tempRF_a",
-                    "--"
-                ),
-
-
-
-
-
-
-            /*
-             * Link
-             */
 
 
             mcs =
-                json.optString(
-                    "mcs",
-                    "--"
-                ),
-
-
-
-            rxFreq =
-                json.optString(
-                    "freq_rx",
-                    "--"
-                ),
-
-
-
-            txFreq =
-                json.optString(
-                    "freq_tx",
-                    "--"
+                obj.optString(
+                    "mcs"
                 ),
 
 
 
             power =
-                json.optString(
-                    "power",
-                    "--"
+                obj.optString(
+                    "power"
                 ),
 
 
 
             distance =
-                json.optString(
-                    "distance",
-                    "--"
+                obj.optString(
+                    "distance"
                 ),
 
 
 
+            txRate =
+                obj.optString(
+                    "ethTx"
+                ),
 
 
-            /*
-             * Ethernet
-             */
-
-
-            ethRx =
-                json.optString(
-                    "ethRx",
-                    "0"
+            rxRate =
+                obj.optString(
+                    "ethRx"
                 ),
 
 
 
-            ethTx =
-                json.optString(
-                    "ethTx",
-                    "0"
+            airNoise =
+                obj.optString(
+                    "noiseFloor_a"
                 )
+                .split(",")
+                .toTypedArray(),
+
+
+
+            gndNoise =
+                obj.optString(
+                    "noiseFloor_g"
+                )
+                .split(",")
+                .toTypedArray()
 
 
         )
 
-
     }
-
-
-
-
-
-
-    /**
-     * 判断是否为有效JSON
-     */
-    fun isValid(
-        data:String
-    ):Boolean {
-
-
-        return try {
-
-
-            JSONObject(data)
-
-            true
-
-
-        }
-        catch(e:Exception){
-
-
-            false
-
-
-        }
-
-
-    }
-
-
-
-
-
-
-    /**
-     * 获取字段
-     * 用于兼容不同固件版本
-     */
-    fun getValue(
-
-        data:String,
-
-        key:String
-
-    ):String {
-
-
-
-        return try{
-
-
-            JSONObject(data)
-
-                .optString(
-                    key,
-                    "--"
-                )
-
-
-        }
-
-        catch(e:Exception){
-
-
-            "--"
-
-
-        }
-
-
-    }
-
-
 
 }
