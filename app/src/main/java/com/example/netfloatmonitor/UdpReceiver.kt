@@ -3,7 +3,6 @@ package com.example.netfloatmonitor
 
 import java.net.DatagramPacket
 import java.net.DatagramSocket
-import java.net.InetAddress
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.concurrent.thread
 
@@ -11,17 +10,13 @@ import kotlin.concurrent.thread
 
 class UdpReceiver(
 
-    // 目标设备IP
     private val targetIp:String,
 
-    // UDP监听端口
     private val port:Int,
 
-    // 数据回调
     private val callback:(String)->Unit
 
 ){
-
 
 
     private var socket:DatagramSocket? = null
@@ -32,10 +27,7 @@ class UdpReceiver(
 
 
 
-    //统计
-
     private var packetCount = 0
-
 
     private var byteCount = 0L
 
@@ -62,17 +54,11 @@ class UdpReceiver(
         thread {
 
 
-            try {
-
+            try{
 
 
                 socket =
                     DatagramSocket(port)
-
-
-
-                socket?.soTimeout =
-                    1000
 
 
 
@@ -81,190 +67,85 @@ class UdpReceiver(
 
 
 
-
-
                 while(running.get()){
 
 
-
-                    try{
-
-
-                        val packet =
-                            DatagramPacket(
-                                buffer,
-                                buffer.size
-                            )
-
-
-
-                        socket?.receive(
-                            packet
+                    val packet =
+                        DatagramPacket(
+                            buffer,
+                            buffer.size
                         )
 
 
-
-                        val sourceIp =
-
-                            packet.address
-                                .hostAddress
-                                ?: ""
+                    socket!!.receive(packet)
 
 
 
-
-
-                        /**
-                         * IP过滤
-                         *
-                         * 空IP表示接收全部
-                         */
-
-                        if(
-                            targetIp.isNotEmpty()
-                            &&
-                            sourceIp != targetIp
-                        ){
-
-                            continue
-
-                        }
+                    val sourceIp =
+                        packet.address.hostAddress ?: ""
 
 
 
+                    // IP过滤
 
-
-
-                        val data =
-
-                            String(
-
-                                packet.data,
-
-                                0,
-
-                                packet.length,
-
-                                Charsets.UTF_8
-
-                            )
-
-
-
-
-
-                        packetCount++
-
-
-                        byteCount +=
-                            packet.length
-
-
-
-
-
-                        val now =
-                            System.currentTimeMillis()
-
-
-
-                        val duration =
-
-                            (now-startTime)
-                                .coerceAtLeast(1)
-
-
-
-
-
-                        val kbps =
-
-                            byteCount
-                                .toDouble()
-                                *
-                                8
-                                /
-                                duration
-                                *
-                                1000
-                                /
-                                1000
-
-
-
-
-
-                        /**
-                         * 返回原始JSON
-                         *
-                         * 不在这里解析
-                         * 交给JsonParser
-                         */
-
-                        callback(
-                            data
-                        )
-
-
-
-
-
+                    if(
+                        targetIp.isNotEmpty()
+                        &&
+                        sourceIp != targetIp
+                    ){
+                        continue
                     }
-                    catch(e:java.net.SocketTimeoutException){
 
 
-                        // 超时继续监听
 
 
-                    }
+                    val data = String(
+
+                        packet.data,
+
+                        0,
+
+                        packet.length,
+
+                        Charsets.UTF_8
+
+                    )
+
+
+
+                    packetCount++
+
+                    byteCount += packet.length
+
+
+
+                    callback(data)
 
 
 
                 }
 
 
-
             }
-
             catch(e:Exception){
 
 
-
                 callback(
-
-                    """
-                    UDP ERROR
-                    
-                    ${e.message}
-                    
-                    """.trimIndent()
-
+                    "UDP ERROR: ${e.message}"
                 )
 
 
-
             }
-
             finally{
 
 
-                try{
-
-
-                    socket?.close()
-
-
-                }
-                catch(_:Exception){}
-
+                socket?.close()
 
 
             }
 
 
-
         }
-
 
 
     }
@@ -274,57 +155,42 @@ class UdpReceiver(
 
 
 
-
-    /**
-     * 获取统计信息
-     */
     fun getStatistics():String{
 
 
         val time =
 
-            (System.currentTimeMillis()
-                    -
-                    startTime)
-                .coerceAtLeast(1)
+            System.currentTimeMillis()
+            -
+            startTime
 
 
 
         val rate =
 
-            byteCount
-                .toDouble()
+            if(time>0)
+
+                byteCount.toDouble()
                 *
                 8
                 /
                 time
                 *
                 1000
-                /
-                1000
+
+            else
+
+                0.0
 
 
 
 
-        return """
-
-PACKET:
-$packetCount
-
-
-DATA:
-${byteCount/1024} KB
-
-
-RATE:
-${String.format("%.2f",rate)} kbps
-
-""".trimIndent()
-
+        return "PACKET:$packetCount\n" +
+                "DATA:${byteCount/1024} KB\n" +
+                "RATE:${String.format("%.2f",rate)} kbps"
 
 
     }
-
 
 
 
@@ -334,24 +200,21 @@ ${String.format("%.2f",rate)} kbps
     fun stop(){
 
 
-
         running.set(false)
-
 
 
         try{
 
-
             socket?.close()
+
+        }
+        catch(e:Exception){
 
 
         }
-        catch(_:Exception){}
-
 
 
     }
-
 
 
 }
