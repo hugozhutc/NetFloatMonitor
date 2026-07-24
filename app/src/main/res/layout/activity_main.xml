@@ -1,109 +1,81 @@
 <?xml version="1.0" encoding="utf-8"?>
 
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
 
-<LinearLayout
+    android:layout_width="match_parent"
 
-xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_height="match_parent"
 
-android:layout_width="match_parent"
+    android:orientation="vertical"
 
-android:layout_height="match_parent"
-
-android:orientation="vertical"
-
-android:padding="20dp">
+    android:padding="20dp">
 
 
+    <TextView
 
-<TextView
+        android:layout_width="wrap_content"
 
-android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
 
-android:layout_height="wrap_content"
+        android:text="NetFloat Monitor"
 
-android:text="NetFloat Monitor"
-
-android:textSize="24sp"/>
+        android:textSize="22sp"/>
 
 
 
-<EditText
+    <EditText
 
-android:id="@+id/ipEdit"
+        android:id="@+id/editIp"
 
-android:layout_width="match_parent"
+        android:layout_width="match_parent"
 
-android:layout_height="wrap_content"
+        android:layout_height="wrap_content"
 
-android:hint="目标IP"
+        android:hint="目标IP地址"
 
-android:text="192.168.1.100"/>
+        android:inputType="text"
 
-
-
-<EditText
-
-android:id="@+id/portEdit"
-
-android:layout_width="match_parent"
-
-android:layout_height="wrap_content"
-
-android:hint="端口"
-
-android:text="14550"
-
-android:inputType="number"/>
+        android:text="192.168.1.100"/>
 
 
 
-<Button
+    <EditText
 
-android:id="@+id/startBtn"
+        android:id="@+id/editPort"
 
-android:layout_width="match_parent"
+        android:layout_width="match_parent"
 
-android:layout_height="wrap_content"
+        android:layout_height="wrap_content"
 
-android:text="开始监听"/>
+        android:hint="UDP端口"
 
+        android:inputType="number"
 
-
-<Button
-
-android:id="@+id/stopBtn"
-
-android:layout_width="match_parent"
-
-android:layout_height="wrap_content"
-
-android:text="停止监听"/>
+        android:text="14550"/>
 
 
 
-<Button
+    <Button
 
-android:id="@+id/floatBtn"
+        android:id="@+id/startBtn"
 
-android:layout_width="match_parent"
+        android:layout_width="match_parent"
 
-android:layout_height="wrap_content"
+        android:layout_height="wrap_content"
 
-android:text="开启悬浮窗"/>
+        android:text="启动悬浮窗"/>
 
 
 
-<TextView
+    <Button
 
-android:id="@+id/statusText"
+        android:id="@+id/stopBtn"
 
-android:layout_width="match_parent"
+        android:layout_width="match_parent"
 
-android:layout_height="wrap_content"
+        android:layout_height="wrap_content"
 
-android:text="状态：停止"
-
-android:textSize="18sp"/>
+        android:text="停止监听"/>
 
 
 </LinearLayout>
