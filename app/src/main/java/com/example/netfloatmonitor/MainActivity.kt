@@ -1,13 +1,13 @@
 package com.example.netfloatmonitor
 
 
+import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
-import android.net.Uri
-import androidx.appcompat.app.AppCompatActivity
 import android.widget.*
-import android.content.Context
+import androidx.appcompat.app.AppCompatActivity
 
 
 
@@ -19,11 +19,15 @@ class MainActivity : AppCompatActivity(){
 
     private lateinit var portEdit:EditText
 
+    private lateinit var logPath:TextView
+
+
+
 
 
     override fun onCreate(
-        savedInstanceState:Bundle?
-    ){
+        savedInstanceState: Bundle?
+    ) {
 
         super.onCreate(savedInstanceState)
 
@@ -46,6 +50,12 @@ class MainActivity : AppCompatActivity(){
             )
 
 
+        logPath =
+            findViewById(
+                R.id.logPath
+            )
+
+
 
         val startBtn =
             findViewById<Button>(
@@ -60,7 +70,16 @@ class MainActivity : AppCompatActivity(){
 
 
 
+        val clearBtn =
+            findViewById<Button>(
+                R.id.clearBtn
+            )
+
+
+
         loadConfig()
+
+
 
 
 
@@ -71,17 +90,23 @@ class MainActivity : AppCompatActivity(){
 
 
 
-            // 检查悬浮窗权限
+            //检查悬浮窗权限
 
-            if(!Settings.canDrawOverlays(this)){
+            if(
+                !Settings.canDrawOverlays(this)
+            ){
 
 
                 val intent =
+
                     Intent(
+
                         Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+
                         Uri.parse(
                             "package:$packageName"
                         )
+
                     )
 
 
@@ -96,20 +121,23 @@ class MainActivity : AppCompatActivity(){
 
 
 
-            val intent =
+            val serviceIntent =
+
                 Intent(
                     this,
                     FloatService::class.java
                 )
 
 
-            intent.putExtra(
+
+            serviceIntent.putExtra(
                 "IP",
                 ipEdit.text.toString()
             )
 
 
-            intent.putExtra(
+
+            serviceIntent.putExtra(
                 "PORT",
                 portEdit.text.toString()
                     .toInt()
@@ -118,11 +146,19 @@ class MainActivity : AppCompatActivity(){
 
 
             startForegroundService(
-                intent
+                serviceIntent
             )
 
 
+            Toast.makeText(
+                this,
+                "监听启动",
+                Toast.LENGTH_SHORT
+            ).show()
+
+
         }
+
 
 
 
@@ -132,14 +168,43 @@ class MainActivity : AppCompatActivity(){
 
 
             stopService(
+
                 Intent(
                     this,
                     FloatService::class.java
                 )
+
             )
 
 
+            Toast.makeText(
+                this,
+                "已停止",
+                Toast.LENGTH_SHORT
+            ).show()
+
+
         }
+
+
+
+
+
+
+
+        clearBtn.setOnClickListener{
+
+
+            clearLog()
+
+
+        }
+
+
+
+
+        showLogPath()
+
 
 
     }
@@ -149,17 +214,19 @@ class MainActivity : AppCompatActivity(){
 
 
 
+
+
+    /**
+     * 保存配置
+     */
     private fun saveConfig(){
 
 
-        val sp =
-            getSharedPreferences(
-                "config",
-                Context.MODE_PRIVATE
-            )
-
-
-        sp.edit()
+        getSharedPreferences(
+            "net_config",
+            Context.MODE_PRIVATE
+        )
+            .edit()
 
             .putString(
                 "ip",
@@ -182,14 +249,20 @@ class MainActivity : AppCompatActivity(){
 
 
 
+
+    /**
+     * 读取配置
+     */
     private fun loadConfig(){
 
 
         val sp =
+
             getSharedPreferences(
-                "config",
+                "net_config",
                 Context.MODE_PRIVATE
             )
+
 
 
         ipEdit.setText(
@@ -211,6 +284,78 @@ class MainActivity : AppCompatActivity(){
             )
 
         )
+
+
+    }
+
+
+
+
+
+
+
+
+
+    private fun showLogPath(){
+
+
+        val path =
+
+            LogManager(this)
+                .getLogPath()
+
+
+
+        logPath.text =
+
+            "日志目录:\n$path"
+
+
+
+    }
+
+
+
+
+
+
+
+
+    /**
+     * 删除日志
+     */
+    private fun clearLog(){
+
+
+        val dir =
+
+            java.io.File(
+
+                LogManager(this)
+                    .getLogPath()
+
+            )
+
+
+
+        dir.listFiles()?.forEach {
+
+
+            it.delete()
+
+        }
+
+
+
+        Toast.makeText(
+
+            this,
+
+            "日志已清除",
+
+            Toast.LENGTH_SHORT
+
+        ).show()
 
 
     }
