@@ -2,7 +2,6 @@ package com.example.netfloatmonitor
 
 
 import android.content.Context
-import android.os.Environment
 import android.util.Log
 import java.io.File
 import java.text.SimpleDateFormat
@@ -27,11 +26,9 @@ class LogManager(
 
         logDir = File(
 
-            Environment.getExternalStoragePublicDirectory(
-                Environment.DIRECTORY_DOCUMENTS
-            ),
+            context.getExternalFilesDir(null),
 
-            "NetFloatMonitor/log"
+            "NetFloat/log"
 
         )
 
@@ -43,9 +40,13 @@ class LogManager(
         }
 
 
+
         Log.d(
+
             "LogManager",
+
             "LOG PATH:${logDir.absolutePath}"
+
         )
 
 
@@ -56,7 +57,7 @@ class LogManager(
 
 
 
-    fun save(json:String){
+    fun save(data:String){
 
 
         try {
@@ -72,19 +73,18 @@ class LogManager(
 
 
 
-            val text =
+            file.appendText(
 
                 """
 ====================
 TIME:${getTime()}
-$json
+$data
 ====================
 
 """.trimIndent()
+                + "\n"
 
-
-
-            file.appendText(text)
+            )
 
 
 
@@ -98,7 +98,6 @@ $json
 
 
         }
-
         catch(e:Exception){
 
 
@@ -106,7 +105,9 @@ $json
 
                 "LogManager",
 
-                "SAVE ERROR:${e.message}"
+                "SAVE ERROR",
+
+                e
 
             )
 
@@ -131,7 +132,6 @@ $json
             Locale.getDefault()
 
         )
-
         .format(Date())
 
 
@@ -152,12 +152,10 @@ $json
             Locale.getDefault()
 
         )
-
         .format(Date())
 
 
     }
-
 
 
 
