@@ -3,6 +3,7 @@ package com.example.netfloatmonitor
 
 import android.content.Context
 import android.os.Environment
+import android.util.Log
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -17,7 +18,6 @@ class LogManager(
 ){
 
 
-
     private val logDir: File
 
 
@@ -25,15 +25,15 @@ class LogManager(
     init {
 
 
-
         logDir = File(
 
-            Environment.getExternalStorageDirectory(),
+            Environment.getExternalStoragePublicDirectory(
+                Environment.DIRECTORY_DOCUMENTS
+            ),
 
             "NetFloatMonitor/log"
 
         )
-
 
 
         if(!logDir.exists()){
@@ -43,6 +43,12 @@ class LogManager(
         }
 
 
+        Log.d(
+            "LogManager",
+            "LOG PATH:${logDir.absolutePath}"
+        )
+
+
     }
 
 
@@ -50,14 +56,10 @@ class LogManager(
 
 
 
-
-    /**
-     * 保存JSON数据
-     */
     fun save(json:String){
 
 
-        try{
+        try {
 
 
             val file = File(
@@ -70,28 +72,29 @@ class LogManager(
 
 
 
-
-
-            val record =
+            val text =
 
                 """
-{
-"time":"${getTime()}",
-"data":$json
-}
+====================
+TIME:${getTime()}
+$json
+====================
 
 """.trimIndent()
 
 
 
+            file.appendText(text)
 
 
-            file.appendText(
 
-                record + "\n"
+            Log.d(
+
+                "LogManager",
+
+                "SAVE OK:${file.absolutePath}"
 
             )
-
 
 
         }
@@ -99,16 +102,19 @@ class LogManager(
         catch(e:Exception){
 
 
-            e.printStackTrace()
+            Log.e(
+
+                "LogManager",
+
+                "SAVE ERROR:${e.message}"
+
+            )
 
 
         }
 
 
     }
-
-
-
 
 
 
@@ -120,7 +126,7 @@ class LogManager(
 
         return SimpleDateFormat(
 
-            "yyyyMMdd'_link.jsonl'",
+            "yyyyMMdd_link.log",
 
             Locale.getDefault()
 
@@ -130,9 +136,6 @@ class LogManager(
 
 
     }
-
-
-
 
 
 
@@ -161,8 +164,6 @@ class LogManager(
 
 
 
-
-
     fun getLogPath():String{
 
 
@@ -170,7 +171,6 @@ class LogManager(
 
 
     }
-
 
 
 }
