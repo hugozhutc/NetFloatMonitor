@@ -9,6 +9,7 @@ import java.util.Date
 import java.util.Locale
 
 
+
 class LogManager(
 
     private val context: Context
@@ -18,7 +19,7 @@ class LogManager(
 
     private val logDir: File = File(
 
-        context.filesDir,
+        context.getExternalFilesDir(null),
 
         "NetFloat/log"
 
@@ -31,20 +32,24 @@ class LogManager(
 
         if(!logDir.exists()){
 
-            logDir.mkdirs()
+            val result = logDir.mkdirs()
+
+            Log.d(
+                "LogManager",
+                "mkdir:$result"
+            )
 
         }
 
 
         Log.d(
-
             "LogManager",
-
-            "PATH:${logDir.absolutePath}"
-
+            "LOG PATH:${logDir.absolutePath}"
         )
 
+
     }
+
 
 
 
@@ -59,10 +64,9 @@ class LogManager(
 
                 logDir,
 
-                "test.log"
+                getFileName()
 
             )
-
 
 
             file.appendText(
@@ -82,12 +86,11 @@ $data
             )
 
 
-
             Log.d(
 
                 "LogManager",
 
-                "WRITE OK:${file.absolutePath}"
+                "SAVE OK:${file.absolutePath}"
 
             )
 
@@ -100,7 +103,7 @@ $data
 
                 "LogManager",
 
-                "WRITE ERROR:${e.message}",
+                "SAVE ERROR:${e.message}",
 
                 e
 
@@ -108,6 +111,26 @@ $data
 
 
         }
+
+
+    }
+
+
+
+
+
+
+    private fun getFileName():String{
+
+
+        return SimpleDateFormat(
+
+            "yyyyMMdd_link.log",
+
+            Locale.getDefault()
+
+        )
+        .format(Date())
 
 
     }
@@ -131,7 +154,6 @@ $data
 
 
     }
-
 
 
 
