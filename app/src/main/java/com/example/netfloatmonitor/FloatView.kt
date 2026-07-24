@@ -21,6 +21,7 @@ class FloatView(
 ) : LinearLayout(context) {
 
 
+
     private val airLayout = LinearLayout(context)
 
     private val gndLayout = LinearLayout(context)
@@ -28,7 +29,16 @@ class FloatView(
 
 
     private var startWidth = 0
+
     private var startHeight = 0
+
+    private var downX = 0f
+
+    private var downY = 0f
+
+    private var resize = false
+
+
 
 
 
@@ -46,20 +56,33 @@ class FloatView(
         )
 
 
+
         val bg = GradientDrawable()
 
+
         bg.setColor(
+
             Color.argb(
+
                 180,
+
                 0,
+
                 0,
+
                 0
+
             )
+
         )
+
 
         bg.cornerRadius = 10f
 
+
+
         background = bg
+
 
 
 
@@ -67,70 +90,77 @@ class FloatView(
             VERTICAL
 
 
+
         gndLayout.orientation =
             VERTICAL
 
 
 
+
+
+
         addView(
 
             createPanel(
+
                 "AIR",
+
                 airLayout
+
             )
 
         )
+
 
 
         addView(
 
             createPanel(
+
                 "GND",
+
                 gndLayout
+
             )
 
         )
 
 
 
-        //拖动+缩放
+
+
 
         setOnTouchListener(
 
-            object: OnTouchListener{
+            object : OnTouchListener {
 
-
-                var downX=0f
-                var downY=0f
-
-                var resize=false
 
 
                 override fun onTouch(
 
-                    v:View?,
+                    v: View?,
 
-                    event:MotionEvent
+                    event: MotionEvent
 
-                ):Boolean{
+                ): Boolean {
+
 
 
                     when(event.action){
 
 
-                        MotionEvent.ACTION_DOWN->{
+
+                        MotionEvent.ACTION_DOWN -> {
+
 
 
                             downX =
                                 event.rawX
 
+
                             downY =
                                 event.rawY
 
-
-                            resize =
-                                    event.x >
-                                    width-50
 
 
                             startWidth =
@@ -140,60 +170,95 @@ class FloatView(
                             startHeight =
                                 height
 
+
+
+                            resize =
+
+                                event.x >
+
+                                width - 50
+
+
+
                         }
 
 
 
-                        MotionEvent.ACTION_MOVE->{
+                        MotionEvent.ACTION_MOVE -> {
 
 
 
                             if(resize){
 
 
+
                                 params.width =
 
                                     (
-                                    startWidth+
-                                    event.rawX-downX
+
+                                    startWidth +
+
+                                    event.rawX -
+
+                                    downX
+
                                     ).toInt()
                                     .coerceAtLeast(300)
+
 
 
 
                                 params.height =
 
                                     (
-                                    startHeight+
-                                    event.rawY-downY
+
+                                    startHeight +
+
+                                    event.rawY -
+
+                                    downY
+
                                     ).toInt()
                                     .coerceAtLeast(200)
 
 
 
                             }
-                            else{
+                            else {
+
 
 
                                 params.x +=
 
-                                (
-                                event.rawX-downX
-                                ).toInt()
+                                    (
+
+                                    event.rawX -
+
+                                    downX
+
+                                    ).toInt()
+
 
 
                                 params.y +=
 
-                                (
-                                event.rawY-downY
-                                ).toInt()
+                                    (
+
+                                    event.rawY -
+
+                                    downY
+
+                                    ).toInt()
+
 
 
                                 downX =
                                     event.rawX
 
+
                                 downY =
                                     event.rawY
+
 
                             }
 
@@ -210,12 +275,15 @@ class FloatView(
 
                         }
 
+
                     }
+
 
 
                     return true
 
                 }
+
 
 
             }
@@ -224,7 +292,13 @@ class FloatView(
         )
 
 
+
     }
+
+
+
+
+
 
 
 
@@ -235,56 +309,93 @@ class FloatView(
 
         layout:LinearLayout
 
-    ):View{
+    ):View {
+
 
 
         val box =
+
             LinearLayout(context)
 
 
+
         box.orientation =
+
             VERTICAL
 
 
-        val tv =
+
+
+
+        val titleView =
+
             TextView(context)
 
 
-        tv.text =
+
+        titleView.text =
+
             title
 
 
-        tv.setTextColor(
-            Color.GREEN
-        )
 
-        tv.textSize =
+        titleView.textSize =
+
             14f
 
 
-        box.addView(tv)
+
+        titleView.setTextColor(
+
+            Color.GREEN
+
+        )
+
 
 
         box.addView(
 
-            ScrollView(context).apply{
+            titleView
+
+        )
 
 
-                addView(layout)
 
-            },
 
-            LayoutParams(
 
-                0,
 
-                MATCH_PARENT,
 
-                1f
+        val scroll =
+
+            ScrollView(context)
+
+
+
+        scroll.addView(
+
+            layout
+
+        )
+
+
+
+
+
+        box.addView(
+
+            scroll,
+
+            LinearLayout.LayoutParams(
+
+                300,
+
+                LinearLayout.LayoutParams.MATCH_PARENT
 
             )
 
         )
+
+
 
 
         return box
@@ -294,11 +405,14 @@ class FloatView(
 
 
 
-    /**
-     * V2.0 JSON显示入口
-     *
-     */
 
+
+
+
+
+    /**
+     * V2.0 JSON显示接口
+     */
     fun updateJson(
 
         json:String
@@ -306,63 +420,137 @@ class FloatView(
     ){
 
 
-        val obj =
-            JSONObject(json)
+
+        try {
 
 
 
-        airLayout.removeAllViews()
+            val obj =
 
-        gndLayout.removeAllViews()
-
-
-
-        obj.keys().forEach{
-
-
-            val key = it
-
-            val value =
-                obj.get(key).toString()
+                JSONObject(json)
 
 
 
-            when{
+
+            airLayout.removeAllViews()
+
+            gndLayout.removeAllViews()
 
 
-                key.endsWith("_a") ->
-
-                    addItem(
-                        airLayout,
-                        key,
-                        value
-                    )
 
 
-                key.endsWith("_g") ->
 
-                    addItem(
-                        gndLayout,
-                        key,
-                        value
-                    )
+            obj.keys().forEach {
 
 
-                else ->
 
-                    addItem(
-                        airLayout,
-                        key,
-                        value
-                    )
+                val key = it
+
+
+                val value =
+
+                    obj.get(key)
+                        .toString()
+
+
+
+
+
+                when {
+
+
+
+                    key.endsWith("_a") -> {
+
+
+                        addItem(
+
+                            airLayout,
+
+                            key,
+
+                            value
+
+                        )
+
+                    }
+
+
+
+
+                    key.endsWith("_g") -> {
+
+
+                        addItem(
+
+                            gndLayout,
+
+                            key,
+
+                            value
+
+                        )
+
+                    }
+
+
+
+
+                    else -> {
+
+
+
+                        addItem(
+
+                            airLayout,
+
+                            key,
+
+                            value
+
+                        )
+
+
+                    }
+
+
+
+                }
+
+
 
             }
+
+
+
+
+
+        }
+
+        catch(e:Exception){
+
+
+
+            addItem(
+
+                airLayout,
+
+                "JSON_ERROR",
+
+                e.message ?: ""
+
+            )
 
 
         }
 
 
+
     }
+
+
+
+
 
 
 
@@ -379,33 +567,56 @@ class FloatView(
     ){
 
 
+
         val tv =
+
             TextView(context)
+
+
 
 
         tv.text =
 
-            String.format(
-
-                "%-12s %s",
-
-                key,
-
-                value
-
-            )
+            "$key : $value"
 
 
-        tv.setTextColor(
-            Color.WHITE
-        )
+
 
 
         tv.textSize =
+
             12f
 
 
-        layout.addView(tv)
+
+        tv.setTextColor(
+
+            Color.WHITE
+
+        )
+
+
+
+        tv.setPadding(
+
+            4,
+
+            3,
+
+            4,
+
+            3
+
+        )
+
+
+
+
+        layout.addView(
+
+            tv
+
+        )
 
 
     }
