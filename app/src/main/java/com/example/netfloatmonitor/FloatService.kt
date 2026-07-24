@@ -200,145 +200,82 @@ class FloatService : Service() {
     private fun showFloatWindow(){
 
 
+    if(floatView != null){
 
-        if(floatView != null)
+        return
 
-            return
+    }
 
 
 
-        val wm =
+    val wm =
 
-    getSystemService(
-        WINDOW_SERVICE
-    ) as WindowManager
+        getSystemService(
+            WINDOW_SERVICE
+        ) as WindowManager
 
 
 
-val params =
 
-    WindowManager.LayoutParams()
+    val params =
 
+        WindowManager.LayoutParams()
 
 
-params.width =
 
-    WindowManager.LayoutParams.WRAP_CONTENT
+    params.width =
 
+        WindowManager.LayoutParams.WRAP_CONTENT
 
-params.height =
 
-    WindowManager.LayoutParams.WRAP_CONTENT
+    params.height =
 
+        WindowManager.LayoutParams.WRAP_CONTENT
 
 
-params.type =
 
-    if(Build.VERSION.SDK_INT >= 26)
 
-        WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+    params.type =
 
-    else
+        if(Build.VERSION.SDK_INT >= 26)
 
-        WindowManager.LayoutParams.TYPE_PHONE
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
 
+        else
 
+            WindowManager.LayoutParams.TYPE_PHONE
 
-params.flags =
 
-    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
 
 
+    params.flags =
 
-params.format =
+        WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
 
-    PixelFormat.TRANSLUCENT
 
 
+    params.format =
 
+        PixelFormat.TRANSLUCENT
 
-floatView =
 
-    FloatView(
 
-        this,
 
-        wm,
+    params.x = 50
 
-        params
+    params.y = 200
 
-    )
 
 
 
 
-         as WindowManager
+    floatView =
 
+        FloatView(
 
+            this,
 
-
-
-        val params =
-
-            WindowManager.LayoutParams()
-
-
-
-        params.width =
-
-            WindowManager.LayoutParams.WRAP_CONTENT
-
-
-
-        params.height =
-
-            WindowManager.LayoutParams.WRAP_CONTENT
-
-
-
-
-
-        params.type =
-
-            if(Build.VERSION.SDK_INT >= 26)
-
-                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-
-            else
-
-                WindowManager.LayoutParams.TYPE_PHONE
-
-
-
-
-
-        params.flags =
-
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
-
-
-
-
-
-        params.format =
-
-            PixelFormat.TRANSLUCENT
-
-
-
-
-
-        params.x = 50
-
-        params.y = 200
-
-
-
-
-
-        wm.addView(
-
-            floatView,
+            wm,
 
             params
 
@@ -346,7 +283,17 @@ floatView =
 
 
 
-    }
+
+    wm.addView(
+
+        floatView,
+
+        params
+
+    )
+
+
+}
 
 
 
