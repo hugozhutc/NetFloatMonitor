@@ -34,7 +34,7 @@ class FloatView(
     private var resizeTouchY = 0f
 
     // ==========================================
-    // 核心重构：改用 val + by lazy，彻底消灭所有 "Val cannot be reassigned" 编译错误的可能性
+    // 核心重构：by lazy 闭包内只需返回最终对象，严禁赋值
     // ==========================================
     
     private val miniIconViewRef: CardView by lazy {
@@ -134,10 +134,10 @@ class FloatView(
                 }
             }
 
-            // 【左侧栏：AIR 天空端】
+            // 【左侧栏：AIR 天空端】已修复 MATCH_PARENT 引用
             val skyLayout = LinearLayout(context).apply {
                 orientation = VERTICAL
-                layoutParams = LayoutParams(0, MATCH_PARENT, 1f)
+                layoutParams = LayoutParams(0, LayoutParams.MATCH_PARENT, 1f)
             }
             
             val skyTitle = TextView(context).apply {
@@ -156,10 +156,10 @@ class FloatView(
             skyLayout.addView(skyTitle)
             skyLayout.addView(skyScrollView)
 
-            // 【右侧栏：GND 地面端】
+            // 【右侧栏：GND 地面端】已修复 MATCH_PARENT 引用
             val groundLayout = LinearLayout(context).apply {
                 orientation = VERTICAL
-                layoutParams = LayoutParams(0, MATCH_PARENT, 1f).apply {
+                layoutParams = LayoutParams(0, LayoutParams.MATCH_PARENT, 1f).apply {
                     leftMargin = dp2px(context, 10f)
                 }
             }
@@ -197,7 +197,6 @@ class FloatView(
     }
 
     private fun initView() {
-        // 将延迟初始化的布局组件直接添加进父容器
         addView(miniIconViewRef)
         addView(expandedPanelViewRef)
 
