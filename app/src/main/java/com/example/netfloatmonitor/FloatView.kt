@@ -26,15 +26,15 @@ class FloatView(
     private val airLayout = LinearLayout(context)
     private val gndLayout = LinearLayout(context)
     
-    // 右侧第三栏：创建一个垂直容器，用于上下堆叠放两个图表
+    // 右侧第三栏：垂直容器，用于上下堆叠放两个图表
     private val chartContainer = LinearLayout(context)
     private val airChartView = WaveformView(context, isAir = true)
     private val gndChartView = WaveformView(context, isAir = false)
 
     private var isExpanded = true
-    // 调整展开后的默认宽高，给予上下双图表更充裕的纵向展示空间
-    private var lastExpandedWidth = 1000
-    private var lastExpandedHeight = 520
+    // 调整展开后的默认宽高，给予上下双图表和Y轴刻度更充裕的展示空间
+    private var lastExpandedWidth = 1040
+    private var lastExpandedHeight = 540
     private val collapsedSize = 160
 
     private var startWidth = 0
@@ -89,14 +89,14 @@ class FloatView(
         airLayout.setOrientation(LinearLayout.VERTICAL)
         gndLayout.setOrientation(LinearLayout.VERTICAL)
         
-        // 1. 左侧和中间的数据面板保持不变
+        // 1. 左侧和中间的数据文本面板
         contentPanel.addView(createPanel("AIR", airLayout))
         contentPanel.addView(createPanel("GND", gndLayout))
         
         // 2. 配置右侧第三栏容器（上下平分摆放两个折线图）
         chartContainer.setOrientation(LinearLayout.VERTICAL)
         
-        // 天空端图表占用 0.5 权重，带下边距分隔
+        // 天空端图表占用 0.5 权重，带 8dp 下边距分隔
         val airChartLp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f).apply {
             setMargins(0, 0, 0, 8)
         }
@@ -106,8 +106,8 @@ class FloatView(
         chartContainer.addView(airChartView, airChartLp)
         chartContainer.addView(gndChartView, gndChartLp)
         
-        // 将整个右侧第三栏加进主面板，分配 360dp 宽度
-        val chartContainerLp = LinearLayout.LayoutParams(360, LinearLayout.LayoutParams.MATCH_PARENT).apply {
+        // 将整个右侧第三栏加进主面板，分配 380dp 宽度给Y轴刻度和曲线留下充裕空间
+        val chartContainerLp = LinearLayout.LayoutParams(380, LinearLayout.LayoutParams.MATCH_PARENT).apply {
             setMargins(12, 0, 4, 0)
         }
         contentPanel.addView(chartContainer, chartContainerLp)
@@ -334,7 +334,8 @@ class FloatView(
             obj.keys().forEach { key ->
                 val valueStr = obj.get(key).toString()
                 val lowerKey = key.lowercase()
-                val numValue = valueStr.toFloatOrNull()
+                // 防御性转化为绝对正数值
+                val numValue = valueStr.toFloatOrNull()?.let { Math.abs(it) }
 
                 if (numValue != null) {
                     when {
@@ -370,7 +371,6 @@ class FloatView(
                 }
             }
 
-            // 分别喂给对应的独立天空端和地面端图表组件
             airChartView.addData(airRssi1, airRssi2, airSnr)
             gndChartView.addData(gndRssi1, gndRssi2, gndSnr)
 
@@ -391,14 +391,22 @@ class FloatView(
     }
 
     /**
-     * 重构后的轻量三曲线波形图组件（复用于天空和地面）
+     * 内部波形图绘制组件
+     * 适配：全正数正向映射（0在最底部，数值变大曲线往上攀升）
      */
     private class WaveformView(context: Context, private val isAir: Boolean) : View(context) {
         private val maxDataPoints = 40
+        private val yAxisWidth = 85f // 左侧预留给Y轴刻度标签的像素宽度
 
         private val rssi1List = LinkedList<Float>()
         private val rssi2List = LinkedList<Float>()
         private val snrList = LinkedList<Float>()
+
+        private val axisTextPaint = Paint().apply {
+            color = Color.parseColor("#BDC3C7")
+            textSize = 16f
+            isAntiAlias = true
+        }
 
         private val textPaint = Paint().apply {
             color = Color.LTGRAY
@@ -406,40 +414,49 @@ class FloatView(
             isAntiAlias = true
         }
 
-        // 无论天空还是地面，均采用统一逻辑的 3 条高对比度画笔颜色
         private val paintRssi1 = Paint().apply {
-            color = if (isAir) Color.parseColor("#2980B9") else Color.parseColor("#D35400") // 天空深蓝，地面深橙
+            color = if (isAir) Color.parseColor("#2980B9") else Color.parseColor("#D35400")
             strokeWidth = 4f
             style = Paint.Style.STROKE
             isAntiAlias = true
         }
 
         private val paintRssi2 = Paint().apply {
-            color = if (isAir) Color.parseColor("#3498DB") else Color.parseColor("#E67E22") // 天空淡蓝，地面浅橙
+            color = if (isAir) Color.parseColor("#3498DB") else Color.parseColor("#E67E22")
             strokeWidth = 3f
             style = Paint.Style.STROKE
             isAntiAlias = true
         }
 
         private val paintSnr = Paint().apply {
-            color = if (isAir) Color.parseColor("#2ECC71") else Color.parseColor("#9B59B6") // 天空嫩绿，地面紫色
+            color = if (isAir) Color.parseColor("#2ECC71") else Color.parseColor("#9B59B6")
             strokeWidth = 3f
             style = Paint.Style.STROKE
             isAntiAlias = true
         }
 
         private val gridPaint = Paint().apply {
-            color = Color.argb(40, 255, 255, 255)
+            color = Color.argb(45, 255, 255, 255)
             strokeWidth = 1f
         }
 
         private val bgPaint = Paint().apply {
-            color = Color.argb(35, 255, 255, 255) // 给图表加层极淡的半透明背景框，便于划分上下边界
+            color = Color.argb(30, 255, 255, 255)
         }
 
+        // --- 重新划定量程：从 0 开始 ---
+        // RSSI 区间：0 到 120（0映射在底部，120映射在顶部）
+        private val rssiMin = 0f
+        private val rssiMax = 120f
+        
+        // SNR 区间：0 到 50（0映射在底部，50映射在顶部）
+        private val snrMin = 0f
+        private val snrMax = 50f
+
         fun addData(r1: Float?, r2: Float?, snr: Float?) {
-            rssi1List.addLast(r1 ?: rssi1List.lastOrNull() ?: -100f)
-            rssi2List.addLast(r2 ?: rssi2List.lastOrNull() ?: -100f)
+            // 兜底值设定为 0（即默认从最底部刷新）
+            rssi1List.addLast(r1 ?: rssi1List.lastOrNull() ?: 0f)
+            rssi2List.addLast(r2 ?: rssi2List.lastOrNull() ?: 0f)
             snrList.addLast(snr ?: snrList.lastOrNull() ?: 0f)
 
             if (rssi1List.size > maxDataPoints) rssi1List.removeFirst()
@@ -455,37 +472,59 @@ class FloatView(
             val h = height.toFloat()
             if (w <= 0 || h <= 0) return
 
-            // 绘制独立图表背景外框
-            canvas.drawRect(0f, 0f, w, h, bgPaint)
+            val chartLeft = yAxisWidth
+            val chartRight = w
+            val chartWidth = chartRight - chartLeft
 
-            // 1. 内部网格虚线
-            canvas.drawLine(0f, h * 0.33f, w, h * 0.33f, gridPaint)
-            canvas.drawLine(0f, h * 0.66f, w, h * 0.66f, gridPaint)
+            // 1. 绘制独立的图表波形限制背景区域
+            canvas.drawRect(chartLeft, 0f, chartRight, h, bgPaint)
 
-            // 2. 区分头部标题与状态输出
+            // 2. 绘制三条水平参考线及对应的 Y 轴刻度文字
+            val yPositions = floatArrayOf(h * 0.15f, h * 0.5f, h * 0.85f)
+            // 刻度排列调整为正向：最上面是最大值，最下面是最基础的 0
+            val rssiLabels = arrayOf("120", "60", "0")
+            val snrLabels = arrayOf("50", "25", "0")
+
+            for (i in yPositions.indices) {
+                val y = yPositions[i]
+                // 绘制网格横线
+                canvas.drawLine(chartLeft, y, chartRight, y, gridPaint)
+                
+                // 输出双边复合刻度，格式如 "120(50)", "60(25)", "0(0)"
+                val labelText = "${rssiLabels[i]}(${snrLabels[i]})"
+                canvas.drawText(labelText, 5f, y + 6f, axisTextPaint)
+            }
+
+            // 3. 绘制顶部实时数字看板输出
             val prefix = if (isAir) "AIR" else "GND"
-            canvas.drawText("[$prefix] R1: ${rssi1List.lastOrNull()?.toInt()}", 10f, 22f, textPaint)
-            canvas.drawText("R2: ${rssi2List.lastOrNull()?.toInt()}", 140f, 22f, textPaint)
-            canvas.drawText("SNR: ${snrList.lastOrNull()?.toInt()}", 250f, 22f, textPaint)
+            canvas.drawText("[$prefix] R1: ${rssi1List.lastOrNull()?.toInt()}", chartLeft + 15f, 25f, textPaint)
+            canvas.drawText("R2: ${rssi2List.lastOrNull()?.toInt()}", chartLeft + 140f, 25f, textPaint)
+            canvas.drawText("SNR: ${snrList.lastOrNull()?.toInt()}", chartLeft + 240f, 25f, textPaint)
 
-            // 3. 独立画线 (RSSI 映射量程 -120 到 -20，SNR 映射量程 -10 到 40)
-            drawCurve(canvas, rssi1List, -120f, -20f, w, h, paintRssi1)
-            drawCurve(canvas, rssi2List, -120f, -20f, w, h, paintRssi2)
-            drawCurve(canvas, snrList, -10f, 40f, w, h, paintSnr)
+            // 4. 执行常规正向比例函数渲染折线
+            // 0 在最底部，数值越大曲线位置越高
+            drawNormalCurve(canvas, rssi1List, rssiMin, rssiMax, chartLeft, chartWidth, h, paintRssi1)
+            drawNormalCurve(canvas, rssi2List, rssiMin, rssiMax, chartLeft, chartWidth, h, paintRssi2)
+            drawNormalCurve(canvas, snrList, snrMin, snrMax, chartLeft, chartWidth, h, paintSnr)
         }
 
-        private fun drawCurve(canvas: Canvas, list: List<Float>, minVal: Float, maxVal: Float, w: Float, h: Float, paint: Paint) {
+        /**
+         * 正向折线坐标映射逻辑
+         * 作用：输入数值越大，算出的坐标 Y 越接近 0（即在 Android View 体系的最上方，视觉上的高处）
+         */
+        private fun drawNormalCurve(canvas: Canvas, list: List<Float>, minVal: Float, maxVal: Float, leftOffset: Float, cWidth: Float, h: Float, paint: Paint) {
             if (list.size < 2) return
-            val stepX = w / (maxDataPoints - 1)
+            val stepX = cWidth / (maxDataPoints - 1)
             val range = maxVal - minVal
 
             for (i in 0 until list.size - 1) {
-                val startX = i * stepX
-                val endX = (i + 1) * stepX
+                val startX = leftOffset + (i * stepX)
+                val endX = leftOffset + ((i + 1) * stepX)
 
                 val valStart = list[i].coerceIn(minVal, maxVal)
                 val valEnd = list[i + 1].coerceIn(minVal, maxVal)
 
+                // 核心标准公式：h * (1f - 比例)，确保 0 值落在底部，大值爬升到顶部
                 val startY = h * (1f - (valStart - minVal) / range)
                 val endY = h * (1f - (valEnd - minVal) / range)
 
