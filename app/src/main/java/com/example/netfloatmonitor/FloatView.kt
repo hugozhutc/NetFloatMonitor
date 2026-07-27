@@ -25,12 +25,12 @@ class FloatView(
     // 状态控制：当前是否处于展开状态
     private var isExpanded = true
 
-    // 缓存展开时的标准宽高（根据原版逻辑，双栏宽约 600+，高自适应或固定）
+    // 展开状态下的标准宽高
     private val expandedWidth = 640
     private val expandedHeight = 450
 
-    // 缓存折叠后小圆点的宽高
-    private val collapsedSize = 100
+    // 【优化】大幅提升折叠后悬浮球的尺寸（从100增大到160），大拇指盲操极其轻松
+    private val collapsedSize = 160
 
     private var startWidth = 0
     private var startHeight = 0
@@ -71,6 +71,7 @@ class FloatView(
         topBar.setGravity(Gravity.RIGHT or Gravity.CENTER_VERTICAL)
         topBar.setPadding(0, 0, 4, 4)
         
+        // 展开状态下关闭按钮的大小
         val btnLp = LinearLayout.LayoutParams(45, 45)
         topBar.addView(toggleBtn, btnLp)
         addView(topBar)
@@ -92,49 +93,62 @@ class FloatView(
                 isExpanded = false
                 contentPanel.visibility = View.GONE // 隐藏下方数据面板
                 
-                // 改变按钮样式，使其变成一个居中的小圆点悬浮图标
-                toggleBtn.text = "M"
+                // 1. 撑满折叠后的整个窗体，让整个大悬浮球都变成可点击区域
+                val collapsedLp = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, 
+                    LinearLayout.LayoutParams.MATCH_PARENT
+                )
+                toggleBtn.layoutParams = collapsedLp
+                
+                // 2. 优化文案与样式：变成一个大号的绿色科技感圆形悬浮钮
+                toggleBtn.text = "展开"
+                toggleBtn.textSize = 14f
                 val btnBg = GradientDrawable().apply {
-                    setColor(Color.parseColor("#2ECC71")) // 变成富有科技感的绿色小球
-                    cornerRadius = 50f
+                    setColor(Color.parseColor("#1ABC9C")) // 更加明亮的青绿色
+                    cornerRadius = 80f // 完美正圆
                 }
                 toggleBtn.background = btnBg
                 
-                // 让外层容器的背景变透明，只露出一颗小球
+                // 3. 彻底外层透明，避免死角干扰
                 panelBg.setColor(Color.TRANSPARENT)
                 this.setBackground(panelBg)
                 this.setPadding(0, 0, 0, 0)
 
-                // 缩小悬浮窗总尺寸到小球大小
+                // 4. 更新悬浮窗总尺寸为加大版尺寸
                 params.width = collapsedSize
                 params.height = collapsedSize
             } else {
                 // 【执行再次展开】
                 isExpanded = true
-                contentPanel.visibility = View.VISIBLE // 恢复显示数据面板
+                contentPanel.visibility = View.VISIBLE
                 
-                // 恢复关闭按钮的样式
+                // 1. 恢复右上角微型有关按钮的尺寸
+                val expandedLp = LinearLayout.LayoutParams(45, 45)
+                toggleBtn.layoutParams = expandedLp
+                
+                // 2. 恢复关闭符号与红方块样式
                 toggleBtn.text = "×"
+                toggleBtn.textSize = 14f
                 val btnBg = GradientDrawable().apply {
                     setColor(Color.parseColor("#C0392B"))
                     cornerRadius = 6f
                 }
                 toggleBtn.background = btnBg
                 
-                // 恢复 180 透明度黑色大面板背景
+                // 3. 恢复 180 透明度黑色大面板背景
                 panelBg.setColor(Color.argb(180, 0, 0, 0))
                 panelBg.cornerRadius = 10f
                 this.setBackground(panelBg)
                 this.setPadding(8, 6, 8, 8)
 
-                // 恢复悬浮窗到大面板尺寸
+                // 4. 恢复悬浮窗到大面板尺寸
                 params.width = expandedWidth
                 params.height = expandedHeight
             }
             windowManager.updateViewLayout(this@FloatView, params)
         }
 
-        // 拖动与缩放手势处理（仅在展开状态下允许右侧边缘缩放）
+        // 拖动与缩放手势处理
         setOnTouchListener(object : OnTouchListener {
             override fun onTouch(v: View?, event: MotionEvent): Boolean {
                 when (event.action) {
