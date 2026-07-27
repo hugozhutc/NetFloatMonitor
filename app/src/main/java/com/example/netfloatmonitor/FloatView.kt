@@ -26,13 +26,15 @@ class FloatView(
     private val airLayout = LinearLayout(context)
     private val gndLayout = LinearLayout(context)
     
-    // 右侧自定义曲线图实例
-    private val chartView = WaveformView(context)
+    // 右侧第三栏：创建一个垂直容器，用于上下堆叠放两个图表
+    private val chartContainer = LinearLayout(context)
+    private val airChartView = WaveformView(context, isAir = true)
+    private val gndChartView = WaveformView(context, isAir = false)
 
     private var isExpanded = true
-    // 增加到 6 条曲线后，建议展开宽度保持 960 或更大，方便并排容纳三栏
+    // 调整展开后的默认宽高，给予上下双图表更充裕的纵向展示空间
     private var lastExpandedWidth = 1000
-    private var lastExpandedHeight = 480
+    private var lastExpandedHeight = 520
     private val collapsedSize = 160
 
     private var startWidth = 0
@@ -87,14 +89,28 @@ class FloatView(
         airLayout.setOrientation(LinearLayout.VERTICAL)
         gndLayout.setOrientation(LinearLayout.VERTICAL)
         
+        // 1. 左侧和中间的数据面板保持不变
         contentPanel.addView(createPanel("AIR", airLayout))
         contentPanel.addView(createPanel("GND", gndLayout))
         
-        // 右侧追加曲线图面板 (指定 360dp 宽度让 6 条线的图例显示更充裕)
+        // 2. 配置右侧第三栏容器（上下平分摆放两个折线图）
+        chartContainer.setOrientation(LinearLayout.VERTICAL)
+        
+        // 天空端图表占用 0.5 权重，带下边距分隔
+        val airChartLp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f).apply {
+            setMargins(0, 0, 0, 8)
+        }
+        // 地面端图表占用 0.5 权重
+        val gndChartLp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f)
+        
+        chartContainer.addView(airChartView, airChartLp)
+        chartContainer.addView(gndChartView, gndChartLp)
+        
+        // 将整个右侧第三栏加进主面板，分配 360dp 宽度
         val chartContainerLp = LinearLayout.LayoutParams(360, LinearLayout.LayoutParams.MATCH_PARENT).apply {
             setMargins(12, 0, 4, 0)
         }
-        contentPanel.addView(chartView, chartContainerLp)
+        contentPanel.addView(chartContainer, chartContainerLp)
         
         contentFrame.addView(contentPanel, FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT,
@@ -307,7 +323,6 @@ class FloatView(
             airLayout.removeAllViews()
             gndLayout.removeAllViews()
 
-            // 定义 6 个波形变量
             var airRssi1: Float? = null
             var airRssi2: Float? = null
             var airSnr: Float? = null
@@ -323,16 +338,14 @@ class FloatView(
 
                 if (numValue != null) {
                     when {
-                        // 天空端数据解析 (_a 后缀)
                         lowerKey.endsWith("_a") -> {
                             when {
                                 lowerKey.contains("rssi1") -> airRssi1 = numValue
                                 lowerKey.contains("rssi2") -> airRssi2 = numValue
-                                lowerKey.contains("rssi") && airRssi1 == null -> airRssi1 = numValue // 兼容只有单线 key 叫 rssi_a 的情况
+                                lowerKey.contains("rssi") && airRssi1 == null -> airRssi1 = numValue
                                 lowerKey.contains("snr") -> airSnr = numValue
                             }
                         }
-                        // 地面端数据解析 (_g 后缀)
                         lowerKey.endsWith("_g") -> {
                             when {
                                 lowerKey.contains("rssi1") -> gndRssi1 = numValue
@@ -341,7 +354,6 @@ class FloatView(
                                 lowerKey.contains("snr") -> gndSnr = numValue
                             }
                         }
-                        // 没有带后缀的通用键名提取兜底
                         lowerKey.contains("air_rssi1") -> airRssi1 = numValue
                         lowerKey.contains("air_rssi2") -> airRssi2 = numValue
                         lowerKey.contains("air_snr") -> airSnr = numValue
@@ -351,7 +363,6 @@ class FloatView(
                     }
                 }
 
-                // 渲染左侧面板文本不变
                 when {
                     key.endsWith("_g") -> addItem(gndLayout, key, valueStr)
                     key.endsWith("_a") -> addItem(airLayout, key, valueStr)
@@ -359,8 +370,9 @@ class FloatView(
                 }
             }
 
-            // 把这 6 条曲线的最新动态值送入图形引擎
-            chartView.addData(airRssi1, airRssi2, airSnr, gndRssi1, gndRssi2, gndSnr)
+            // 分别喂给对应的独立天空端和地面端图表组件
+            airChartView.addData(airRssi1, airRssi2, airSnr)
+            gndChartView.addData(gndRssi1, gndRssi2, gndSnr)
 
         } catch (e: Exception) {
             airLayout.removeAllViews()
@@ -379,60 +391,60 @@ class FloatView(
     }
 
     /**
-     * 【升级版】纯 Canvas 实时 6 曲线波形图组件
+     * 重构后的轻量三曲线波形图组件（复用于天空和地面）
      */
-    private class WaveformView(context: Context) : View(context) {
-        private val maxDataPoints = 40 // 数据宽度
+    private class WaveformView(context: Context, private val isAir: Boolean) : View(context) {
+        private val maxDataPoints = 40
 
-        // 6 个高性能队列
-        private val airRssi1List = LinkedList<Float>()
-        private val airRssi2List = LinkedList<Float>()
-        private val airSnrList = LinkedList<Float>()
-        
-        private val gndRssi1List = LinkedList<Float>()
-        private val gndRssi2List = LinkedList<Float>()
-        private val gndSnrList = LinkedList<Float>()
+        private val rssi1List = LinkedList<Float>()
+        private val rssi2List = LinkedList<Float>()
+        private val snrList = LinkedList<Float>()
 
         private val textPaint = Paint().apply {
             color = Color.LTGRAY
-            textSize = 20f
+            textSize = 18f
             isAntiAlias = true
         }
 
-        // 天空 RSSI1 (深蓝) & RSSI2 (淡蓝)
-        private val paintAirRssi1 = Paint().apply { color = Color.parseColor("#2980B9"); strokeWidth = 4f; style = Paint.Style.STROKE; isAntiAlias = true }
-        private val paintAirRssi2 = Paint().apply { color = Color.parseColor("#3498DB"); strokeWidth = 3f; style = Paint.Style.STROKE; isAntiAlias = true }
-        // 天空 SNR (明绿)
-        private val paintAirSnr = Paint().apply { color = Color.parseColor("#2ECC71"); strokeWidth = 3f; style = Paint.Style.STROKE; isAntiAlias = true }
-
-        // 地面 RSSI1 (深红/暗橙) & RSSI2 (亮黄/浅橙)
-        private val paintGndRssi1 = Paint().apply { color = Color.parseColor("#D35400"); strokeWidth = 4f; style = Paint.Style.STROKE; isAntiAlias = true }
-        private val paintGndRssi2 = Paint().apply { color = Color.parseColor("#E67E22"); strokeWidth = 3f; style = Paint.Style.STROKE; isAntiAlias = true }
-        // 地面 SNR (紫色或青色，这里选紫色区分天空绿)
-        private val paintGndSnr = Paint().apply { color = Color.parseColor("#9B59B6"); strokeWidth = 3f; style = Paint.Style.STROKE; isAntiAlias = true }
-
-        private val gridPaint = Paint().apply {
-            color = Color.argb(45, 255, 255, 255)
-            strokeWidth = 1.5f
+        // 无论天空还是地面，均采用统一逻辑的 3 条高对比度画笔颜色
+        private val paintRssi1 = Paint().apply {
+            color = if (isAir) Color.parseColor("#2980B9") else Color.parseColor("#D35400") // 天空深蓝，地面深橙
+            strokeWidth = 4f
+            style = Paint.Style.STROKE
+            isAntiAlias = true
         }
 
-        fun addData(aR1: Float?, aR2: Float?, aSnr: Float?, gR1: Float?, gR2: Float?, gSnr: Float?) {
-            // 维持上一帧连续性防断流
-            airRssi1List.addLast(aR1 ?: airRssi1List.lastOrNull() ?: -100f)
-            airRssi2List.addLast(aR2 ?: airRssi2List.lastOrNull() ?: -100f)
-            airSnrList.addLast(aSnr ?: airSnrList.lastOrNull() ?: 0f)
-            
-            gndRssi1List.addLast(gR1 ?: gndRssi1List.lastOrNull() ?: -100f)
-            gndRssi2List.addLast(gR2 ?: gndRssi2List.lastOrNull() ?: -100f)
-            gndSnrList.addLast(gSnr ?: gndSnrList.lastOrNull() ?: 0f)
+        private val paintRssi2 = Paint().apply {
+            color = if (isAir) Color.parseColor("#3498DB") else Color.parseColor("#E67E22") // 天空淡蓝，地面浅橙
+            strokeWidth = 3f
+            style = Paint.Style.STROKE
+            isAntiAlias = true
+        }
 
-            // 超长截断
-            if (airRssi1List.size > maxDataPoints) airRssi1List.removeFirst()
-            if (airRssi2List.size > maxDataPoints) airRssi2List.removeFirst()
-            if (airSnrList.size > maxDataPoints) airSnrList.removeFirst()
-            if (gndRssi1List.size > maxDataPoints) gndRssi1List.removeFirst()
-            if (gndRssi2List.size > maxDataPoints) gndRssi2List.removeFirst()
-            if (gndSnrList.size > maxDataPoints) gndSnrList.removeFirst()
+        private val paintSnr = Paint().apply {
+            color = if (isAir) Color.parseColor("#2ECC71") else Color.parseColor("#9B59B6") // 天空嫩绿，地面紫色
+            strokeWidth = 3f
+            style = Paint.Style.STROKE
+            isAntiAlias = true
+        }
+
+        private val gridPaint = Paint().apply {
+            color = Color.argb(40, 255, 255, 255)
+            strokeWidth = 1f
+        }
+
+        private val bgPaint = Paint().apply {
+            color = Color.argb(35, 255, 255, 255) // 给图表加层极淡的半透明背景框，便于划分上下边界
+        }
+
+        fun addData(r1: Float?, r2: Float?, snr: Float?) {
+            rssi1List.addLast(r1 ?: rssi1List.lastOrNull() ?: -100f)
+            rssi2List.addLast(r2 ?: rssi2List.lastOrNull() ?: -100f)
+            snrList.addLast(snr ?: snrList.lastOrNull() ?: 0f)
+
+            if (rssi1List.size > maxDataPoints) rssi1List.removeFirst()
+            if (rssi2List.size > maxDataPoints) rssi2List.removeFirst()
+            if (snrList.size > maxDataPoints) snrList.removeFirst()
 
             postInvalidate()
         }
@@ -443,28 +455,23 @@ class FloatView(
             val h = height.toFloat()
             if (w <= 0 || h <= 0) return
 
-            // 1. 背景标线
-            canvas.drawLine(0f, h * 0.25f, w, h * 0.25f, gridPaint)
-            canvas.drawLine(0f, h * 0.5f, w, h * 0.5f, gridPaint)
-            canvas.drawLine(0f, h * 0.75f, w, h * 0.75f, gridPaint)
+            // 绘制独立图表背景外框
+            canvas.drawRect(0f, 0f, w, h, bgPaint)
 
-            // 2. 绘制 6 条线的实时文字状态看板 (分左右两列排布，防重叠)
-            canvas.drawText("A_R1: ${airRssi1List.lastOrNull()?.toInt()}", 10f, 25f, textPaint)
-            canvas.drawText("A_R2: ${airRssi2List.lastOrNull()?.toInt()}", 130f, 25f, textPaint)
-            canvas.drawText("A_SNR: ${airSnrList.lastOrNull()?.toInt()}", 250f, 25f, textPaint)
+            // 1. 内部网格虚线
+            canvas.drawLine(0f, h * 0.33f, w, h * 0.33f, gridPaint)
+            canvas.drawLine(0f, h * 0.66f, w, h * 0.66f, gridPaint)
 
-            canvas.drawText("G_R1: ${gndRssi1List.lastOrNull()?.toInt()}", 10f, 55f, textPaint)
-            canvas.drawText("G_R2: ${gndRssi2List.lastOrNull()?.toInt()}", 130f, 55f, textPaint)
-            canvas.drawText("G_SNR: ${gndSnrList.lastOrNull()?.toInt()}", 250f, 55f, textPaint)
+            // 2. 区分头部标题与状态输出
+            val prefix = if (isAir) "AIR" else "GND"
+            canvas.drawText("[$prefix] R1: ${rssi1List.lastOrNull()?.toInt()}", 10f, 22f, textPaint)
+            canvas.drawText("R2: ${rssi2List.lastOrNull()?.toInt()}", 140f, 22f, textPaint)
+            canvas.drawText("SNR: ${snrList.lastOrNull()?.toInt()}", 250f, 22f, textPaint)
 
-            // 3. 实时绘制 6 条归一化曲线 (RSSI 映射量程 -120 到 -20，SNR 映射量程 -10 到 40)
-            drawCurve(canvas, airRssi1List, -120f, -20f, w, h, paintAirRssi1)
-            drawCurve(canvas, airRssi2List, -120f, -20f, w, h, paintAirRssi2)
-            drawCurve(canvas, airSnrList, -10f, 40f, w, h, paintAirSnr)
-            
-            drawCurve(canvas, gndRssi1List, -120f, -20f, w, h, paintGndRssi1)
-            drawCurve(canvas, gndRssi2List, -120f, -20f, w, h, paintGndRssi2)
-            drawCurve(canvas, gndSnrList, -10f, 40f, w, h, paintGndSnr)
+            // 3. 独立画线 (RSSI 映射量程 -120 到 -20，SNR 映射量程 -10 到 40)
+            drawCurve(canvas, rssi1List, -120f, -20f, w, h, paintRssi1)
+            drawCurve(canvas, rssi2List, -120f, -20f, w, h, paintRssi2)
+            drawCurve(canvas, snrList, -10f, 40f, w, h, paintSnr)
         }
 
         private fun drawCurve(canvas: Canvas, list: List<Float>, minVal: Float, maxVal: Float, w: Float, h: Float, paint: Paint) {
