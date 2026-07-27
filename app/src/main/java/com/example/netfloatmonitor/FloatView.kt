@@ -34,7 +34,7 @@ class FloatView(
     private var resizeTouchY = 0f
 
     // ==========================================
-    // 终极重构：剥离过于复杂的闭包，由独立方法控制返回，杜绝一切编译歧义
+    // 终极修复：使用显式 receiver (this.layoutParams) 彻底解决作用域穿透赋值冲突
     // ==========================================
     
     private val miniIconViewRef: CardView by lazy { createMiniIconView(context) }
@@ -46,7 +46,7 @@ class FloatView(
             textSize = 11f
             setTextColor(Color.WHITE)
             setBackgroundColor(Color.parseColor("#E74C3C"))
-            layoutParams = LinearLayout.LayoutParams(dp2px(context, 50f), dp2px(context, 26f))
+            this.layoutParams = LinearLayout.LayoutParams(dp2px(context, 50f), dp2px(context, 26f)) // 显式指定 this
         }
     }
 
@@ -70,14 +70,13 @@ class FloatView(
 
     private val resizeHandleRef: View by lazy {
         View(context).apply {
-            layoutParams = FrameLayout.LayoutParams(dp2px(context, 30f), dp2px(context, 30f)).apply {
-                gravity = Gravity.BOTTOM or Gravity.RIGHT
-            }
+            val lp = FrameLayout.LayoutParams(dp2px(context, 30f), dp2px(context, 30f))
+            lp.gravity = Gravity.BOTTOM or Gravity.RIGHT
+            this.layoutParams = lp // 显式指定 this
             setBackgroundColor(Color.TRANSPARENT)
         }
     }
 
-    // 独立出迷你图标的构建，防止局部变量与属性冲突
     private fun createMiniIconView(ctx: Context): CardView {
         val card = CardView(ctx)
         card.radius = dp2px(ctx, 30f).toFloat()
@@ -95,7 +94,6 @@ class FloatView(
         return card
     }
 
-    // 独立出大面板的构建，打破无限嵌套的 apply 作用域
     private fun createExpandedPanelView(ctx: Context): CardView {
         val panel = CardView(ctx)
         panel.radius = dp2px(ctx, 8f).toFloat()
@@ -130,9 +128,9 @@ class FloatView(
         // 双栏布局容器 (左边 AIR，右边 GND)
         val dualColumnLayout = LinearLayout(ctx)
         dualColumnLayout.orientation = LinearLayout.HORIZONTAL
-        dualColumnLayout.layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f).apply {
-            topMargin = dp2px(ctx, 6f)
-        }
+        val dualLp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f)
+        dualLp.topMargin = dp2px(ctx, 6f)
+        dualColumnLayout.layoutParams = dualLp
 
         // 【左侧栏：AIR 天空端】
         val skyLayout = LinearLayout(ctx)
@@ -156,9 +154,9 @@ class FloatView(
         // 【右侧栏：GND 地面端】
         val groundLayout = LinearLayout(ctx)
         groundLayout.orientation = LinearLayout.VERTICAL
-        groundLayout.layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f).apply {
-            leftMargin = dp2px(ctx, 10f)
-        }
+        val groundLp = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f)
+        groundLp.leftMargin = dp2px(ctx, 10f)
+        groundLayout.layoutParams = groundLp
         
         val groundTitle = TextView(ctx)
         groundTitle.text = "GND"
