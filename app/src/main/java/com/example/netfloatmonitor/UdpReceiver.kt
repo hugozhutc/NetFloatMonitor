@@ -1,238 +1,55 @@
 package com.example.netfloatmonitor
 
-
+import android.util.Log
 import java.net.DatagramPacket
 import java.net.DatagramSocket
-import java.net.InetSocketAddress
-import kotlin.concurrent.thread
-import org.json.JSONObject
+import java.lang.Exception
 
+class UdpReceiver(private val port: Int, private val onData: (String) -> Unit) {
 
+    private var socket: DatagramSocket? = null
+    private var running = false
+    private var thread: Thread? = null
 
-class UdpReceiver(
-
-    private val port:Int,
-
-    private val onData:(String)->Unit
-
-){
-
-
-    private var running=false
-
-    private var socket:DatagramSocket?=null
-
-
-
-    fun start(){
-
-
-        if(running)
-            return
-
-
-        running=true
-
-
-
-        thread {
-
-
+    fun start() {
+        if (running) return
+        running = true
+        
+        thread = Thread {
+            val buffer = ByteArray(2048)
             try {
-
-
-
-                socket = DatagramSocket(null)
-
-
-
-                socket!!.reuseAddress=true
-
-
-
-                socket!!.bind(
-
-                    InetSocketAddress(
-
-                        "0.0.0.0",
-
-                        port
-
-                    )
-
-                )
-
-
-
-                println(
-                    "UDP LISTEN:$port"
-                )
-
-
-
-
-                val buffer =
-                    ByteArray(8192)
-
-
-
-
-                while(running){
-
-
-
-                    val packet =
-
-                        DatagramPacket(
-
-                            buffer,
-
-                            buffer.size
-
-                        )
-
-
-
-                    socket!!.receive(packet)
-
-
-
-                    val ip =
-
-                        packet.address
-                            .hostAddress
-                            ?: ""
-
-
-
-
-                    val data =
-
-                        String(
-
-                            packet.data,
-
-                            0,
-
-                            packet.length,
-
-                            Charsets.UTF_8
-
-                        ).trim()
-
-
-
-
-                    println(
-                        "RX $ip : $data"
-                    )
-
-
-
-
-                    //JSON检查
-
-                    if(isJson(data)){
-
-
-                        onData(data)
-
-
-                    }
-                    else{
-
-
-                        println(
-                            "DROP NON JSON"
-                        )
-
-
-                    }
-
-
-
+                socket = DatagramSocket(port)
+                Log.d("UdpReceiver", "UDP 服务已在端口 $port 启动监听...")
+
+                while (running) {
+                    val packet = DatagramPacket(buffer, buffer.size)
+                    socket?.receive(packet)
+                    
+                    val ip = packet.address?.hostAddress ?: "未知IP"
+                    val data = String(packet.data, 0, packet.length, Charsets.UTF_8).trim()
+
+                    Log.d("UdpReceiver", "收到来自 $ip 的原始数据: $data")
+                    
+                    // 直接回调分发所有收到的网络数据，不做强行丢弃
+                    onData(data)
                 }
-
-
-
+            } catch (e: Exception) {
+                Log.e("UdpReceiver", "UDP 服务运行异常: ${e.message}", e)
+            } finally {
+                stop()
             }
-
-            catch(e:Exception){
-
-
-                println(
-
-                    "UDP ERROR:${e.message}"
-
-                )
-
-
-            }
-
-
-
         }
-
-
-
+        thread?.start()
     }
 
-
-
-
-
-
-
-    private fun isJson(
-
-        text:String
-
-    ):Boolean{
-
-
-        return try{
-
-
-            JSONObject(text)
-
-            true
-
-
-        }
-
-        catch(e:Exception){
-
-            false
-
-        }
-
-
-    }
-
-
-
-
-
-
-
-
-    fun stop(){
-
-
-        running=false
-
-
-        try{
-
+    fun stop() {
+        running = false
+        try {
             socket?.close()
-
+        } catch (e: Exception) {
+            Log.e("UdpReceiver", "关闭 Socket 异常: ${e.message}")
         }
-
-        catch(_:Exception){}
-
-
+        socket = null
+        thread = null
     }
-
-
-
 }
