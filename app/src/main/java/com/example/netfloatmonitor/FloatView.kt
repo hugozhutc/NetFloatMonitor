@@ -37,6 +37,9 @@ class FloatView(
     private lateinit var expandedPanelView: CardView
     private lateinit var minimizeBtn: Button
     
+    // 显式保留右下角的缩放触摸块引用，彻底弃用 R.id 动态计算
+    private lateinit var resizeHandle: View
+    
     // 左右两端的文本显示组件
     private lateinit var skyTextView: TextView
     private lateinit var groundTextView: TextView
@@ -64,7 +67,7 @@ class FloatView(
             visibility = View.VISIBLE
         }
 
-        // 2. 创建展开状态的数据面板布局 (使用 FrameLayout 方便右下角层叠缩放块)
+        // 2. 创建展开状态的数据面板布局
         expandedPanelView = CardView(context).apply {
             radius = dp2px(context, 12f).toFloat()
             setCardBackgroundColor(Color.parseColor("#1C1C1E"))
@@ -174,12 +177,11 @@ class FloatView(
             rootFrame.addView(innerLayout)
 
             // 右下角添加专用于拖动改变大小的触摸块 (30dp x 30dp)
-            val resizeHandle = View(context).apply {
-                id = R.id.btn_minimize + 99 // 设定独立ID区分
+            resizeHandle = View(context).apply {
                 layoutParams = FrameLayout.LayoutParams(dp2px(context, 30f), dp2px(context, 30f)).apply {
                     gravity = Gravity.BOTTOM or Gravity.RIGHT
                 }
-                setBackgroundColor(Color.TRANSPARENT) // 透明块，不遮挡视觉
+                setBackgroundColor(Color.TRANSPARENT)
             }
             rootFrame.addView(resizeHandle)
 
@@ -216,13 +218,27 @@ class FloatView(
         }
     }
 
+    /**
+     * 兼容性修正：保留原有的 updateJson 方法，防止 FloatService.kt 编译报错。
+     * 自动解析特征，如果是天空端数据就往左边送，如果是地面端就往右边送。
+     */
+    fun updateJson(data: String) {
+        if (data.isBlank()) return
+        // 自动判定无线链路标记分配显示区域
+        if (data.contains("sky") || data.contains("uav") || data.contains("node_1")) {
+            skyTextView.text = data
+        } else {
+            groundTextView.text = data
+        }
+    }
+
     fun updateData(skyData: String, groundData: String) {
         if (skyData.isNotEmpty()) skyTextView.text = skyData
         if (groundData.isNotEmpty()) groundTextView.text = groundData
     }
 
     private fun setupDragAndResizeListeners(context: Context) {
-        // 1. 拖动悬浮窗位置的监听器 (绑定在图标和面板主体)
+        // 1. 位置拖拽监听
         val dragListener = OnTouchListener { _, event ->
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
@@ -254,9 +270,8 @@ class FloatView(
         miniIconView.setOnTouchListener(dragListener)
         expandedPanelView.setOnTouchListener(dragListener)
 
-        // 2. 拖动右下角改变大小的监听器
-        val resizeHandle = expandedPanelView.findViewById<View>(R.id.btn_minimize + 99)
-        resizeHandle?.setOnTouchListener { _, event ->
+        // 2. 右下角大小拉伸缩放监听（修复：改用显式变量引用，拒绝运算错误）
+        resizeHandle.setOnTouchListener { _, event ->
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
                     initialWidth = params.width
@@ -269,7 +284,6 @@ class FloatView(
                     val deltaX = (event.rawX - resizeTouchX).toInt()
                     val deltaY = (event.rawY - resizeTouchY).toInt()
                     
-                    // 限制最小尺寸，防止缩成 0 像素无法拉回
                     val newWidth = (initialWidth + deltaX).coerceAtLeast(dp2px(context, 240f))
                     val newHeight = (initialHeight + deltaY).coerceAtLeast(dp2px(context, 200f))
                     
