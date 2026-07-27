@@ -3,7 +3,6 @@ package com.example.netfloatmonitor
 import android.content.Context
 import android.graphics.Color
 import android.view.Gravity
-import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
@@ -34,7 +33,6 @@ class FloatView(
 
     init {
         orientation = VERTICAL
-        // 动态构建悬浮窗的内部布局，也可以使用 LayoutInflater 加载 XML
         initView(context)
         setupDragListener()
     }
@@ -48,12 +46,12 @@ class FloatView(
             
             val tv = TextView(context).apply {
                 text = "NET"
-                textColor = Color.WHITE
+                setTextColor(Color.WHITE)
                 gravity = Gravity.CENTER
                 textSize = 14f
             }
             addView(tv, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
-            visibility = View.VISIBLE // 默认显示小图标
+            visibility = View.VISIBLE
         }
 
         // 2. 创建展开状态的数据面板布局
@@ -65,7 +63,8 @@ class FloatView(
             // 面板内部垂直排列
             val innerLayout = LinearLayout(context).apply {
                 orientation = VERTICAL
-                padding = dp2px(context, 12f)
+                val p = dp2px(context, 12f)
+                setPadding(p, p, p, p) // 修正：使用原生 setPadding 替代 padding
             }
 
             // 标题与收起按钮栏
@@ -75,7 +74,7 @@ class FloatView(
             }
             val titleTv = TextView(context).apply {
                 text = "网络监控面板"
-                textColor = Color.WHITE
+                setTextColor(Color.WHITE) // 修正：使用 setTextColor
                 textSize = 16f
                 layoutParams = LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f)
             }
@@ -98,14 +97,14 @@ class FloatView(
             }
             jsonTextView = TextView(context).apply {
                 text = "等待网络数据..."
-                textColor = Color.GREEN
+                setTextColor(Color.GREEN) // 修正：使用 setTextColor
                 textSize = 12f
             }
             scrollView.addView(jsonTextView)
             innerLayout.addView(scrollView)
 
             addView(innerLayout)
-            visibility = View.GONE // 默认隐藏面板
+            visibility = View.GONE
         }
 
         // 将两个状态的视图都塞入根布局
@@ -119,7 +118,6 @@ class FloatView(
                 miniIconView.visibility = View.GONE
                 expandedPanelView.visibility = View.VISIBLE
                 
-                // 动态拉大悬浮窗的 Window 宽高以容纳面板
                 params.width = dp2px(context, 260f)
                 params.height = dp2px(context, 300f)
                 windowManager.updateViewLayout(this, params)
@@ -133,7 +131,6 @@ class FloatView(
                 expandedPanelView.visibility = View.GONE
                 miniIconView.visibility = View.VISIBLE
                 
-                // 动态将悬浮窗的 Window 还原为图标大小
                 params.width = WindowManager.LayoutParams.WRAP_CONTENT
                 params.height = WindowManager.LayoutParams.WRAP_CONTENT
                 windowManager.updateViewLayout(this, params)
@@ -141,16 +138,10 @@ class FloatView(
         }
     }
 
-    /**
-     * 更新面板内的文本数据
-     */
     fun updateJson(data: String) {
         jsonTextView.text = data
     }
 
-    /**
-     * 实现悬浮窗的全屏拖动逻辑
-     */
     private fun setupDragListener() {
         val touchListener = OnTouchListener { _, event ->
             when (event.action) {
@@ -168,7 +159,6 @@ class FloatView(
                     true
                 }
                 MotionEvent.ACTION_UP -> {
-                    // 如果拖动距离极小，判定为点击事件，触发控件原生的 clearFocus/performClick
                     val deltaX = Math.abs(event.rawX - touchX)
                     val deltaY = Math.abs(event.rawY - touchY)
                     if (deltaX < 10 && deltaY < 10) {
@@ -182,7 +172,6 @@ class FloatView(
             }
         }
 
-        // 让小图标和展开后的标题栏都支持拖拽移动
         miniIconView.setOnTouchListener(touchListener)
         expandedPanelView.setOnTouchListener(touchListener)
     }
