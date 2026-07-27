@@ -42,14 +42,14 @@ class FloatView(
     // 顶部的控制栏容器
     private val topBar = LinearLayout(context)
     
-    // 下方的数据面板层（改用 FrameLayout 包裹，以便在右下角叠放一个缩放角标提示）
+    // 下方的数据面板层
     private val contentFrame = FrameLayout(context)
     private val contentPanel = LinearLayout(context)
     
-    // 【优化】右下角微型视觉缩放提示块（只在展开状态下可见）
+    // 右下角微型视觉缩放提示块
     private val resizeIndicator = View(context).apply {
         val triangleBg = GradientDrawable().apply {
-            setColor(Color.parseColor("#3498DB")) // 明亮的浅蓝色提示块
+            setColor(Color.parseColor("#3498DB"))
             cornerRadius = 4f
         }
         background = triangleBg
@@ -101,7 +101,7 @@ class FloatView(
             FrameLayout.LayoutParams.MATCH_PARENT
         ))
         
-        // 把缩放视觉角标固定在右下角（大小 15x15）
+        // 把缩放视觉角标固定在右下角
         val indicatorLp = FrameLayout.LayoutParams(15, 15).apply {
             gravity = Gravity.BOTTOM or Gravity.RIGHT
             setMargins(0, 0, 4, 4)
@@ -159,7 +159,7 @@ class FloatView(
             if (isExpanded) performToggle()
         }
 
-        // 整体面板的手势处理（重点优化右下角盲操体验）
+        // 整体面板的手势处理
         setOnTouchListener(object : OnTouchListener {
             override fun onTouch(v: View?, event: MotionEvent): Boolean {
                 when (event.action) {
@@ -168,8 +168,6 @@ class FloatView(
                         downY = event.rawY
                         startWidth = width
                         startHeight = height
-                        
-                        // 【优化】右下角触发判定范围大幅扩容：从 50 像素暴力提升到 120 像素，闭着眼睛都能抠住
                         resize = isExpanded && (event.x > (width - 120)) && (event.y > (height - 120))
                     }
                     MotionEvent.ACTION_MOVE -> {
@@ -265,7 +263,7 @@ class FloatView(
     }
 
     /**
-     * V2.0 JSON数据精准解析处理与【动态均衡分流渲染】
+     * V3.0 优先级排序与动态分流均衡渲染
      */
     fun updateJson(json: String) {
         try {
@@ -275,19 +273,33 @@ class FloatView(
             airLayout.removeAllViews()
             gndLayout.removeAllViews()
 
-            obj.keys().forEach { key ->
+            val allKeys = mutableListOf<String>()
+            obj.keys().forEach { allKeys.add(it) }
+
+            // 【第一步】寻找并优先把包含 pass_a 或 pass_g 的关键核心数据顶上去
+            allKeys.forEach { key ->
+                val value = obj.get(key).toString()
+                if (key.contains("pass_a")) {
+                    addItem(airLayout, key, value)
+                } else if (key.contains("pass_g")) {
+                    addItem(gndLayout, key, value)
+                }
+            }
+
+            // 【第二步】处理其余所有的常规统计指标数据
+            allKeys.forEach { key ->
+                // 跳过已经在第一步排布过的数据
+                if (key.contains("pass_a") || key.contains("pass_g")) return@forEach
+                
                 val value = obj.get(key).toString()
 
                 when {
-                    // 1. 明确属于地面端的数据，依旧死死固定在右侧栏
+                    // 明确属于地面端的数据，固定在右侧栏
                     key.endsWith("_g") -> {
                         addItem(gndLayout, key, value)
                     }
-                    
-                    // 2. 属于天空端（_a）或者缺省未指定的数据，启用智能行数均衡机制
+                    // 其余未明确指定或天空端的数据，按两栏的当前高度动态分流均衡
                     else -> {
-                        // 【核心改动】如果左侧栏（AIR）当前挂载的项比右侧栏（GND）多，
-                        // 为了防止左侧拉得太长，自动把当前这条数据分流移到右侧栏（GND）显示
                         if (airLayout.childCount > gndLayout.childCount) {
                             addItem(gndLayout, key, value)
                         } else {
