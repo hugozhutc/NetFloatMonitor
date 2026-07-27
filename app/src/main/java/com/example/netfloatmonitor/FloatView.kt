@@ -33,14 +33,15 @@ class FloatView(
     private var resizeTouchX = 0f
     private var resizeTouchY = 0f
 
-    private lateinit var miniIconView: CardView
-    private lateinit var expandedPanelView: CardView
-    private lateinit var minimizeBtn: Button
-    private lateinit var resizeHandle: View
+    // 核心修复：修改所有变量命名，加 Ref 后缀，彻底解决系统潜在的同名 val 冲突
+    private lateinit var miniIconViewRef: CardView
+    private lateinit var expandedPanelViewRef: CardView
+    private lateinit var minimizeBtnRef: Button
+    private lateinit var resizeHandleRef: View
     
     // 左右两端的文本显示组件
-    private lateinit var skyTextView: TextView
-    private lateinit var groundTextView: TextView
+    private lateinit var skyTextViewRef: TextView
+    private lateinit var groundTextViewRef: TextView
 
     init {
         orientation = VERTICAL
@@ -62,41 +63,39 @@ class FloatView(
         tv.textSize = 14f
         miniIcon.addView(tv, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
         miniIcon.visibility = View.VISIBLE
-        this.miniIconView = miniIcon
+        this.miniIconViewRef = miniIcon
 
-        // ==========================================
-        // 核心修复：使用纯局部变量初始化，最后单向赋值给类变量，彻底规避所有 apply 作用域重名冲突
-        // ==========================================
+        // 2. 初始化核心子控件
         val btn = Button(context)
         btn.text = "收起"
         btn.textSize = 11f
         btn.setTextColor(Color.WHITE)
         btn.setBackgroundColor(Color.parseColor("#E74C3C"))
         btn.layoutParams = LayoutParams(dp2px(context, 50f), dp2px(context, 26f))
-        this.minimizeBtn = btn
+        this.minimizeBtnRef = btn
 
         val skyTv = TextView(context)
         skyTv.text = "waiting..."
         skyTv.setTextColor(Color.WHITE)
         skyTv.textSize = 13f
         skyTv.lineSpacingMultiplier = 1.2f
-        this.skyTextView = skyTv
+        this.skyTextViewRef = skyTv
 
         val groundTv = TextView(context)
         groundTv.text = "waiting..."
         groundTv.setTextColor(Color.WHITE)
         groundTv.textSize = 13f
         groundTv.lineSpacingMultiplier = 1.2f
-        this.groundTextView = groundTv
+        this.groundTextViewRef = groundTv
 
         val handle = View(context)
         handle.layoutParams = FrameLayout.LayoutParams(dp2px(context, 30f), dp2px(context, 30f)).apply {
             gravity = Gravity.BOTTOM or Gravity.RIGHT
         }
         handle.setBackgroundColor(Color.TRANSPARENT)
-        this.resizeHandle = handle
+        this.resizeHandleRef = handle
 
-        // 2. 创建展开状态的数据面板布局
+        // 3. 创建展开状态的数据面板布局
         val panel = CardView(context)
         panel.radius = dp2px(context, 8f).toFloat()
         panel.setCardBackgroundColor(Color.parseColor("#1A222D"))
@@ -124,7 +123,7 @@ class FloatView(
         titleTv.layoutParams = LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f)
         
         titleLayout.addView(titleTv)
-        titleLayout.addView(this.minimizeBtn)
+        titleLayout.addView(this.minimizeBtnRef)
         innerLayout.addView(titleLayout)
 
         // 双栏布局容器 (左边 AIR，右边 GND)
@@ -149,7 +148,7 @@ class FloatView(
         skyScrollView.layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
         skyScrollView.isVerticalScrollBarEnabled = false
         
-        skyScrollView.addView(this.skyTextView)
+        skyScrollView.addView(this.skyTextViewRef)
         skyLayout.addView(skyTitle)
         skyLayout.addView(skyScrollView)
 
@@ -170,7 +169,7 @@ class FloatView(
         groundScrollView.layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
         groundScrollView.isVerticalScrollBarEnabled = false
         
-        groundScrollView.addView(this.groundTextView)
+        groundScrollView.addView(this.groundTextViewRef)
         groundLayout.addView(groundTitle)
         groundLayout.addView(groundScrollView)
 
@@ -179,20 +178,20 @@ class FloatView(
         innerLayout.addView(dualColumnLayout)
         
         rootFrame.addView(innerLayout)
-        rootFrame.addView(this.resizeHandle)
+        rootFrame.addView(this.resizeHandleRef)
         panel.addView(rootFrame)
         
-        this.expandedPanelView = panel
+        this.expandedPanelViewRef = panel
 
-        addView(this.miniIconView)
-        addView(this.expandedPanelView)
+        addView(this.miniIconViewRef)
+        addView(this.expandedPanelViewRef)
 
         // 点击小图标 -> 展开面板
-        this.miniIconView.setOnClickListener {
+        this.miniIconViewRef.setOnClickListener {
             if (!isExpanded) {
                 isExpanded = true
-                this.miniIconView.visibility = View.GONE
-                this.expandedPanelView.visibility = View.VISIBLE
+                this.miniIconViewRef.visibility = View.GONE
+                this.expandedPanelViewRef.visibility = View.VISIBLE
                 
                 params.width = dp2px(context, 360f)
                 params.height = dp2px(context, 280f)
@@ -201,11 +200,11 @@ class FloatView(
         }
 
         // 点击收起按钮 -> 折叠回小图标
-        this.minimizeBtn.setOnClickListener {
+        this.minimizeBtnRef.setOnClickListener {
             if (isExpanded) {
                 isExpanded = false
-                this.expandedPanelView.visibility = View.GONE
-                this.miniIconView.visibility = View.VISIBLE
+                this.expandedPanelViewRef.visibility = View.GONE
+                this.miniIconViewRef.visibility = View.VISIBLE
                 
                 params.width = WindowManager.LayoutParams.WRAP_CONTENT
                 params.height = WindowManager.LayoutParams.WRAP_CONTENT
@@ -243,10 +242,10 @@ class FloatView(
         }
 
         if (skyBuilder.isNotEmpty()) {
-            skyTextView.text = skyBuilder.toString().trimEnd()
+            skyTextViewRef.text = skyBuilder.toString().trimEnd()
         }
         if (groundBuilder.isNotEmpty()) {
-            groundTextView.text = groundBuilder.toString().trimEnd()
+            groundTextViewRef.text = groundBuilder.toString().trimEnd()
         }
     }
 
@@ -271,7 +270,7 @@ class FloatView(
                     val deltaY = Math.abs(event.rawY - touchY)
                     if (deltaX < 10 && deltaY < 10) {
                         if (!isExpanded) {
-                            miniIconView.performClick()
+                            miniIconViewRef.performClick()
                         }
                     }
                     true
@@ -279,10 +278,10 @@ class FloatView(
                 else -> false
             }
         }
-        miniIconView.setOnTouchListener(dragListener)
-        expandedPanelView.setOnTouchListener(dragListener)
+        miniIconViewRef.setOnTouchListener(dragListener)
+        expandedPanelViewRef.setOnTouchListener(dragListener)
 
-        resizeHandle.setOnTouchListener { _, event ->
+        resizeHandleRef.setOnTouchListener { _, event ->
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
                     initialWidth = params.width
