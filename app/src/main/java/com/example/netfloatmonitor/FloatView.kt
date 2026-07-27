@@ -96,8 +96,8 @@ class FloatView(
                 layoutParams = LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f)
             }
             
-            // 修复：直接对类成员变量赋值，不加额外的局部声明
-            minimizeBtn = Button(context).apply {
+            // 修复核心：使用 this@FloatView 显式对类变量赋值，杜绝作用域误判导致的 Val reassigned 错误
+            this@FloatView.minimizeBtn = Button(context).apply {
                 text = "收起"
                 textSize = 11f
                 setTextColor(Color.WHITE)
@@ -105,7 +105,7 @@ class FloatView(
                 layoutParams = LayoutParams(dp2px(context, 50f), dp2px(context, 26f))
             }
             titleLayout.addView(titleTv)
-            titleLayout.addView(minimizeBtn)
+            titleLayout.addView(this@FloatView.minimizeBtn)
             innerLayout.addView(titleLayout)
 
             // 双栏布局容器 (左边 AIR，右边 GND)
@@ -131,13 +131,13 @@ class FloatView(
                 layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
                 isVerticalScrollBarEnabled = false
             }
-            skyTextView = TextView(context).apply {
+            this@FloatView.skyTextView = TextView(context).apply {
                 text = "waiting..."
                 setTextColor(Color.WHITE)
                 textSize = 13f
                 lineSpacingMultiplier = 1.2f
             }
-            skyScrollView.addView(skyTextView)
+            skyScrollView.addView(this@FloatView.skyTextView)
             skyLayout.addView(skyTitle)
             skyLayout.addView(skyScrollView)
 
@@ -158,13 +158,13 @@ class FloatView(
                 layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
                 isVerticalScrollBarEnabled = false
             }
-            groundTextView = TextView(context).apply {
+            this@FloatView.groundTextView = TextView(context).apply {
                 text = "waiting..."
                 setTextColor(Color.WHITE)
                 textSize = 13f
                 lineSpacingMultiplier = 1.2f
             }
-            groundScrollView.addView(groundTextView)
+            groundScrollView.addView(this@FloatView.groundTextView)
             groundLayout.addView(groundTitle)
             groundLayout.addView(groundScrollView)
 
@@ -175,13 +175,13 @@ class FloatView(
             rootFrame.addView(innerLayout)
 
             // 右下角拉伸缩放响应块
-            resizeHandle = View(context).apply {
+            this@FloatView.resizeHandle = View(context).apply {
                 layoutParams = FrameLayout.LayoutParams(dp2px(context, 30f), dp2px(context, 30f)).apply {
                     gravity = Gravity.BOTTOM or Gravity.RIGHT
                 }
                 setBackgroundColor(Color.TRANSPARENT)
             }
-            rootFrame.addView(resizeHandle)
+            rootFrame.addView(this@FloatView.resizeHandle)
 
             addView(rootFrame)
         }
