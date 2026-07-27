@@ -36,8 +36,6 @@ class FloatView(
     private lateinit var miniIconView: CardView
     private lateinit var expandedPanelView: CardView
     private lateinit var minimizeBtn: Button
-    
-    // 右下角缩放块引用
     private lateinit var resizeHandle: View
     
     // 左右两端的文本显示组件
@@ -69,8 +67,8 @@ class FloatView(
 
         // 2. 创建展开状态的数据面板布局
         expandedPanelView = CardView(context).apply {
-            radius = dp2px(context, 8f).toFloat() // 恢复之前较小的圆角
-            setCardBackgroundColor(Color.parseColor("#1A222D")) // 深蓝黑底色，接近图示背景
+            radius = dp2px(context, 8f).toFloat()
+            setCardBackgroundColor(Color.parseColor("#1A222D"))
             layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
             visibility = View.GONE
 
@@ -92,11 +90,13 @@ class FloatView(
                 gravity = Gravity.CENTER_VERTICAL
             }
             val titleTv = TextView(context).apply {
-                text = "NetFloatMonitor" // 还原顶部半透明背景的标题
-                setTextColor(Color.parseColor("#80FFFFFF")) // 半透明白
+                text = "NetFloatMonitor"
+                setTextColor(Color.parseColor("#80FFFFFF"))
                 textSize = 14f
                 layoutParams = LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f)
             }
+            
+            // 修复：直接对类成员变量赋值，不加额外的局部声明
             minimizeBtn = Button(context).apply {
                 text = "收起"
                 textSize = 11f
@@ -108,7 +108,7 @@ class FloatView(
             titleLayout.addView(minimizeBtn)
             innerLayout.addView(titleLayout)
 
-            // 双栏布局容器 (还原你图中的布局：左边 AIR，右边 GND)
+            // 双栏布局容器 (左边 AIR，右边 GND)
             val dualColumnLayout = LinearLayout(context).apply {
                 orientation = HORIZONTAL
                 layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f).apply {
@@ -123,19 +123,19 @@ class FloatView(
             }
             val skyTitle = TextView(context).apply {
                 text = "AIR"
-                setTextColor(Color.parseColor("#00FF00")) // 还原图中的绿色高亮标题
+                setTextColor(Color.parseColor("#00FF00"))
                 textSize = 16f
-                paint.isFakeBoldText = true // 加粗
+                paint.isFakeBoldText = true
             }
             val skyScrollView = ScrollView(context).apply {
                 layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
-                isVerticalScrollBarEnabled = false // 隐藏滚动条更美观
+                isVerticalScrollBarEnabled = false
             }
             skyTextView = TextView(context).apply {
                 text = "waiting..."
-                setTextColor(Color.WHITE) // 还原图中的白色属性文字
+                setTextColor(Color.WHITE)
                 textSize = 13f
-                lineSpacingMultiplier = 1.2f // 调整行间距贴合原版
+                lineSpacingMultiplier = 1.2f
             }
             skyScrollView.addView(skyTextView)
             skyLayout.addView(skyTitle)
@@ -145,12 +145,12 @@ class FloatView(
             val groundLayout = LinearLayout(context).apply {
                 orientation = VERTICAL
                 layoutParams = LayoutParams(0, LayoutParams.MATCH_PARENT, 1f).apply {
-                    leftMargin = dp2px(context, 10f) // 左右留出间距
+                    leftMargin = dp2px(context, 10f)
                 }
             }
             val groundTitle = TextView(context).apply {
                 text = "GND"
-                setTextColor(Color.parseColor("#00FF00")) // 绿色高亮
+                setTextColor(Color.parseColor("#00FF00"))
                 textSize = 16f
                 paint.isFakeBoldText = true
             }
@@ -217,7 +217,7 @@ class FloatView(
     }
 
     /**
-     * 核心修复：精准智能拆分单条 JSON 报文到左右两栏
+     * 精准智能拆分单条 JSON 报文到左右两栏
      */
     fun updateJson(data: String) {
         if (data.isBlank()) return
@@ -225,7 +225,6 @@ class FloatView(
         val skyBuilder = StringBuilder()
         val groundBuilder = StringBuilder()
 
-        // 将接收到的文本按行拆分，或者去掉花括号后按逗号拆分键值对
         val cleanData = data.replace("{", "").replace("}", "").replace("\"", "")
         val lines = cleanData.split(Regex("[\n,]+"))
 
@@ -233,22 +232,18 @@ class FloatView(
             val trimmed = line.trim()
             if (trimmed.isEmpty()) continue
 
-            // 包含 _a 或 air 的行扔给左边 AIR 栏
             if (trimmed.contains("_a") || trimmed.contains("air", ignoreCase = true)) {
                 skyBuilder.append(trimmed).append("\n")
             } 
-            // 包含 _g 或 gnd 的行扔给右边 GND 栏
             else if (trimmed.contains("_g") || trimmed.contains("gnd", ignoreCase = true)) {
                 groundBuilder.append(trimmed).append("\n")
             }
-            // 如果是没有特定后缀的通用行，两边同时打印（或者你也可以自行分配）
             else {
                 skyBuilder.append(trimmed).append("\n")
                 groundBuilder.append(trimmed).append("\n")
             }
         }
 
-        // 更新界面
         if (skyBuilder.isNotEmpty()) {
             skyTextView.text = skyBuilder.toString().trimEnd()
         }
@@ -258,7 +253,6 @@ class FloatView(
     }
 
     private fun setupDragAndResizeListeners(context: Context) {
-        // 拖拽位置
         val dragListener = OnTouchListener { _, event ->
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
@@ -290,7 +284,6 @@ class FloatView(
         miniIconView.setOnTouchListener(dragListener)
         expandedPanelView.setOnTouchListener(dragListener)
 
-        // 右下角大小拉伸
         resizeHandle.setOnTouchListener { _, event ->
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
