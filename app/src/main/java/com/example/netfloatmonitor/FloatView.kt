@@ -8,7 +8,6 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
 import android.widget.Button
-import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -23,27 +22,41 @@ class FloatView(
     private val airLayout = LinearLayout(context)
     private val gndLayout = LinearLayout(context)
 
+    // 状态控制：当前是否处于展开状态
+    private var isExpanded = true
+
+    // 缓存展开时的标准宽高（根据原版逻辑，双栏宽约 600+，高自适应或固定）
+    private val expandedWidth = 640
+    private val expandedHeight = 450
+
+    // 缓存折叠后小圆点的宽高
+    private val collapsedSize = 100
+
     private var startWidth = 0
     private var startHeight = 0
     private var downX = 0f
     private var downY = 0f
     private var resize = false
 
-    // 新增：小巧的隐藏/收起按钮（带微圆角深红背景，更加精致）
-    private val hideBtn = Button(context).apply {
+    // 顶部的控制栏容器
+    private val topBar = LinearLayout(context)
+    // 下方的数据面板容器
+    private val contentPanel = LinearLayout(context)
+
+    // 精巧的切换状态按钮
+    private val toggleBtn = Button(context).apply {
         text = "×"
         textSize = 14f
         setTextColor(Color.WHITE)
         setGravity(Gravity.CENTER)
         val btnBg = GradientDrawable().apply {
-            setColor(Color.parseColor("#C0392B")) // 深红色背景
+            setColor(Color.parseColor("#C0392B")) // 初始为深红色
             cornerRadius = 6f
         }
         background = btnBg
     }
 
     init {
-        // 采用外层垂直布局，方便将隐藏按钮栏和下方的数据面板完美分层
         this.setOrientation(LinearLayout.VERTICAL)
         this.setPadding(8, 6, 8, 8)
 
@@ -53,41 +66,75 @@ class FloatView(
         bg.cornerRadius = 10f
         this.setBackground(bg)
 
-        // 创建顶部的微型控制栏（把隐藏按钮靠右放置）
-        val topBar = LinearLayout(context).apply {
-            setOrientation(LinearLayout.HORIZONTAL)
-            setGravity(Gravity.RIGHT or Gravity.CENTER_VERTICAL)
-            setPadding(0, 0, 4, 4)
-        }
+        // 配置顶部控制栏
+        topBar.setOrientation(LinearLayout.HORIZONTAL)
+        topBar.setGravity(Gravity.RIGHT or Gravity.CENTER_VERTICAL)
+        topBar.setPadding(0, 0, 4, 4)
         
-        // 显式设置按钮的大小（宽45，高45，在手机上刚好是一个精巧可点的微型正方形）
         val btnLp = LinearLayout.LayoutParams(45, 45)
-        topBar.addView(hideBtn, btnLp)
+        topBar.addView(toggleBtn, btnLp)
         addView(topBar)
 
-        // 创建下方的数据主面板容器（保持横向 AIR / GND 双栏）
-        val contentPanel = LinearLayout(context)
+        // 配置下方主面板
         contentPanel.setOrientation(LinearLayout.HORIZONTAL)
-
-        // 初始化子布局方向
         airLayout.setOrientation(LinearLayout.VERTICAL)
         gndLayout.setOrientation(LinearLayout.VERTICAL)
-
-        // 挂载 AIR 和 GND 双面板到容器中
         contentPanel.addView(createPanel("AIR", airLayout))
         contentPanel.addView(createPanel("GND", gndLayout))
         addView(contentPanel)
 
-        // 点击隐藏按钮的处理逻辑：直接让悬浮窗缩小为不可见的极小尺寸，或者让内容不可见
-        // 这里采用最直接的方式：点击后直接隐藏整个内容或让整个 View 移除/隐藏
-        hideBtn.setOnClickListener {
-            // 方式：直接将悬浮窗整体宽高设为 0，实现完美隐藏
-            params.width = 0
-            params.height = 0
+        // 一键切换折叠与再次展开的核心逻辑
+        toggleBtn.setOnClickListener {
+            val panelBg = GradientDrawable()
+            
+            if (isExpanded) {
+                // 【执行折叠】
+                isExpanded = false
+                contentPanel.visibility = View.GONE // 隐藏下方数据面板
+                
+                // 改变按钮样式，使其变成一个居中的小圆点悬浮图标
+                toggleBtn.text = "M"
+                val btnBg = GradientDrawable().apply {
+                    setColor(Color.parseColor("#2ECC71")) // 变成富有科技感的绿色小球
+                    cornerRadius = 50f
+                }
+                toggleBtn.background = btnBg
+                
+                // 让外层容器的背景变透明，只露出一颗小球
+                panelBg.setColor(Color.TRANSPARENT)
+                this.setBackground(panelBg)
+                this.setPadding(0, 0, 0, 0)
+
+                // 缩小悬浮窗总尺寸到小球大小
+                params.width = collapsedSize
+                params.height = collapsedSize
+            } else {
+                // 【执行再次展开】
+                isExpanded = true
+                contentPanel.visibility = View.VISIBLE // 恢复显示数据面板
+                
+                // 恢复关闭按钮的样式
+                toggleBtn.text = "×"
+                val btnBg = GradientDrawable().apply {
+                    setColor(Color.parseColor("#C0392B"))
+                    cornerRadius = 6f
+                }
+                toggleBtn.background = btnBg
+                
+                // 恢复 180 透明度黑色大面板背景
+                panelBg.setColor(Color.argb(180, 0, 0, 0))
+                panelBg.cornerRadius = 10f
+                this.setBackground(panelBg)
+                this.setPadding(8, 6, 8, 8)
+
+                // 恢复悬浮窗到大面板尺寸
+                params.width = expandedWidth
+                params.height = expandedHeight
+            }
             windowManager.updateViewLayout(this@FloatView, params)
         }
 
-        // 拖动与缩放手势处理
+        // 拖动与缩放手势处理（仅在展开状态下允许右侧边缘缩放）
         setOnTouchListener(object : OnTouchListener {
             override fun onTouch(v: View?, event: MotionEvent): Boolean {
                 when (event.action) {
@@ -96,7 +143,7 @@ class FloatView(
                         downY = event.rawY
                         startWidth = width
                         startHeight = height
-                        resize = event.x > (width - 50)
+                        resize = isExpanded && (event.x > (width - 50))
                     }
                     MotionEvent.ACTION_MOVE -> {
                         if (resize) {
@@ -129,7 +176,6 @@ class FloatView(
         val scroll = ScrollView(context)
         scroll.addView(containerLayout)
 
-        // 显式使用 setLayoutParams 规避重载冲突
         val lp = LinearLayout.LayoutParams(300, LinearLayout.LayoutParams.MATCH_PARENT)
         box.addView(scroll, lp)
 
