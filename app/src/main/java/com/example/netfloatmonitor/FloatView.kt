@@ -26,7 +26,7 @@ class FloatView(
     // 状态控制：当前是否处于展开状态
     private var isExpanded = true
 
-    // 【核心改动】用于记忆上一次展开状态下的实时宽高（初始为标准宽高）
+    // 用于记忆上一次展开状态下的实时宽高（初始为标准宽高）
     private var lastExpandedWidth = 640
     private var lastExpandedHeight = 450
 
@@ -143,6 +143,13 @@ class FloatView(
                             params.y += (event.rawY - downY).toInt()
                             downX = event.rawX
                             downY = event.rawY
+                            
+                            // 拖动时同步防触底安全过滤
+                            val maxAllowableY = getScreenHeight() - getNavigationBarHeight() - height
+                            if (params.y > maxAllowableY) {
+                                params.y = maxAllowableY
+                            }
+
                             windowManager.updateViewLayout(this@FloatView, params)
                         }
                     }
@@ -174,17 +181,37 @@ class FloatView(
                         if (resize) {
                             // 计算缩放后的新尺寸
                             val newWidth = (startWidth + event.rawX - downX).toInt().coerceAtLeast(300)
-                            val newHeight = (startHeight + event.rawY - downY).toInt().coerceAtLeast(200)
+                            var newHeight = (startHeight + event.rawY - downY).toInt().coerceAtLeast(200)
                             
+                            // 【核心安全过滤】获取屏幕可用总高度并减去导航栏小白条的高度
+                            val navBarHeight = getNavigationBarHeight()
+                            val usableScreenHeight = getScreenHeight() - navBarHeight
+                            
+                            // 限制悬浮窗最大拉伸高度，不能把底部的安全空间吃掉掉
+                            if (params.y + newHeight > usableScreenHeight) {
+                                newHeight = usableScreenHeight - params.y
+                            }
+
                             params.width = newWidth
                             params.height = newHeight
                             
-                            // 【核心改动】只要用户在调整大小，就实时更新并记忆最新的展开宽度和高度
+                            // 实时更新并记忆最新的展开宽度和高度
                             lastExpandedWidth = newWidth
                             lastExpandedHeight = newHeight
                         } else {
                             params.x += (event.rawX - downX).toInt()
-                            params.y += (event.rawY - downY).toInt()
+                            var targetY = params.y + (event.rawY - downY).toInt()
+                            
+                            // 移动位置时，同样防止面板的底边越过导航小白条
+                            val navBarHeight = getNavigationBarHeight()
+                            val usableScreenHeight = getScreenHeight() - navBarHeight
+                            if (targetY + height > usableScreenHeight) {
+                                targetY = usableScreenHeight - height
+                            }
+                            
+                            params.x = params.x
+                            params.y = targetY
+                            
                             downX = event.rawX
                             downY = event.rawY
                         }
@@ -194,6 +221,25 @@ class FloatView(
                 return true
             }
         })
+    }
+
+    /**
+     * 获取系统导航栏（小白条）的实时高度
+     */
+    private fun getNavigationBarHeight(): Int {
+        val resourceId = context.resources.getIdentifier("navigation_bar_height", "dimen", "android")
+        return if (resourceId > 0) {
+            context.resources.getDimensionPixelSize(resourceId)
+        } else {
+            0
+        }
+    }
+
+    /**
+     * 获取屏幕总高度
+     */
+    private fun getScreenHeight(): Int {
+        return context.resources.displayMetrics.heightPixels
     }
 
     private fun performToggle() {
@@ -245,7 +291,7 @@ class FloatView(
             this.setBackground(panelBg)
             this.setPadding(8, 6, 8, 8)
 
-            // 【核心改动】再次展开时，不再使用写死的默认值，而是直接读取上一次被修改并记录的宽高值
+            // 再次展开时，读取上一次被修改并记录的宽高值
             params.width = lastExpandedWidth
             params.height = lastExpandedHeight
         }
