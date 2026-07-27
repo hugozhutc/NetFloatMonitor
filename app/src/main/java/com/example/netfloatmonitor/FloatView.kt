@@ -34,20 +34,21 @@ class FloatView(
     private var resizeTouchY = 0f
 
     // ==========================================
-    // 终极修复：使用显式 receiver (this.layoutParams) 彻底解决作用域穿透赋值冲突
+    // 终极修复：彻底废除闭包内的 layoutParams 赋值，全部改用显式变量引用赋值
     // ==========================================
     
     private val miniIconViewRef: CardView by lazy { createMiniIconView(context) }
     private val expandedPanelViewRef: CardView by lazy { createExpandedPanelView(context) }
     
     private val minimizeBtnRef: Button by lazy {
-        Button(context).apply {
-            text = "收起"
-            textSize = 11f
-            setTextColor(Color.WHITE)
-            setBackgroundColor(Color.parseColor("#E74C3C"))
-            this.layoutParams = LinearLayout.LayoutParams(dp2px(context, 50f), dp2px(context, 26f)) // 显式指定 this
-        }
+        val btn = Button(context)
+        btn.text = "收起"
+        btn.textSize = 11f
+        btn.setTextColor(Color.WHITE)
+        btn.setBackgroundColor(Color.parseColor("#E74C3C"))
+        // 彻底移出 apply 闭包，用明确的对象引用赋值，绝无歧义
+        btn.layoutParams = LinearLayout.LayoutParams(dp2px(context, 50f), dp2px(context, 26f))
+        btn
     }
 
     private val skyTextViewRef: TextView by lazy {
@@ -69,12 +70,12 @@ class FloatView(
     }
 
     private val resizeHandleRef: View by lazy {
-        View(context).apply {
-            val lp = FrameLayout.LayoutParams(dp2px(context, 30f), dp2px(context, 30f))
-            lp.gravity = Gravity.BOTTOM or Gravity.RIGHT
-            this.layoutParams = lp // 显式指定 this
-            setBackgroundColor(Color.TRANSPARENT)
-        }
+        val v = View(context)
+        val lp = FrameLayout.LayoutParams(dp2px(context, 30f), dp2px(context, 30f))
+        lp.gravity = Gravity.BOTTOM or Gravity.RIGHT
+        v.layoutParams = lp
+        v.setBackgroundColor(Color.TRANSPARENT)
+        v
     }
 
     private fun createMiniIconView(ctx: Context): CardView {
