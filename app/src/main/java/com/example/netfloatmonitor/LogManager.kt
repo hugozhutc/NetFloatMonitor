@@ -8,8 +8,9 @@ import java.util.*
 
 class LogManager(private val context: Context) {
 
-    // 切换至 App 内部私有存储目录，100% 具备读写权限
-    private val logDir = File(context.filesDir, "NetFloatLogs").apply {
+    // 切换至 Android/data/com.example.netfloatmonitor/files/NetFloatLogs
+    // 这是外部私有目录，不需要任何动态权限，且在 Android 10+ 上完全合规
+    private val logDir = File(context.getExternalFilesDir(null), "NetFloatLogs").apply {
         if (!exists()) {
             val mkdirResult = mkdirs()
             Log.d("LogManager", "创建日志文件夹: $mkdirResult, 路径: $absolutePath")
@@ -25,6 +26,26 @@ class LogManager(private val context: Context) {
         val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.getDefault())
         return sdf.format(Date())
     }
+
+    // ==========================================
+    // 补全以下公开方法，彻底解决 MainActivity.kt 编译报错
+    // ==========================================
+
+    /**
+     * 获取当前日志文件夹的绝对路径，解决 getLogPath 未定义错误
+     */
+    fun getLogPath(): String {
+        return logDir.absolutePath
+    }
+
+    /**
+     * 获取所有日志文件的列表，解决 forEach 遍历歧义与 it 无法识别错误
+     */
+    fun getLogFiles(): List<File> {
+        return logDir.listFiles()?.filter { it.isFile && it.name.endsWith(".txt") }?.toList() ?: emptyList()
+    }
+
+    // ==========================================
 
     fun save(data: String) {
         if (data.isBlank()) {
