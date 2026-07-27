@@ -26,9 +26,9 @@ class FloatView(
     // 状态控制：当前是否处于展开状态
     private var isExpanded = true
 
-    // 展开状态下的标准宽高
-    private val expandedWidth = 640
-    private val expandedHeight = 450
+    // 【核心改动】用于记忆上一次展开状态下的实时宽高（初始为标准宽高）
+    private var lastExpandedWidth = 640
+    private var lastExpandedHeight = 450
 
     // 大号悬浮球尺寸
     private val collapsedSize = 160
@@ -172,8 +172,16 @@ class FloatView(
                     }
                     MotionEvent.ACTION_MOVE -> {
                         if (resize) {
-                            params.width = (startWidth + event.rawX - downX).toInt().coerceAtLeast(300)
-                            params.height = (startHeight + event.rawY - downY).toInt().coerceAtLeast(200)
+                            // 计算缩放后的新尺寸
+                            val newWidth = (startWidth + event.rawX - downX).toInt().coerceAtLeast(300)
+                            val newHeight = (startHeight + event.rawY - downY).toInt().coerceAtLeast(200)
+                            
+                            params.width = newWidth
+                            params.height = newHeight
+                            
+                            // 【核心改动】只要用户在调整大小，就实时更新并记忆最新的展开宽度和高度
+                            lastExpandedWidth = newWidth
+                            lastExpandedHeight = newHeight
                         } else {
                             params.x += (event.rawX - downX).toInt()
                             params.y += (event.rawY - downY).toInt()
@@ -237,8 +245,9 @@ class FloatView(
             this.setBackground(panelBg)
             this.setPadding(8, 6, 8, 8)
 
-            params.width = expandedWidth
-            params.height = expandedHeight
+            // 【核心改动】再次展开时，不再使用写死的默认值，而是直接读取上一次被修改并记录的宽高值
+            params.width = lastExpandedWidth
+            params.height = lastExpandedHeight
         }
         windowManager.updateViewLayout(this@FloatView, params)
     }
