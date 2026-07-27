@@ -65,6 +65,38 @@ class FloatView(
             visibility = View.VISIBLE
         }
 
+        // ==========================================
+        // 核心修复：在外层安全作用域下直接完成成员变量的初始化，彻底杜绝隐式 val 冲突
+        // ==========================================
+        minimizeBtn = Button(context).apply {
+            text = "收起"
+            textSize = 11f
+            setTextColor(Color.WHITE)
+            setBackgroundColor(Color.parseColor("#E74C3C"))
+            layoutParams = LayoutParams(dp2px(context, 50f), dp2px(context, 26f))
+        }
+
+        skyTextView = TextView(context).apply {
+            text = "waiting..."
+            setTextColor(Color.WHITE)
+            textSize = 13f
+            lineSpacingMultiplier = 1.2f
+        }
+
+        groundTextView = TextView(context).apply {
+            text = "waiting..."
+            setTextColor(Color.WHITE)
+            textSize = 13f
+            lineSpacingMultiplier = 1.2f
+        }
+
+        resizeHandle = View(context).apply {
+            layoutParams = FrameLayout.LayoutParams(dp2px(context, 30f), dp2px(context, 30f)).apply {
+                gravity = Gravity.BOTTOM or Gravity.RIGHT
+            }
+            setBackgroundColor(Color.TRANSPARENT)
+        }
+
         // 2. 创建展开状态的数据面板布局
         expandedPanelView = CardView(context).apply {
             radius = dp2px(context, 8f).toFloat()
@@ -76,7 +108,6 @@ class FloatView(
                 layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
             }
             
-            // 主体内容垂直排列
             val innerLayout = LinearLayout(context).apply {
                 orientation = VERTICAL
                 val p = dp2px(context, 10f)
@@ -96,16 +127,8 @@ class FloatView(
                 layoutParams = LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f)
             }
             
-            // 修复核心：使用 this@FloatView 显式对类变量赋值，杜绝作用域误判导致的 Val reassigned 错误
-            this@FloatView.minimizeBtn = Button(context).apply {
-                text = "收起"
-                textSize = 11f
-                setTextColor(Color.WHITE)
-                setBackgroundColor(Color.parseColor("#E74C3C"))
-                layoutParams = LayoutParams(dp2px(context, 50f), dp2px(context, 26f))
-            }
             titleLayout.addView(titleTv)
-            titleLayout.addView(this@FloatView.minimizeBtn)
+            titleLayout.addView(minimizeBtn) // 直接把外层初始化好的控件 add 进来
             innerLayout.addView(titleLayout)
 
             // 双栏布局容器 (左边 AIR，右边 GND)
@@ -131,13 +154,8 @@ class FloatView(
                 layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
                 isVerticalScrollBarEnabled = false
             }
-            this@FloatView.skyTextView = TextView(context).apply {
-                text = "waiting..."
-                setTextColor(Color.WHITE)
-                textSize = 13f
-                lineSpacingMultiplier = 1.2f
-            }
-            skyScrollView.addView(this@FloatView.skyTextView)
+            
+            skyScrollView.addView(skyTextView)
             skyLayout.addView(skyTitle)
             skyLayout.addView(skyScrollView)
 
@@ -158,13 +176,8 @@ class FloatView(
                 layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
                 isVerticalScrollBarEnabled = false
             }
-            this@FloatView.groundTextView = TextView(context).apply {
-                text = "waiting..."
-                setTextColor(Color.WHITE)
-                textSize = 13f
-                lineSpacingMultiplier = 1.2f
-            }
-            groundScrollView.addView(this@FloatView.groundTextView)
+            
+            groundScrollView.addView(groundTextView)
             groundLayout.addView(groundTitle)
             groundLayout.addView(groundScrollView)
 
@@ -173,15 +186,7 @@ class FloatView(
             innerLayout.addView(dualColumnLayout)
             
             rootFrame.addView(innerLayout)
-
-            // 右下角拉伸缩放响应块
-            this@FloatView.resizeHandle = View(context).apply {
-                layoutParams = FrameLayout.LayoutParams(dp2px(context, 30f), dp2px(context, 30f)).apply {
-                    gravity = Gravity.BOTTOM or Gravity.RIGHT
-                }
-                setBackgroundColor(Color.TRANSPARENT)
-            }
-            rootFrame.addView(this@FloatView.resizeHandle)
+            rootFrame.addView(resizeHandle)
 
             addView(rootFrame)
         }
