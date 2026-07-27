@@ -29,7 +29,7 @@ class FloatView(
     private val expandedWidth = 640
     private val expandedHeight = 450
 
-    // 【优化】大幅提升折叠后悬浮球的尺寸（从100增大到160），大拇指盲操极其轻松
+    // 大号悬浮球尺寸
     private val collapsedSize = 160
 
     private var startWidth = 0
@@ -43,7 +43,7 @@ class FloatView(
     // 下方的数据面板容器
     private val contentPanel = LinearLayout(context)
 
-    // 精巧的切换状态按钮
+    // 核心切换状态按钮
     private val toggleBtn = Button(context).apply {
         text = "×"
         textSize = 14f
@@ -71,7 +71,6 @@ class FloatView(
         topBar.setGravity(Gravity.RIGHT or Gravity.CENTER_VERTICAL)
         topBar.setPadding(0, 0, 4, 4)
         
-        // 展开状态下关闭按钮的大小
         val btnLp = LinearLayout.LayoutParams(45, 45)
         topBar.addView(toggleBtn, btnLp)
         addView(topBar)
@@ -84,71 +83,62 @@ class FloatView(
         contentPanel.addView(createPanel("GND", gndLayout))
         addView(contentPanel)
 
-        // 一键切换折叠与再次展开的核心逻辑
-        toggleBtn.setOnClickListener {
-            val panelBg = GradientDrawable()
-            
-            if (isExpanded) {
-                // 【执行折叠】
-                isExpanded = false
-                contentPanel.visibility = View.GONE // 隐藏下方数据面板
-                
-                // 1. 撑满折叠后的整个窗体，让整个大悬浮球都变成可点击区域
-                val collapsedLp = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT, 
-                    LinearLayout.LayoutParams.MATCH_PARENT
-                )
-                toggleBtn.layoutParams = collapsedLp
-                
-                // 2. 优化文案与样式：变成一个大号的绿色科技感圆形悬浮钮
-                toggleBtn.text = "展开"
-                toggleBtn.textSize = 14f
-                val btnBg = GradientDrawable().apply {
-                    setColor(Color.parseColor("#1ABC9C")) // 更加明亮的青绿色
-                    cornerRadius = 80f // 完美正圆
-                }
-                toggleBtn.background = btnBg
-                
-                // 3. 彻底外层透明，避免死角干扰
-                panelBg.setColor(Color.TRANSPARENT)
-                this.setBackground(panelBg)
-                this.setPadding(0, 0, 0, 0)
+        // 【核心优化】接管按钮的触摸事件，让大球状态下既能拖动，又能区分点击
+        toggleBtn.setOnTouchListener(object : OnTouchListener {
+            private var btnDownX = 0f
+            private var btnDownY = 0f
+            private var isDragging = false
 
-                // 4. 更新悬浮窗总尺寸为加大版尺寸
-                params.width = collapsedSize
-                params.height = collapsedSize
-            } else {
-                // 【执行再次展开】
-                isExpanded = true
-                contentPanel.visibility = View.VISIBLE
-                
-                // 1. 恢复右上角微型有关按钮的尺寸
-                val expandedLp = LinearLayout.LayoutParams(45, 45)
-                toggleBtn.layoutParams = expandedLp
-                
-                // 2. 恢复关闭符号与红方块样式
-                toggleBtn.text = "×"
-                toggleBtn.textSize = 14f
-                val btnBg = GradientDrawable().apply {
-                    setColor(Color.parseColor("#C0392B"))
-                    cornerRadius = 6f
+            override fun onTouch(v: View?, event: MotionEvent): Boolean {
+                if (isExpanded) {
+                    // 展开状态下，保持原本的普通按钮点击逻辑（走 onClick 触发关闭）
+                    return false
                 }
-                toggleBtn.background = btnBg
-                
-                // 3. 恢复 180 透明度黑色大面板背景
-                panelBg.setColor(Color.argb(180, 0, 0, 0))
-                panelBg.cornerRadius = 10f
-                this.setBackground(panelBg)
-                this.setPadding(8, 6, 8, 8)
 
-                // 4. 恢复悬浮窗到大面板尺寸
-                params.width = expandedWidth
-                params.height = expandedHeight
+                // 折叠状态（大绿球）下，接管所有手势以支持拖动
+                when (event.action) {
+                    MotionEvent.ACTION_DOWN -> {
+                        downX = event.rawX
+                        downY = event.rawY
+                        btnDownX = event.rawX
+                        btnDownY = event.rawY
+                        isDragging = false
+                    }
+                    MotionEvent.ACTION_MOVE -> {
+                        val dx = event.rawX - btnDownX
+                        val dy = event.rawY - btnDownY
+                        // 只要移动距离超过 10 像素，就判定为拖动，不再触发点击
+                        if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
+                            isDragging = true
+                        }
+
+                        if (isDragging) {
+                            params.x += (event.rawX - downX).toInt()
+                            params.y += (event.rawY - downY).toInt()
+                            downX = event.rawX
+                            downY = event.rawY
+                            windowManager.updateViewLayout(this@FloatView, params)
+                        }
+                    }
+                    MotionEvent.ACTION_UP -> {
+                        // 如果从头到尾几乎没怎么动，说明用户只是想“点一下”展开
+                        if (!isDragging) {
+                            performToggle()
+                        }
+                    }
+                }
+                return true
             }
-            windowManager.updateViewLayout(this@FloatView, params)
+        })
+
+        // 展开状态下点击红叉的响应
+        toggleBtn.setOnClickListener {
+            if (isExpanded) {
+                performToggle()
+            }
         }
 
-        // 拖动与缩放手势处理
+        // 大面板空白处的拖动与缩放手势处理
         setOnTouchListener(object : OnTouchListener {
             override fun onTouch(v: View?, event: MotionEvent): Boolean {
                 when (event.action) {
@@ -175,6 +165,64 @@ class FloatView(
                 return true
             }
         })
+    }
+
+    /**
+     * 抽取公共的折叠/展开状态切换逻辑
+     */
+    private fun performToggle() {
+        val panelBg = GradientDrawable()
+        
+        if (isExpanded) {
+            // 【执行折叠】
+            isExpanded = false
+            contentPanel.visibility = View.GONE
+            
+            val collapsedLp = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 
+                LinearLayout.LayoutParams.MATCH_PARENT
+            )
+            toggleBtn.layoutParams = collapsedLp
+            
+            toggleBtn.text = "展开"
+            toggleBtn.textSize = 14f
+            val btnBg = GradientDrawable().apply {
+                setColor(Color.parseColor("#1ABC9C"))
+                cornerRadius = 80f
+            }
+            toggleBtn.background = btnBg
+            
+            panelBg.setColor(Color.TRANSPARENT)
+            this.setBackground(panelBg)
+            this.setPadding(0, 0, 0, 0)
+
+            params.width = collapsedSize
+            params.height = collapsedSize
+        } else {
+            // 【执行再次展开】
+            isExpanded = true
+            contentPanel.visibility = View.VISIBLE
+            
+            val expandedLp = LinearLayout.LayoutParams(45, 45)
+            toggleBtn.layoutParams = expandedLp
+            
+            toggleBtn.text = "×"
+            toggleBtn.textSize = 14f
+            val btnBg = GradientDrawable().apply {
+                setColor(Color.parseColor("#C0392B"))
+                cornerRadius = 6f
+            }
+            toggleBtn.background = btnBg
+            
+            panelBg.setColor(Color.argb(180, 0, 0, 0))
+            panelBg.cornerRadius = 10f
+            this.setBackground(panelBg)
+            this.setPadding(8, 6, 8, 8)
+
+            params.width = expandedWidth
+            params.height = expandedHeight
+        }
+        windowManager.updateViewLayout(this@FloatView, params)
     }
 
     private fun createPanel(title: String, containerLayout: LinearLayout): View {
