@@ -263,7 +263,7 @@ class FloatView(
             }
             toggleBtn.background = btnBg
             
-            panelBg.setColor(Color.TRANSPARETransparent)
+            panelBg.setColor(Color.TRANSPARENT)
             this.setBackground(panelBg)
             this.setPadding(0, 0, 0, 0)
 
