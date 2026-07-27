@@ -33,165 +33,180 @@ class FloatView(
     private var resizeTouchX = 0f
     private var resizeTouchY = 0f
 
-    // 核心修复：修改所有变量命名，加 Ref 后缀，彻底解决系统潜在的同名 val 冲突
-    private lateinit var miniIconViewRef: CardView
-    private lateinit var expandedPanelViewRef: CardView
-    private lateinit var minimizeBtnRef: Button
-    private lateinit var resizeHandleRef: View
+    // ==========================================
+    // 核心重构：改用 val + by lazy，彻底消灭所有 "Val cannot be reassigned" 编译错误的可能性
+    // ==========================================
     
-    // 左右两端的文本显示组件
-    private lateinit var skyTextViewRef: TextView
-    private lateinit var groundTextViewRef: TextView
+    private val miniIconViewRef: CardView by lazy {
+        CardView(context).apply {
+            radius = dp2px(context, 30f).toFloat()
+            setCardBackgroundColor(Color.parseColor("#2ECC71"))
+            layoutParams = LayoutParams(dp2px(context, 60f), dp2px(context, 60f))
+            visibility = View.VISIBLE
+            
+            val tv = TextView(context).apply {
+                text = "NET"
+                setTextColor(Color.WHITE)
+                gravity = Gravity.CENTER
+                textSize = 14f
+            }
+            addView(tv, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
+        }
+    }
+
+    private val minimizeBtnRef: Button by lazy {
+        Button(context).apply {
+            text = "收起"
+            textSize = 11f
+            setTextColor(Color.WHITE)
+            setBackgroundColor(Color.parseColor("#E74C3C"))
+            layoutParams = LayoutParams(dp2px(context, 50f), dp2px(context, 26f))
+        }
+    }
+
+    private val skyTextViewRef: TextView by lazy {
+        TextView(context).apply {
+            text = "waiting..."
+            setTextColor(Color.WHITE)
+            textSize = 13f
+            lineSpacingMultiplier = 1.2f
+        }
+    }
+
+    private val groundTextViewRef: TextView by lazy {
+        TextView(context).apply {
+            text = "waiting..."
+            setTextColor(Color.WHITE)
+            textSize = 13f
+            lineSpacingMultiplier = 1.2f
+        }
+    }
+
+    private val resizeHandleRef: View by lazy {
+        View(context).apply {
+            layoutParams = FrameLayout.LayoutParams(dp2px(context, 30f), dp2px(context, 30f)).apply {
+                gravity = Gravity.BOTTOM or Gravity.RIGHT
+            }
+            setBackgroundColor(Color.TRANSPARENT)
+        }
+    }
+
+    private val expandedPanelViewRef: CardView by lazy {
+        CardView(context).apply {
+            radius = dp2px(context, 8f).toFloat()
+            setCardBackgroundColor(Color.parseColor("#1A222D"))
+            layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
+            visibility = View.GONE
+
+            val rootFrame = FrameLayout(context).apply {
+                layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
+            }
+            
+            val innerLayout = LinearLayout(context).apply {
+                orientation = VERTICAL
+                val p = dp2px(context, 10f)
+                setPadding(p, p, p, p)
+                layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
+            }
+
+            // 标题与收起按钮栏
+            val titleLayout = LinearLayout(context).apply {
+                orientation = HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+            }
+            
+            val titleTv = TextView(context).apply {
+                text = "NetFloatMonitor"
+                setTextColor(Color.parseColor("#80FFFFFF"))
+                textSize = 14f
+                layoutParams = LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f)
+            }
+            
+            titleLayout.addView(titleTv)
+            titleLayout.addView(minimizeBtnRef)
+            innerLayout.addView(titleLayout)
+
+            // 双栏布局容器 (左边 AIR，右边 GND)
+            val dualColumnLayout = LinearLayout(context).apply {
+                orientation = HORIZONTAL
+                layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f).apply {
+                    topMargin = dp2px(context, 6f)
+                }
+            }
+
+            // 【左侧栏：AIR 天空端】
+            val skyLayout = LinearLayout(context).apply {
+                orientation = VERTICAL
+                layoutParams = LayoutParams(0, MATCH_PARENT, 1f)
+            }
+            
+            val skyTitle = TextView(context).apply {
+                text = "AIR"
+                setTextColor(Color.parseColor("#00FF00"))
+                textSize = 16f
+                paint.isFakeBoldText = true
+            }
+            
+            val skyScrollView = ScrollView(context).apply {
+                layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
+                isVerticalScrollBarEnabled = false
+            }
+            
+            skyScrollView.addView(skyTextViewRef)
+            skyLayout.addView(skyTitle)
+            skyLayout.addView(skyScrollView)
+
+            // 【右侧栏：GND 地面端】
+            val groundLayout = LinearLayout(context).apply {
+                orientation = VERTICAL
+                layoutParams = LayoutParams(0, MATCH_PARENT, 1f).apply {
+                    leftMargin = dp2px(context, 10f)
+                }
+            }
+            
+            val groundTitle = TextView(context).apply {
+                text = "GND"
+                setTextColor(Color.parseColor("#00FF00"))
+                textSize = 16f
+                paint.isFakeBoldText = true
+            }
+            
+            val groundScrollView = ScrollView(context).apply {
+                layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
+                isVerticalScrollBarEnabled = false
+            }
+            
+            groundScrollView.addView(groundTextViewRef)
+            groundLayout.addView(groundTitle)
+            groundLayout.addView(groundScrollView)
+
+            dualColumnLayout.addView(skyLayout)
+            dualColumnLayout.addView(groundLayout)
+            innerLayout.addView(dualColumnLayout)
+            
+            rootFrame.addView(innerLayout)
+            rootFrame.addView(resizeHandleRef)
+            addView(rootFrame)
+        }
+    }
 
     init {
         orientation = VERTICAL
-        initView(context)
+        initView()
         setupDragAndResizeListeners(context)
     }
 
-    private fun initView(context: Context) {
-        // 1. 创建折叠状态的悬浮小图标 (60dp x 60dp 绿圆)
-        val miniIcon = CardView(context)
-        miniIcon.radius = dp2px(context, 30f).toFloat()
-        miniIcon.setCardBackgroundColor(Color.parseColor("#2ECC71"))
-        miniIcon.layoutParams = LayoutParams(dp2px(context, 60f), dp2px(context, 60f))
-        
-        val tv = TextView(context)
-        tv.text = "NET"
-        tv.setTextColor(Color.WHITE)
-        tv.gravity = Gravity.CENTER
-        tv.textSize = 14f
-        miniIcon.addView(tv, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
-        miniIcon.visibility = View.VISIBLE
-        this.miniIconViewRef = miniIcon
-
-        // 2. 初始化核心子控件
-        val btn = Button(context)
-        btn.text = "收起"
-        btn.textSize = 11f
-        btn.setTextColor(Color.WHITE)
-        btn.setBackgroundColor(Color.parseColor("#E74C3C"))
-        btn.layoutParams = LayoutParams(dp2px(context, 50f), dp2px(context, 26f))
-        this.minimizeBtnRef = btn
-
-        val skyTv = TextView(context)
-        skyTv.text = "waiting..."
-        skyTv.setTextColor(Color.WHITE)
-        skyTv.textSize = 13f
-        skyTv.lineSpacingMultiplier = 1.2f
-        this.skyTextViewRef = skyTv
-
-        val groundTv = TextView(context)
-        groundTv.text = "waiting..."
-        groundTv.setTextColor(Color.WHITE)
-        groundTv.textSize = 13f
-        groundTv.lineSpacingMultiplier = 1.2f
-        this.groundTextViewRef = groundTv
-
-        val handle = View(context)
-        handle.layoutParams = FrameLayout.LayoutParams(dp2px(context, 30f), dp2px(context, 30f)).apply {
-            gravity = Gravity.BOTTOM or Gravity.RIGHT
-        }
-        handle.setBackgroundColor(Color.TRANSPARENT)
-        this.resizeHandleRef = handle
-
-        // 3. 创建展开状态的数据面板布局
-        val panel = CardView(context)
-        panel.radius = dp2px(context, 8f).toFloat()
-        panel.setCardBackgroundColor(Color.parseColor("#1A222D"))
-        panel.layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
-        panel.visibility = View.GONE
-
-        val rootFrame = FrameLayout(context)
-        rootFrame.layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
-        
-        val innerLayout = LinearLayout(context)
-        innerLayout.orientation = VERTICAL
-        val p = dp2px(context, 10f)
-        innerLayout.setPadding(p, p, p, p)
-        innerLayout.layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
-
-        // 标题与收起按钮栏
-        val titleLayout = LinearLayout(context)
-        titleLayout.orientation = HORIZONTAL
-        titleLayout.gravity = Gravity.CENTER_VERTICAL
-        
-        val titleTv = TextView(context)
-        titleTv.text = "NetFloatMonitor"
-        titleTv.setTextColor(Color.parseColor("#80FFFFFF"))
-        titleTv.textSize = 14f
-        titleTv.layoutParams = LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f)
-        
-        titleLayout.addView(titleTv)
-        titleLayout.addView(this.minimizeBtnRef)
-        innerLayout.addView(titleLayout)
-
-        // 双栏布局容器 (左边 AIR，右边 GND)
-        val dualColumnLayout = LinearLayout(context)
-        dualColumnLayout.orientation = HORIZONTAL
-        dualColumnLayout.layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f).apply {
-            topMargin = dp2px(context, 6f)
-        }
-
-        // 【左侧栏：AIR 天空端】
-        val skyLayout = LinearLayout(context)
-        skyLayout.orientation = VERTICAL
-        skyLayout.layoutParams = LayoutParams(0, LayoutParams.MATCH_PARENT, 1f)
-        
-        val skyTitle = TextView(context)
-        skyTitle.text = "AIR"
-        skyTitle.setTextColor(Color.parseColor("#00FF00"))
-        skyTitle.textSize = 16f
-        skyTitle.paint.isFakeBoldText = true
-        
-        val skyScrollView = ScrollView(context)
-        skyScrollView.layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
-        skyScrollView.isVerticalScrollBarEnabled = false
-        
-        skyScrollView.addView(this.skyTextViewRef)
-        skyLayout.addView(skyTitle)
-        skyLayout.addView(skyScrollView)
-
-        // 【右侧栏：GND 地面端】
-        val groundLayout = LinearLayout(context)
-        groundLayout.orientation = VERTICAL
-        groundLayout.layoutParams = LayoutParams(0, LayoutParams.MATCH_PARENT, 1f).apply {
-            leftMargin = dp2px(context, 10f)
-        }
-        
-        val groundTitle = TextView(context)
-        groundTitle.text = "GND"
-        groundTitle.setTextColor(Color.parseColor("#00FF00"))
-        groundTitle.textSize = 16f
-        groundTitle.paint.isFakeBoldText = true
-        
-        val groundScrollView = ScrollView(context)
-        groundScrollView.layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
-        groundScrollView.isVerticalScrollBarEnabled = false
-        
-        groundScrollView.addView(this.groundTextViewRef)
-        groundLayout.addView(groundTitle)
-        groundLayout.addView(groundScrollView)
-
-        dualColumnLayout.addView(skyLayout)
-        dualColumnLayout.addView(groundLayout)
-        innerLayout.addView(dualColumnLayout)
-        
-        rootFrame.addView(innerLayout)
-        rootFrame.addView(this.resizeHandleRef)
-        panel.addView(rootFrame)
-        
-        this.expandedPanelViewRef = panel
-
-        addView(this.miniIconViewRef)
-        addView(this.expandedPanelViewRef)
+    private fun initView() {
+        // 将延迟初始化的布局组件直接添加进父容器
+        addView(miniIconViewRef)
+        addView(expandedPanelViewRef)
 
         // 点击小图标 -> 展开面板
-        this.miniIconViewRef.setOnClickListener {
+        miniIconViewRef.setOnClickListener {
             if (!isExpanded) {
                 isExpanded = true
-                this.miniIconViewRef.visibility = View.GONE
-                this.expandedPanelViewRef.visibility = View.VISIBLE
+                miniIconViewRef.visibility = View.GONE
+                expandedPanelViewRef.visibility = View.VISIBLE
                 
                 params.width = dp2px(context, 360f)
                 params.height = dp2px(context, 280f)
@@ -200,11 +215,11 @@ class FloatView(
         }
 
         // 点击收起按钮 -> 折叠回小图标
-        this.minimizeBtnRef.setOnClickListener {
+        minimizeBtnRef.setOnClickListener {
             if (isExpanded) {
                 isExpanded = false
-                this.expandedPanelViewRef.visibility = View.GONE
-                this.miniIconViewRef.visibility = View.VISIBLE
+                expandedPanelViewRef.visibility = View.GONE
+                miniIconViewRef.visibility = View.VISIBLE
                 
                 params.width = WindowManager.LayoutParams.WRAP_CONTENT
                 params.height = WindowManager.LayoutParams.WRAP_CONTENT
