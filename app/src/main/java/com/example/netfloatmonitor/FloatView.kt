@@ -8,6 +8,7 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
 import android.widget.Button
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -40,8 +41,20 @@ class FloatView(
 
     // 顶部的控制栏容器
     private val topBar = LinearLayout(context)
-    // 下方的数据面板容器
+    
+    // 下方的数据面板层（改用 FrameLayout 包裹，以便在右下角叠放一个缩放角标提示）
+    private val contentFrame = FrameLayout(context)
     private val contentPanel = LinearLayout(context)
+    
+    // 【优化】右下角微型视觉缩放提示块（只在展开状态下可见）
+    private val resizeIndicator = View(context).apply {
+        val triangleBg = GradientDrawable().apply {
+            setColor(Color.parseColor("#3498DB")) // 明亮的浅蓝色提示块
+            cornerRadius = 4f
+        }
+        background = triangleBg
+        visibility = View.VISIBLE
+    }
 
     // 核心切换状态按钮
     private val toggleBtn = Button(context).apply {
@@ -50,7 +63,7 @@ class FloatView(
         setTextColor(Color.WHITE)
         setGravity(Gravity.CENTER)
         val btnBg = GradientDrawable().apply {
-            setColor(Color.parseColor("#C0392B")) // 初始为深红色
+            setColor(Color.parseColor("#C0392B"))
             cornerRadius = 6f
         }
         background = btnBg
@@ -75,27 +88,42 @@ class FloatView(
         topBar.addView(toggleBtn, btnLp)
         addView(topBar)
 
-        // 配置下方主面板
+        // 配置下方主面板容器
         contentPanel.setOrientation(LinearLayout.HORIZONTAL)
         airLayout.setOrientation(LinearLayout.VERTICAL)
         gndLayout.setOrientation(LinearLayout.VERTICAL)
         contentPanel.addView(createPanel("AIR", airLayout))
         contentPanel.addView(createPanel("GND", gndLayout))
-        addView(contentPanel)
+        
+        // 将主面板装入 FrameLayout
+        contentFrame.addView(contentPanel, FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            FrameLayout.LayoutParams.MATCH_PARENT
+        ))
+        
+        // 把缩放视觉角标固定在右下角（大小 15x15）
+        val indicatorLp = FrameLayout.LayoutParams(15, 15).apply {
+            gravity = Gravity.BOTTOM or Gravity.RIGHT
+            setMargins(0, 0, 4, 4)
+        }
+        contentFrame.addView(resizeIndicator, indicatorLp)
+        
+        // 挂载混合层到最外层
+        val frameLp = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.MATCH_PARENT
+        )
+        addView(contentFrame, frameLp)
 
-        // 【核心优化】接管按钮的触摸事件，让大球状态下既能拖动，又能区分点击
+        // 接管大球状态下的拖动与点击手势
         toggleBtn.setOnTouchListener(object : OnTouchListener {
             private var btnDownX = 0f
             private var btnDownY = 0f
             private var isDragging = false
 
             override fun onTouch(v: View?, event: MotionEvent): Boolean {
-                if (isExpanded) {
-                    // 展开状态下，保持原本的普通按钮点击逻辑（走 onClick 触发关闭）
-                    return false
-                }
+                if (isExpanded) return false
 
-                // 折叠状态（大绿球）下，接管所有手势以支持拖动
                 when (event.action) {
                     MotionEvent.ACTION_DOWN -> {
                         downX = event.rawX
@@ -107,11 +135,9 @@ class FloatView(
                     MotionEvent.ACTION_MOVE -> {
                         val dx = event.rawX - btnDownX
                         val dy = event.rawY - btnDownY
-                        // 只要移动距离超过 10 像素，就判定为拖动，不再触发点击
                         if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
                             isDragging = true
                         }
-
                         if (isDragging) {
                             params.x += (event.rawX - downX).toInt()
                             params.y += (event.rawY - downY).toInt()
@@ -121,10 +147,7 @@ class FloatView(
                         }
                     }
                     MotionEvent.ACTION_UP -> {
-                        // 如果从头到尾几乎没怎么动，说明用户只是想“点一下”展开
-                        if (!isDragging) {
-                            performToggle()
-                        }
+                        if (!isDragging) performToggle()
                     }
                 }
                 return true
@@ -133,12 +156,10 @@ class FloatView(
 
         // 展开状态下点击红叉的响应
         toggleBtn.setOnClickListener {
-            if (isExpanded) {
-                performToggle()
-            }
+            if (isExpanded) performToggle()
         }
 
-        // 大面板空白处的拖动与缩放手势处理
+        // 整体面板的手势处理（重点优化右下角盲操体验）
         setOnTouchListener(object : OnTouchListener {
             override fun onTouch(v: View?, event: MotionEvent): Boolean {
                 when (event.action) {
@@ -147,7 +168,9 @@ class FloatView(
                         downY = event.rawY
                         startWidth = width
                         startHeight = height
-                        resize = isExpanded && (event.x > (width - 50))
+                        
+                        // 【优化】右下角触发判定范围大幅扩容：从 50 像素暴力提升到 120 像素，闭着眼睛都能抠住
+                        resize = isExpanded && (event.x > (width - 120)) && (event.y > (height - 120))
                     }
                     MotionEvent.ACTION_MOVE -> {
                         if (resize) {
@@ -167,16 +190,13 @@ class FloatView(
         })
     }
 
-    /**
-     * 抽取公共的折叠/展开状态切换逻辑
-     */
     private fun performToggle() {
         val panelBg = GradientDrawable()
         
         if (isExpanded) {
-            // 【执行折叠】
             isExpanded = false
-            contentPanel.visibility = View.GONE
+            contentFrame.visibility = View.GONE
+            resizeIndicator.visibility = View.GONE
             
             val collapsedLp = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 
@@ -199,9 +219,9 @@ class FloatView(
             params.width = collapsedSize
             params.height = collapsedSize
         } else {
-            // 【执行再次展开】
             isExpanded = true
-            contentPanel.visibility = View.VISIBLE
+            contentFrame.visibility = View.VISIBLE
+            resizeIndicator.visibility = View.VISIBLE
             
             val expandedLp = LinearLayout.LayoutParams(45, 45)
             toggleBtn.layoutParams = expandedLp
@@ -245,7 +265,7 @@ class FloatView(
     }
 
     /**
-     * V2.0 JSON数据精准解析处理与动态渲染
+     * V2.0 JSON数据精准解析处理与【动态均衡分流渲染】
      */
     fun updateJson(json: String) {
         try {
@@ -259,19 +279,26 @@ class FloatView(
                 val value = obj.get(key).toString()
 
                 when {
-                    key.endsWith("_a") -> {
-                        addItem(airLayout, key, value)
-                    }
+                    // 1. 明确属于地面端的数据，依旧死死固定在右侧栏
                     key.endsWith("_g") -> {
                         addItem(gndLayout, key, value)
                     }
+                    
+                    // 2. 属于天空端（_a）或者缺省未指定的数据，启用智能行数均衡机制
                     else -> {
-                        addItem(airLayout, key, value)
+                        // 【核心改动】如果左侧栏（AIR）当前挂载的项比右侧栏（GND）多，
+                        // 为了防止左侧拉得太长，自动把当前这条数据分流移到右侧栏（GND）显示
+                        if (airLayout.childCount > gndLayout.childCount) {
+                            addItem(gndLayout, key, value)
+                        } else {
+                            addItem(airLayout, key, value)
+                        }
                     }
                 }
             }
         } catch (e: Exception) {
             airLayout.removeAllViews()
+            gndLayout.removeAllViews()
             addItem(airLayout, "JSON_ERROR", e.message ?: "Unknown Error")
         }
     }
