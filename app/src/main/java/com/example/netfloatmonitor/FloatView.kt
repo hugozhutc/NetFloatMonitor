@@ -37,7 +37,7 @@ class FloatView(
     private lateinit var expandedPanelView: CardView
     private lateinit var minimizeBtn: Button
     
-    // 显式保留右下角的缩放触摸块引用，彻底弃用 R.id 动态计算
+    // 右下角缩放块引用
     private lateinit var resizeHandle: View
     
     // 左右两端的文本显示组件
@@ -69,8 +69,8 @@ class FloatView(
 
         // 2. 创建展开状态的数据面板布局
         expandedPanelView = CardView(context).apply {
-            radius = dp2px(context, 12f).toFloat()
-            setCardBackgroundColor(Color.parseColor("#1C1C1E"))
+            radius = dp2px(context, 8f).toFloat() // 恢复之前较小的圆角
+            setCardBackgroundColor(Color.parseColor("#1A222D")) // 深蓝黑底色，接近图示背景
             layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
             visibility = View.GONE
 
@@ -81,7 +81,7 @@ class FloatView(
             // 主体内容垂直排列
             val innerLayout = LinearLayout(context).apply {
                 orientation = VERTICAL
-                val p = dp2px(context, 12f)
+                val p = dp2px(context, 10f)
                 setPadding(p, p, p, p)
                 layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
             }
@@ -92,91 +92,89 @@ class FloatView(
                 gravity = Gravity.CENTER_VERTICAL
             }
             val titleTv = TextView(context).apply {
-                text = "网络监控面板"
-                setTextColor(Color.WHITE)
-                textSize = 16f
+                text = "NetFloatMonitor" // 还原顶部半透明背景的标题
+                setTextColor(Color.parseColor("#80FFFFFF")) // 半透明白
+                textSize = 14f
                 layoutParams = LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f)
             }
             minimizeBtn = Button(context).apply {
                 text = "收起"
-                textSize = 12f
+                textSize = 11f
                 setTextColor(Color.WHITE)
                 setBackgroundColor(Color.parseColor("#E74C3C"))
-                layoutParams = LayoutParams(dp2px(context, 60f), dp2px(context, 30f))
+                layoutParams = LayoutParams(dp2px(context, 50f), dp2px(context, 26f))
             }
             titleLayout.addView(titleTv)
             titleLayout.addView(minimizeBtn)
             innerLayout.addView(titleLayout)
 
-            // 双栏布局容器 (左边天空端，右边地面端)
+            // 双栏布局容器 (还原你图中的布局：左边 AIR，右边 GND)
             val dualColumnLayout = LinearLayout(context).apply {
                 orientation = HORIZONTAL
                 layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f).apply {
-                    topMargin = dp2px(context, 8f)
+                    topMargin = dp2px(context, 6f)
                 }
             }
 
-            // 【左侧栏：天空端】
+            // 【左侧栏：AIR 天空端】
             val skyLayout = LinearLayout(context).apply {
                 orientation = VERTICAL
                 layoutParams = LayoutParams(0, LayoutParams.MATCH_PARENT, 1f)
             }
             val skyTitle = TextView(context).apply {
-                text = "【天空端】"
-                setTextColor(Color.parseColor("#3498DB"))
-                textSize = 12f
+                text = "AIR"
+                setTextColor(Color.parseColor("#00FF00")) // 还原图中的绿色高亮标题
+                textSize = 16f
+                paint.isFakeBoldText = true // 加粗
             }
             val skyScrollView = ScrollView(context).apply {
                 layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
+                isVerticalScrollBarEnabled = false // 隐藏滚动条更美观
             }
             skyTextView = TextView(context).apply {
-                text = "等待数据..."
-                setTextColor(Color.GREEN)
-                textSize = 11f
+                text = "waiting..."
+                setTextColor(Color.WHITE) // 还原图中的白色属性文字
+                textSize = 13f
+                lineSpacingMultiplier = 1.2f // 调整行间距贴合原版
             }
             skyScrollView.addView(skyTextView)
             skyLayout.addView(skyTitle)
             skyLayout.addView(skyScrollView)
 
-            // 分界线
-            val divider = View(context).apply {
-                setBackgroundColor(Color.DKGRAY)
-                layoutParams = LayoutParams(dp2px(context, 1f), LayoutParams.MATCH_PARENT).apply {
-                    leftMargin = dp2px(context, 6f)
-                    rightMargin = dp2px(context, 6f)
-                }
-            }
-
-            // 【右侧栏：地面端】
+            // 【右侧栏：GND 地面端】
             val groundLayout = LinearLayout(context).apply {
                 orientation = VERTICAL
-                layoutParams = LayoutParams(0, LayoutParams.MATCH_PARENT, 1f)
+                layoutParams = LayoutParams(0, LayoutParams.MATCH_PARENT, 1f).apply {
+                    leftMargin = dp2px(context, 10f) // 左右留出间距
+                }
             }
             val groundTitle = TextView(context).apply {
-                text = "【地面端】"
-                setTextColor(Color.parseColor("#E67E22"))
-                textSize = 12f
+                text = "GND"
+                setTextColor(Color.parseColor("#00FF00")) // 绿色高亮
+                textSize = 16f
+                paint.isFakeBoldText = true
             }
             val groundScrollView = ScrollView(context).apply {
                 layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
+                isVerticalScrollBarEnabled = false
             }
             groundTextView = TextView(context).apply {
-                text = "等待数据..."
-                setTextColor(Color.GREEN)
-                textSize = 11f
+                text = "waiting..."
+                setTextColor(Color.WHITE)
+                textSize = 13f
+                lineSpacingMultiplier = 1.2f
             }
             groundScrollView.addView(groundTextView)
             groundLayout.addView(groundTitle)
             groundLayout.addView(groundScrollView)
 
             dualColumnLayout.addView(skyLayout)
-            dualColumnLayout.addView(divider)
             dualColumnLayout.addView(groundLayout)
             innerLayout.addView(dualColumnLayout)
             
             rootFrame.addView(innerLayout)
 
-            // 右下角添加专用于拖动改变大小的触摸块 (30dp x 30dp)
+            // 右下角拉伸缩放响应块
             resizeHandle = View(context).apply {
                 layoutParams = FrameLayout.LayoutParams(dp2px(context, 30f), dp2px(context, 30f)).apply {
                     gravity = Gravity.BOTTOM or Gravity.RIGHT
@@ -199,7 +197,7 @@ class FloatView(
                 expandedPanelView.visibility = View.VISIBLE
                 
                 params.width = dp2px(context, 360f)
-                params.height = dp2px(context, 300f)
+                params.height = dp2px(context, 280f)
                 windowManager.updateViewLayout(this, params)
             }
         }
@@ -219,26 +217,48 @@ class FloatView(
     }
 
     /**
-     * 兼容性修正：保留原有的 updateJson 方法，防止 FloatService.kt 编译报错。
-     * 自动解析特征，如果是天空端数据就往左边送，如果是地面端就往右边送。
+     * 核心修复：精准智能拆分单条 JSON 报文到左右两栏
      */
     fun updateJson(data: String) {
         if (data.isBlank()) return
-        // 自动判定无线链路标记分配显示区域
-        if (data.contains("sky") || data.contains("uav") || data.contains("node_1")) {
-            skyTextView.text = data
-        } else {
-            groundTextView.text = data
+
+        val skyBuilder = StringBuilder()
+        val groundBuilder = StringBuilder()
+
+        // 将接收到的文本按行拆分，或者去掉花括号后按逗号拆分键值对
+        val cleanData = data.replace("{", "").replace("}", "").replace("\"", "")
+        val lines = cleanData.split(Regex("[\n,]+"))
+
+        for (line in lines) {
+            val trimmed = line.trim()
+            if (trimmed.isEmpty()) continue
+
+            // 包含 _a 或 air 的行扔给左边 AIR 栏
+            if (trimmed.contains("_a") || trimmed.contains("air", ignoreCase = true)) {
+                skyBuilder.append(trimmed).append("\n")
+            } 
+            // 包含 _g 或 gnd 的行扔给右边 GND 栏
+            else if (trimmed.contains("_g") || trimmed.contains("gnd", ignoreCase = true)) {
+                groundBuilder.append(trimmed).append("\n")
+            }
+            // 如果是没有特定后缀的通用行，两边同时打印（或者你也可以自行分配）
+            else {
+                skyBuilder.append(trimmed).append("\n")
+                groundBuilder.append(trimmed).append("\n")
+            }
+        }
+
+        // 更新界面
+        if (skyBuilder.isNotEmpty()) {
+            skyTextView.text = skyBuilder.toString().trimEnd()
+        }
+        if (groundBuilder.isNotEmpty()) {
+            groundTextView.text = groundBuilder.toString().trimEnd()
         }
     }
 
-    fun updateData(skyData: String, groundData: String) {
-        if (skyData.isNotEmpty()) skyTextView.text = skyData
-        if (groundData.isNotEmpty()) groundTextView.text = groundData
-    }
-
     private fun setupDragAndResizeListeners(context: Context) {
-        // 1. 位置拖拽监听
+        // 拖拽位置
         val dragListener = OnTouchListener { _, event ->
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
@@ -270,7 +290,7 @@ class FloatView(
         miniIconView.setOnTouchListener(dragListener)
         expandedPanelView.setOnTouchListener(dragListener)
 
-        // 2. 右下角大小拉伸缩放监听（修复：改用显式变量引用，拒绝运算错误）
+        // 右下角大小拉伸
         resizeHandle.setOnTouchListener { _, event ->
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
@@ -284,8 +304,8 @@ class FloatView(
                     val deltaX = (event.rawX - resizeTouchX).toInt()
                     val deltaY = (event.rawY - resizeTouchY).toInt()
                     
-                    val newWidth = (initialWidth + deltaX).coerceAtLeast(dp2px(context, 240f))
-                    val newHeight = (initialHeight + deltaY).coerceAtLeast(dp2px(context, 200f))
+                    val newWidth = (initialWidth + deltaX).coerceAtLeast(dp2px(context, 260f))
+                    val newHeight = (initialHeight + deltaY).coerceAtLeast(dp2px(context, 180f))
                     
                     params.width = newWidth
                     params.height = newHeight
