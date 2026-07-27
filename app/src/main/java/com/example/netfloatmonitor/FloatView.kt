@@ -263,7 +263,7 @@ class FloatView(
     }
 
     /**
-     * V3.0 优先级排序与动态分流均衡渲染
+     * V4.0 恢复为经典数据布局：仅依靠严格后缀和缺省规则分类
      */
     fun updateJson(json: String) {
         try {
@@ -273,38 +273,21 @@ class FloatView(
             airLayout.removeAllViews()
             gndLayout.removeAllViews()
 
-            val allKeys = mutableListOf<String>()
-            obj.keys().forEach { allKeys.add(it) }
-
-            // 【第一步】寻找并优先把包含 pass_a 或 pass_g 的关键核心数据顶上去
-            allKeys.forEach { key ->
-                val value = obj.get(key).toString()
-                if (key.contains("pass_a")) {
-                    addItem(airLayout, key, value)
-                } else if (key.contains("pass_g")) {
-                    addItem(gndLayout, key, value)
-                }
-            }
-
-            // 【第二步】处理其余所有的常规统计指标数据
-            allKeys.forEach { key ->
-                // 跳过已经在第一步排布过的数据
-                if (key.contains("pass_a") || key.contains("pass_g")) return@forEach
-                
+            obj.keys().forEach { key ->
                 val value = obj.get(key).toString()
 
                 when {
-                    // 明确属于地面端的数据，固定在右侧栏
+                    // 1. 地面端数据归右边
                     key.endsWith("_g") -> {
                         addItem(gndLayout, key, value)
                     }
-                    // 其余未明确指定或天空端的数据，按两栏的当前高度动态分流均衡
+                    // 2. 天空端数据归左边
+                    key.endsWith("_a") -> {
+                        addItem(airLayout, key, value)
+                    }
+                    // 3. 没有任何明确后缀的兜底数据，默认归左边天空端
                     else -> {
-                        if (airLayout.childCount > gndLayout.childCount) {
-                            addItem(gndLayout, key, value)
-                        } else {
-                            addItem(airLayout, key, value)
-                        }
+                        addItem(airLayout, key, value)
                     }
                 }
             }
