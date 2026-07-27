@@ -33,7 +33,7 @@ class FloatView(
 
     private var isExpanded = true
     // 调整展开后的默认宽高，给予上下双图表和Y轴刻度更充裕的展示空间
-    private var lastExpandedWidth = 1180
+    private var lastExpandedWidth = 1300
     private var lastExpandedHeight = 540
     private val collapsedSize = 160
 
@@ -106,8 +106,8 @@ class FloatView(
         chartContainer.addView(airChartView, airChartLp)
         chartContainer.addView(gndChartView, gndChartLp)
         
-        // 将整个右侧第三栏加进主面板，分配 520dp 宽度给Y轴刻度和曲线留下充裕空间
-        val chartContainerLp = LinearLayout.LayoutParams(520, LinearLayout.LayoutParams.MATCH_PARENT).apply {
+        // 将整个右侧第三栏加进主面板，分配 700dp 宽度给Y轴刻度和曲线留下充裕空间
+        val chartContainerLp = LinearLayout.LayoutParams(700, LinearLayout.LayoutParams.MATCH_PARENT).apply {
             setMargins(12, 0, 4, 0)
         }
         contentPanel.addView(chartContainer, chartContainerLp)
@@ -394,7 +394,7 @@ class FloatView(
      * 适配：天空与地面颜色一致、实时看版文字颜色与折线对齐
      */
     private class WaveformView(context: Context, private val isAir: Boolean) : View(context) {
-        private val maxDataPoints = 200
+        private val maxDataPoints = 100
         private val yAxisWidth = 85f 
 
         private val rssi1List = LinkedList<Float>()
