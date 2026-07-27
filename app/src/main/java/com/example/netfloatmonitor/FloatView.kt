@@ -394,7 +394,7 @@ class FloatView(
      * 适配：天空与地面颜色一致、实时看版文字颜色与折线对齐
      */
     private class WaveformView(context: Context, private val isAir: Boolean) : View(context) {
-        private val maxDataPoints = 80
+        private val maxDataPoints = 200
         private val yAxisWidth = 85f 
 
         private val rssi1List = LinkedList<Float>()
