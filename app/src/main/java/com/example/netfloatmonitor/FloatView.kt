@@ -34,7 +34,7 @@ class FloatView(
     private var resizeTouchY = 0f
 
     // ==========================================
-    // 核心重构：by lazy 闭包内只需返回最终对象，严禁赋值
+    // 延迟初始化组件，内部绝无任何二次赋值
     // ==========================================
     
     private val miniIconViewRef: CardView by lazy {
@@ -103,7 +103,7 @@ class FloatView(
             }
             
             val innerLayout = LinearLayout(context).apply {
-                orientation = VERTICAL
+                this.orientation = LinearLayout.VERTICAL  // 显式声明，防作用域污染
                 val p = dp2px(context, 10f)
                 setPadding(p, p, p, p)
                 layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
@@ -111,7 +111,7 @@ class FloatView(
 
             // 标题与收起按钮栏
             val titleLayout = LinearLayout(context).apply {
-                orientation = HORIZONTAL
+                this.orientation = LinearLayout.HORIZONTAL  // 显式声明
                 gravity = Gravity.CENTER_VERTICAL
             }
             
@@ -128,15 +128,15 @@ class FloatView(
 
             // 双栏布局容器 (左边 AIR，右边 GND)
             val dualColumnLayout = LinearLayout(context).apply {
-                orientation = HORIZONTAL
+                this.orientation = LinearLayout.HORIZONTAL  // 显式声明
                 layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f).apply {
                     topMargin = dp2px(context, 6f)
                 }
             }
 
-            // 【左侧栏：AIR 天空端】已修复 MATCH_PARENT 引用
+            // 【左侧栏：AIR 天空端】
             val skyLayout = LinearLayout(context).apply {
-                orientation = VERTICAL
+                this.orientation = LinearLayout.VERTICAL  // 显式声明
                 layoutParams = LayoutParams(0, LayoutParams.MATCH_PARENT, 1f)
             }
             
@@ -156,9 +156,9 @@ class FloatView(
             skyLayout.addView(skyTitle)
             skyLayout.addView(skyScrollView)
 
-            // 【右侧栏：GND 地面端】已修复 MATCH_PARENT 引用
+            // 【右侧栏：GND 地面端】
             val groundLayout = LinearLayout(context).apply {
-                orientation = VERTICAL
+                this.orientation = LinearLayout.VERTICAL  // 显式声明
                 layoutParams = LayoutParams(0, LayoutParams.MATCH_PARENT, 1f).apply {
                     leftMargin = dp2px(context, 10f)
                 }
@@ -191,7 +191,7 @@ class FloatView(
     }
 
     init {
-        orientation = VERTICAL
+        this.orientation = LinearLayout.VERTICAL  // 显式声明
         initView()
         setupDragAndResizeListeners(context)
     }
