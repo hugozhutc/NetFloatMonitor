@@ -71,7 +71,8 @@ class FloatView(
 
     init {
         this.setOrientation(LinearLayout.VERTICAL)
-        this.setPadding(8, 6, 8, 8)
+        // 增加底部的 Padding（从 8 提高到 24），确保即使紧贴小白条，内容也不会被裁剪
+        this.setPadding(8, 6, 8, 24)
 
         // 180透明度黑色背景与圆角设置
         val bg = GradientDrawable()
@@ -101,10 +102,10 @@ class FloatView(
             FrameLayout.LayoutParams.MATCH_PARENT
         ))
         
-        // 把缩放视觉角标固定在右下角
+        // 把缩放视觉角标固定在右下角（稍微往上抬一点，避开小白条极限边缘）
         val indicatorLp = FrameLayout.LayoutParams(15, 15).apply {
             gravity = Gravity.BOTTOM or Gravity.RIGHT
-            setMargins(0, 0, 4, 4)
+            setMargins(0, 0, 4, 16)
         }
         contentFrame.addView(resizeIndicator, indicatorLp)
         
@@ -144,7 +145,7 @@ class FloatView(
                             downX = event.rawX
                             downY = event.rawY
                             
-                            // 拖动时同步防触底安全过滤
+                            // 大球移动时防触底安全过滤
                             val maxAllowableY = getScreenHeight() - getNavigationBarHeight() - height
                             if (params.y > maxAllowableY) {
                                 params.y = maxAllowableY
@@ -175,21 +176,26 @@ class FloatView(
                         downY = event.rawY
                         startWidth = width
                         startHeight = height
-                        resize = isExpanded && (event.x > (width - 120)) && (event.y > (height - 120))
+                        // 将拉伸判定的热区稍微向上扩充，防止在小白条处按不到
+                        resize = isExpanded && (event.x > (width - 150)) && (event.y > (height - 150))
                     }
                     MotionEvent.ACTION_MOVE -> {
+                        // 获取当前窗口在屏幕上的绝对物理位置坐标
+                        val location = IntArray(2)
+                        this@FloatView.getLocationOnScreen(location)
+                        val absoluteY = location[1]
+
+                        val navBarHeight = getNavigationBarHeight()
+                        val usableScreenHeight = getScreenHeight() - navBarHeight
+
                         if (resize) {
                             // 计算缩放后的新尺寸
                             val newWidth = (startWidth + event.rawX - downX).toInt().coerceAtLeast(300)
                             var newHeight = (startHeight + event.rawY - downY).toInt().coerceAtLeast(200)
                             
-                            // 【核心安全过滤】获取屏幕可用总高度并减去导航栏小白条的高度
-                            val navBarHeight = getNavigationBarHeight()
-                            val usableScreenHeight = getScreenHeight() - navBarHeight
-                            
-                            // 限制悬浮窗最大拉伸高度，不能把底部的安全空间吃掉掉
-                            if (params.y + newHeight > usableScreenHeight) {
-                                newHeight = usableScreenHeight - params.y
+                            // 用屏幕绝对坐标判定是否触底，规避 params.y 虚拟偏移误差
+                            if (absoluteY + newHeight > usableScreenHeight) {
+                                newHeight = usableScreenHeight - absoluteY
                             }
 
                             params.width = newWidth
@@ -202,16 +208,12 @@ class FloatView(
                             params.x += (event.rawX - downX).toInt()
                             var targetY = params.y + (event.rawY - downY).toInt()
                             
-                            // 移动位置时，同样防止面板的底边越过导航小白条
-                            val navBarHeight = getNavigationBarHeight()
-                            val usableScreenHeight = getScreenHeight() - navBarHeight
+                            // 移动位置时，同样通过绝对坐标限制，防止底边越过导航小白条
                             if (targetY + height > usableScreenHeight) {
                                 targetY = usableScreenHeight - height
                             }
                             
-                            params.x = params.x
                             params.y = targetY
-                            
                             downX = event.rawX
                             downY = event.rawY
                         }
@@ -289,9 +291,10 @@ class FloatView(
             panelBg.setColor(Color.argb(180, 0, 0, 0))
             panelBg.cornerRadius = 10f
             this.setBackground(panelBg)
-            this.setPadding(8, 6, 8, 8)
+            // 恢复展开状态的底部留白安全间距
+            this.setPadding(8, 6, 8, 24)
 
-            // 再次展开时，读取上一次被修改并记录的宽高值
+            // 恢复到上次记忆的宽高
             params.width = lastExpandedWidth
             params.height = lastExpandedHeight
         }
@@ -317,9 +320,6 @@ class FloatView(
         return box
     }
 
-    /**
-     * V4.0 恢复为经典数据布局：仅依靠严格后缀和缺省规则分类
-     */
     fun updateJson(json: String) {
         try {
             if (json.isBlank()) return
@@ -332,18 +332,9 @@ class FloatView(
                 val value = obj.get(key).toString()
 
                 when {
-                    // 1. 地面端数据归右边
-                    key.endsWith("_g") -> {
-                        addItem(gndLayout, key, value)
-                    }
-                    // 2. 天空端数据归左边
-                    key.endsWith("_a") -> {
-                        addItem(airLayout, key, value)
-                    }
-                    // 3. 没有任何明确后缀的兜底数据，默认归左边天空端
-                    else -> {
-                        addItem(airLayout, key, value)
-                    }
+                    key.endsWith("_g") -> addItem(gndLayout, key, value)
+                    key.endsWith("_a") -> addItem(airLayout, key, value)
+                    else -> addItem(airLayout, key, value)
                 }
             }
         } catch (e: Exception) {
