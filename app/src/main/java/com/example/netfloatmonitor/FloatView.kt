@@ -71,8 +71,8 @@ class FloatView(
 
     init {
         this.setOrientation(LinearLayout.VERTICAL)
-        // 增加底部的 Padding（从 8 提高到 24），确保即使紧贴小白条，内容也不会被裁剪
-        this.setPadding(8, 6, 8, 24)
+        // 【优化】恢复紧凑的内边距，底部不再留出巨大的 24dp 空白
+        this.setPadding(8, 6, 8, 8)
 
         // 180透明度黑色背景与圆角设置
         val bg = GradientDrawable()
@@ -102,10 +102,10 @@ class FloatView(
             FrameLayout.LayoutParams.MATCH_PARENT
         ))
         
-        // 把缩放视觉角标固定在右下角（稍微往上抬一点，避开小白条极限边缘）
+        // 【优化】缩放提示角标恢复到右下角贴边状态
         val indicatorLp = FrameLayout.LayoutParams(15, 15).apply {
             gravity = Gravity.BOTTOM or Gravity.RIGHT
-            setMargins(0, 0, 4, 16)
+            setMargins(0, 0, 4, 4)
         }
         contentFrame.addView(resizeIndicator, indicatorLp)
         
@@ -145,7 +145,7 @@ class FloatView(
                             downX = event.rawX
                             downY = event.rawY
                             
-                            // 大球移动时防触底安全过滤
+                            // 大球移动时防触底
                             val maxAllowableY = getScreenHeight() - getNavigationBarHeight() - height
                             if (params.y > maxAllowableY) {
                                 params.y = maxAllowableY
@@ -176,24 +176,23 @@ class FloatView(
                         downY = event.rawY
                         startWidth = width
                         startHeight = height
-                        // 将拉伸判定的热区稍微向上扩充，防止在小白条处按不到
-                        resize = isExpanded && (event.x > (width - 150)) && (event.y > (height - 150))
+                        // 右下角 120 像素区域作为缩放热区
+                        resize = isExpanded && (event.x > (width - 120)) && (event.y > (height - 120))
                     }
                     MotionEvent.ACTION_MOVE -> {
-                        // 获取当前窗口在屏幕上的绝对物理位置坐标
                         val location = IntArray(2)
                         this@FloatView.getLocationOnScreen(location)
                         val absoluteY = location[1]
 
+                        // 【核心安全缝隙校准】仅仅扣除小白条的物理高度，不多预留多余空白
                         val navBarHeight = getNavigationBarHeight()
                         val usableScreenHeight = getScreenHeight() - navBarHeight
 
                         if (resize) {
-                            // 计算缩放后的新尺寸
                             val newWidth = (startWidth + event.rawX - downX).toInt().coerceAtLeast(300)
                             var newHeight = (startHeight + event.rawY - downY).toInt().coerceAtLeast(200)
                             
-                            // 用屏幕绝对坐标判定是否触底，规避 params.y 虚拟偏移误差
+                            // 极限制卡位：刚好卡在小白条正上方，不留缝隙
                             if (absoluteY + newHeight > usableScreenHeight) {
                                 newHeight = usableScreenHeight - absoluteY
                             }
@@ -201,14 +200,13 @@ class FloatView(
                             params.width = newWidth
                             params.height = newHeight
                             
-                            // 实时更新并记忆最新的展开宽度和高度
                             lastExpandedWidth = newWidth
                             lastExpandedHeight = newHeight
                         } else {
                             params.x += (event.rawX - downX).toInt()
                             var targetY = params.y + (event.rawY - downY).toInt()
                             
-                            // 移动位置时，同样通过绝对坐标限制，防止底边越过导航小白条
+                            // 整体拖动时同样无缝卡位
                             if (targetY + height > usableScreenHeight) {
                                 targetY = usableScreenHeight - height
                             }
@@ -225,9 +223,6 @@ class FloatView(
         })
     }
 
-    /**
-     * 获取系统导航栏（小白条）的实时高度
-     */
     private fun getNavigationBarHeight(): Int {
         val resourceId = context.resources.getIdentifier("navigation_bar_height", "dimen", "android")
         return if (resourceId > 0) {
@@ -237,9 +232,6 @@ class FloatView(
         }
     }
 
-    /**
-     * 获取屏幕总高度
-     */
     private fun getScreenHeight(): Int {
         return context.resources.displayMetrics.heightPixels
     }
@@ -291,10 +283,9 @@ class FloatView(
             panelBg.setColor(Color.argb(180, 0, 0, 0))
             panelBg.cornerRadius = 10f
             this.setBackground(panelBg)
-            // 恢复展开状态的底部留白安全间距
-            this.setPadding(8, 6, 8, 24)
+            // 恢复展开状态紧凑的 padding
+            this.setPadding(8, 6, 8, 8)
 
-            // 恢复到上次记忆的宽高
             params.width = lastExpandedWidth
             params.height = lastExpandedHeight
         }
