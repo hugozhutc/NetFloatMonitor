@@ -77,6 +77,15 @@ class MainActivity : AppCompatActivity() {
 
             val port = portEdit.text.toString().toIntOrNull() ?: 16789
 
+            // 【核心优化】点击启动时，不等服务广播，前台先行本地刷新 UI，防止显示滞后
+            logManager.startNewSession() // 预先触发一次 session 获取文件名
+            val previewFile = logManager.getCurrentFileName()
+            tvStatusInfo.text = """
+                链路状态: 正在初始化...
+                当前文件: $previewFile
+                已收数据: 0 包 | 速率: 0 Hz
+            """.trimIndent()
+
             val serviceIntent = Intent(this, FloatService::class.java).apply {
                 putExtra("PORT", port)
                 putExtra("IP", ipEdit.text.toString())
