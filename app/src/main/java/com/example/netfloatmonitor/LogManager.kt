@@ -2,24 +2,26 @@ package com.example.netfloatmonitor
 
 import android.content.Context
 import android.util.Log
+import org.json.JSONObject
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
 
 class LogManager(private val context: Context) {
 
-    // 切换至 Android/data/com.example.netfloatmonitor/files/NetFloatLogs
-    // 这是外部私有目录，不需要任何动态权限，且在 Android 10+ 上完全合规
     private val logDir = File(context.getExternalFilesDir(null), "NetFloatLogs").apply {
         if (!exists()) {
-            val mkdirResult = mkdirs()
-            Log.d("LogManager", "创建日志文件夹: $mkdirResult, 路径: $absolutePath")
+            mkdirs()
         }
     }
 
-    private fun getFileName(): String {
-        val sdf = SimpleDateFormat("yyyyMMdd", Locale.getDefault())
-        return "log_${sdf.format(Date())}.txt"
+    private var isRecording = false
+    private var currentFileName: String? = null
+    private val csvHeaders = mutableListOf<String>()
+
+    private fun generateNewFileName(): String {
+        val sdf = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault())
+        return "log_${sdf.format(Date())}.csv"
     }
 
     private fun getTime(): String {
@@ -27,51 +29,73 @@ class LogManager(private val context: Context) {
         return sdf.format(Date())
     }
 
-    // ==========================================
-    // 补全以下公开方法，彻底解决 MainActivity.kt 编译报错
-    // ==========================================
+    fun getLogPath(): String = logDir.absolutePath
 
-    /**
-     * 获取当前日志文件夹的绝对路径，解决 getLogPath 未定义错误
-     */
-    fun getLogPath(): String {
-        return logDir.absolutePath
-    }
-
-    /**
-     * 获取所有日志文件的列表，解决 forEach 遍历歧义与 it 无法识别错误
-     */
     fun getLogFiles(): List<File> {
-        return logDir.listFiles()?.filter { it.isFile && it.name.endsWith(".txt") }?.toList() ?: emptyList()
+        return logDir.listFiles()?.filter { it.isFile && it.name.endsWith(".csv") }?.toList() ?: emptyList()
     }
 
-    // ==========================================
+    fun getCurrentFileName(): String {
+        return currentFileName ?: "未开启监控"
+    }
 
-    fun save(data: String) {
-        if (data.isBlank()) {
-            Log.w("LogManager", "警告: 尝试写入空数据，已跳过")
-            return
+    @Synchronized
+    fun startNewSession() {
+        if (isRecording) {
+            stopSession()
         }
+        csvHeaders.clear()
+        currentFileName = generateNewFileName()
+        isRecording = true
+        Log.d("LogManager", ">>> 新CSV会话开启: $currentFileName")
+    }
+
+    @Synchronized
+    fun stopSession() {
+        if (!isRecording) return
+        isRecording = false
+        currentFileName = null
+        csvHeaders.clear()
+        Log.d("LogManager", ">>> CSV会话已安全关闭")
+    }
+
+    @Synchronized
+    fun save(jsonData: String) {
+        if (!isRecording || currentFileName == null || jsonData.isBlank()) return
 
         try {
-            val file = File(logDir, getFileName())
-            
-            // 显式确保文件已被创建
-            if (!file.exists()) {
-                val createResult = file.createNewFile()
-                Log.d("LogManager", "成功创建新日志文件: $createResult")
+            val jsonObject = JSONObject(jsonData)
+            val file = File(logDir, currentFileName!!)
+
+            // 遇到本批次文件的第一条有效数据，初始化表头
+            if (csvHeaders.isEmpty()) {
+                csvHeaders.add("Timestamp")
+                val keys = jsonObject.keys()
+                while (keys.hasNext()) {
+                    csvHeaders.add(keys.next())
+                }
+                val headerLine = csvHeaders.joinToString(separator = ",") + "\n"
+                file.appendText(headerLine)
             }
 
-            val logContent = """
-            ==================== TIME:${getTime()}
-            $data
-            ====================
-            """.trimIndent() + "\n"
+            // 根据表头对齐填充数据
+            val rowData = mutableListOf<String>()
+            rowData.add(getTime())
 
-            file.appendText(logContent)
-            Log.d("LogManager", "日志写入成功: ${file.absolutePath}")
+            for (i in 1 until csvHeaders.size) {
+                val key = csvHeaders[i]
+                val value = jsonObject.optString(key, "")
+                
+                // 处理可能存在的内部逗号以包裹双引号，防止CSV错位
+                val cleanValue = if (value.contains(",")) "\"$value\"" else value
+                rowData.add(cleanValue)
+            }
+
+            val dataLine = rowData.joinToString(separator = ",") + "\n"
+            file.appendText(dataLine)
+
         } catch (e: Exception) {
-            Log.e("LogManager", "日志写入失败: ${e.message}", e)
+            Log.e("LogManager", "解析JSON并写入CSV失败: ${e.message}")
         }
     }
 }
