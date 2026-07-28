@@ -7,7 +7,10 @@ import android.os.Build
 import android.os.IBinder
 import android.view.WindowManager
 import androidx.core.app.NotificationCompat
+import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import android.util.Log
+import java.util.Timer
+import java.util.TimerTask
 
 class FloatService : Service() {
 
@@ -15,22 +18,31 @@ class FloatService : Service() {
     private var receiver: UdpReceiver? = null
     private lateinit var logger: LogManager
 
+    private var totalPackets = 0
+    private var packetsInLastSecond = 0
+    private var currentHz = 0
+    private var statusTimer: Timer? = null
+
     override fun onCreate() {
         super.onCreate()
         logger = LogManager(this)
         
         Log.d("FloatService", "Service onCreate 触发")
-        logger.save("SERVICE START TEST") 
-        logger.save("========== SERVICE CREATE ==========")
-        
         createNotificationChannel()
         startForeground(1001, createNotification())
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val port = intent?.getIntExtra("PORT", 16789) ?: 16789
+        
+        totalPackets = 0
+        currentHz = 0
+        logger.startNewSession()
+        
         showFloatWindow()
         startUdpReceive(port)
+        startStatusTimer()
+        
         return START_NOT_STICKY
     }
 
@@ -39,21 +51,37 @@ class FloatService : Service() {
         
         receiver = UdpReceiver(port) { data ->
             try {
-                // 收到任何 UDP 数据都会实时追加进日志文件
-                logger.save("UDP RECEIVE -> \n$data")
+                totalPackets++
+                packetsInLastSecond++
+
+                logger.save(data)
                 
-                // 刷新悬浮窗 UI
                 floatView?.post {
                     floatView?.updateJson(data)
                 }
             } catch (e: Exception) {
-                Log.e("FloatService", "UI 更新或日志记录异常", e)
-                logger.save("DISPLAY ERROR:\n${e.stackTraceToString()}")
+                Log.e("FloatService", "数据流转处理异常", e)
             }
         }
         
         receiver?.start()
-        logger.save("UDP LISTEN START PORT: $port")
+    }
+
+    private fun startStatusTimer() {
+        statusTimer?.cancel()
+        statusTimer = Timer()
+        statusTimer?.scheduleAtFixedRate(object : TimerTask() {
+            override fun run() {
+                currentHz = packetsInLastSecond
+                packetsInLastSecond = 0
+
+                val intent = Intent("com.example.netfloatmonitor.STATUS_UPDATE").apply {
+                    putExtra("TOTAL_PACKETS", totalPackets)
+                    putExtra("HZ", currentHz)
+                }
+                LocalBroadcastManager.getInstance(this@FloatService).sendBroadcast(intent)
+            }
+        }, 1000, 1000)
     }
 
     private fun showFloatWindow() {
@@ -79,9 +107,16 @@ class FloatService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
-        Log.d("FloatService", "Service onDestroy 触发")
-        logger.save("========== SERVICE DESTROY ==========")
+        statusTimer?.cancel()
+        statusTimer = null
         
+        logger.stopSession()
+        
+        val intent = Intent("com.example.netfloatmonitor.STATUS_UPDATE").apply {
+            putExtra("IS_STOPPED", true)
+        }
+        LocalBroadcastManager.getInstance(this).sendBroadcast(intent)
+
         receiver?.stop()
         receiver = null
         
@@ -96,9 +131,7 @@ class FloatService : Service() {
         }
     }
 
-    override fun onBind(intent: Intent?): IBinder? {
-        return null
-    }
+    override fun onBind(intent: Intent?): IBinder? = null
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= 26) {
