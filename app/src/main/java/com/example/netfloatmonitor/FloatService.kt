@@ -4,7 +4,9 @@ import android.app.*
 import android.content.Intent
 import android.graphics.PixelFormat
 import android.os.Build
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.view.WindowManager
 import androidx.core.app.NotificationCompat
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
@@ -42,6 +44,11 @@ class FloatService : Service() {
         showFloatWindow()
         startUdpReceive(port)
         startStatusTimer()
+
+        // 【新增优化】延迟 200ms 发送第一帧广播，确保前台 Activity 的 BroadcastReceiver 已经完全注册完成
+        Handler(Looper.getMainLooper()).postDelayed({
+            sendStatusBroadcast()
+        }, 200)
         
         return START_NOT_STICKY
     }
@@ -74,14 +81,18 @@ class FloatService : Service() {
             override fun run() {
                 currentHz = packetsInLastSecond
                 packetsInLastSecond = 0
-
-                val intent = Intent("com.example.netfloatmonitor.STATUS_UPDATE").apply {
-                    putExtra("TOTAL_PACKETS", totalPackets)
-                    putExtra("HZ", currentHz)
-                }
-                LocalBroadcastManager.getInstance(this@FloatService).sendBroadcast(intent)
+                sendStatusBroadcast()
             }
         }, 1000, 1000)
+    }
+
+    // 抽取为独立方法，方便复用
+    private fun sendStatusBroadcast() {
+        val intent = Intent("com.example.netfloatmonitor.STATUS_UPDATE").apply {
+            putExtra("TOTAL_PACKETS", totalPackets)
+            putExtra("HZ", currentHz)
+        }
+        LocalBroadcastManager.getInstance(this@FloatService).sendBroadcast(intent)
     }
 
     private fun showFloatWindow() {
