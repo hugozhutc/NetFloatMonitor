@@ -1,508 +1,151 @@
 package com.example.netfloatmonitor
 
-
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
+import androidx.localbroadcastmanager.content.LocalBroadcastManager
+import java.io.File
 
-
-
-class MainActivity : AppCompatActivity(){
-
-
+class MainActivity : AppCompatActivity() {
 
     private lateinit var ipEdit: EditText
-
     private lateinit var portEdit: EditText
-
     private lateinit var logPath: TextView
-
-
-
-
-    override fun onCreate(
-
-        savedInstanceState: Bundle?
-
-    ) {
-
-
-        super.onCreate(savedInstanceState)
-
-
-
-        setContentView(
-
-            R.layout.activity_main
-
-        )
-
-
-
-
-        ipEdit =
-
-            findViewById(
-
-                R.id.editIp
-
-            )
-
-
-
-        portEdit =
-
-            findViewById(
-
-                R.id.editPort
-
-            )
-
-
-
-        logPath =
-
-            findViewById(
-
-                R.id.logPath
-
-            )
-
-
-
-
-
-        val startBtn =
-
-            findViewById<Button>(
-
-                R.id.startBtn
-
-            )
-
-
-
-        val stopBtn =
-
-            findViewById<Button>(
-
-                R.id.stopBtn
-
-            )
-
-
-
-        val clearBtn =
-
-            findViewById<Button>(
-
-                R.id.clearBtn
-
-            )
-
-
-
-
-
-        loadConfig()
-
-
-
-        showLogPath()
-
-
-
-
-
-
-        /**
-         * 启动监听
-         */
-        startBtn.setOnClickListener {
-
-
-
-            saveConfig()
-
-
-
-            //检查悬浮窗权限
-
-            if(
-
-                !Settings.canDrawOverlays(this)
-
-            ){
-
-
-                val intent = Intent(
-
-                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-
-                    Uri.parse(
-
-                        "package:$packageName"
-
-                    )
-
-                )
-
-
-                startActivity(intent)
-
-
-                Toast.makeText(
-
-                    this,
-
-                    "请开启悬浮窗权限",
-
-                    Toast.LENGTH_SHORT
-
-                ).show()
-
-
-                return@setOnClickListener
-
+    private lateinit var logManager: LogManager
+    private lateinit var tvStatusInfo: TextView
+
+    private val statusReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent == null) return
+            
+            val isStopped = intent.getBooleanExtra("IS_STOPPED", false)
+            if (isStopped) {
+                tvStatusInfo.text = "链路状态: 已停止\n当前文件: 未开启监控\n已收数据: 0 包 | 速率: 0 Hz"
+                return
             }
 
+            val total = intent.getIntExtra("TOTAL_PACKETS", 0)
+            val hz = intent.getIntExtra("HZ", 0)
+            val currentFile = logManager.getCurrentFileName()
 
-
-
-            val port =
-
-
-                portEdit.text
-                    .toString()
-                    .toIntOrNull()
-
-                    ?:16789
-
-
-
-
-
-            val serviceIntent = Intent(
-
-                this,
-
-                FloatService::class.java
-
-            )
-
-
-
-            serviceIntent.putExtra(
-
-                "PORT",
-
-                port
-
-            )
-
-
-
-            serviceIntent.putExtra(
-
-                "IP",
-
-                ipEdit.text
-                    .toString()
-
-            )
-
-
-
-
-
-            startForegroundService(
-
-                serviceIntent
-
-            )
-
-
-
-
-            Toast.makeText(
-
-                this,
-
-                "UDP监听启动 端口:$port",
-
-                Toast.LENGTH_SHORT
-
-            ).show()
-
-
-
+            tvStatusInfo.text = """
+                链路状态: 正在监听...
+                当前文件: $currentFile
+                已收数据: $total 包 | 速率: $hz Hz
+            """.trimIndent()
         }
+    }
 
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main)
 
+        logManager = LogManager(this)
 
+        ipEdit = findViewById(R.id.editIp)
+        portEdit = findViewById(R.id.editPort)
+        logPath = findViewById(R.id.logPath)
+        tvStatusInfo = findViewById(R.id.tvStatusInfo)
 
+        val startBtn = findViewById<Button>(R.id.startBtn)
+        val stopBtn = findViewById<Button>(R.id.stopBtn)
+        val clearBtn = findViewById<Button>(R.id.clearBtn)
 
+        loadConfig()
+        showLogPath()
+        
+        tvStatusInfo.text = "链路状态: 待机\n当前文件: 未开启监控\n已收数据: 0 包 | 速率: 0 Hz"
 
+        startBtn.setOnClickListener {
+            saveConfig()
 
-        /**
-         * 停止监听
-         */
-        stopBtn.setOnClickListener {
-
-
-
-            stopService(
-
-                Intent(
-
-                    this,
-
-                    FloatService::class.java
-
+            if (!Settings.canDrawOverlays(this)) {
+                val intent = Intent(
+                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    Uri.parse("package:$packageName")
                 )
+                startActivity(intent)
+                Toast.makeText(this, "请开启悬浮窗权限", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
 
-            )
+            val port = portEdit.text.toString().toIntOrNull() ?: 16789
 
+            val serviceIntent = Intent(this, FloatService::class.java).apply {
+                putExtra("PORT", port)
+                putExtra("IP", ipEdit.text.toString())
+            }
 
+            if (android.os.Build.VERSION.SDK_INT >= 26) {
+                startForegroundService(serviceIntent)
+            } else {
+                startService(serviceIntent)
+            }
 
-            Toast.makeText(
-
-                this,
-
-                "监听已停止",
-
-                Toast.LENGTH_SHORT
-
-            ).show()
-
-
-
+            Toast.makeText(this, "UDP监听启动 端口:$port", Toast.LENGTH_SHORT).show()
         }
 
+        stopBtn.setOnClickListener {
+            stopService(Intent(this, FloatService::class.java))
+            Toast.makeText(this, "监听已停止，CSV表格已封存", Toast.LENGTH_SHORT).show()
+        }
 
-
-
-
-
-
-
-
-        /**
-         * 清除日志
-         */
         clearBtn.setOnClickListener {
-
-
             clearLog()
-
-
         }
-
-
-
     }
 
-
-
-
-
-
-
-
-
-    /**
-     * 保存配置
-     */
-    private fun saveConfig(){
-
-
-        getSharedPreferences(
-
-            "net_config",
-
-            Context.MODE_PRIVATE
-
+    override fun onStart() {
+        super.onStart()
+        LocalBroadcastManager.getInstance(this).registerReceiver(
+            statusReceiver, 
+            IntentFilter("com.example.netfloatmonitor.STATUS_UPDATE")
         )
+    }
 
+    override fun onStop() {
+        super.onStop()
+        LocalBroadcastManager.getInstance(this).unregisterReceiver(statusReceiver)
+    }
+
+    private fun saveConfig() {
+        getSharedPreferences("net_config", Context.MODE_PRIVATE)
             .edit()
-
-            .putString(
-
-                "ip",
-
-                ipEdit.text.toString()
-
-            )
-
-            .putString(
-
-                "port",
-
-                portEdit.text.toString()
-
-            )
-
+            .putString("ip", ipEdit.text.toString())
+            .putString("port", portEdit.text.toString())
             .apply()
-
-
     }
 
-
-
-
-
-
-
-
-
-    /**
-     * 读取配置
-     */
-    private fun loadConfig(){
-
-
-
-        val sp =
-
-
-            getSharedPreferences(
-
-                "net_config",
-
-                Context.MODE_PRIVATE
-
-            )
-
-
-
-
-        ipEdit.setText(
-
-
-            sp.getString(
-
-                "ip",
-
-                "192.168.144.33"
-
-            )
-
-        )
-
-
-
-
-
-        portEdit.setText(
-
-
-            sp.getString(
-
-                "port",
-
-                "16789"
-
-            )
-
-        )
-
-
+    private fun loadConfig() {
+        val sp = getSharedPreferences("net_config", Context.MODE_PRIVATE)
+        ipEdit.setText(sp.getString("ip", "192.168.144.33"))
+        portEdit.setText(sp.getString("port", "16789"))
     }
 
-
-
-
-
-
-
-
-
-    /**
-     * 显示日志路径
-     */
-    private fun showLogPath(){
-
-
-
-        val path =
-
-
-            LogManager(this)
-
-                .getLogPath()
-
-
-
-
-
-        logPath.text =
-
-
-            "日志目录:\n$path"
-
-
-
+    private fun showLogPath() {
+        logPath.text = "日志目录:\n${logManager.getLogPath()}"
     }
 
-
-
-
-
-
-
-
-
-    /**
-     * 清除日志
-     */
-    private fun clearLog(){
-
-
-
-        val dir = java.io.File(
-
-
-            LogManager(this)
-
-                .getLogPath()
-
-
-        )
-
-
-
-
-        dir.listFiles()?.forEach{
-
-
-            it.delete()
-
-
+    private fun clearLog() {
+        val files: List<File> = logManager.getLogFiles()
+        var deletedCount = 0
+        
+        files.forEach { file ->
+            if (file.exists() && file.delete()) {
+                deletedCount++
+            }
         }
-
-
-
-
 
         Toast.makeText(
-
             this,
-
-            "日志已清除",
-
+            if (deletedCount > 0) "已成功清除 $deletedCount 个历史CSV表格" else "没有需要清除的历史数据",
             Toast.LENGTH_SHORT
-
         ).show()
-
-
-
     }
-
-
-
-
 }
