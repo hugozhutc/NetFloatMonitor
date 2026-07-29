@@ -4,17 +4,27 @@ package com.example.netfloatmonitor.ui
 import android.content.Context
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
-import android.view.*
-import android.widget.*
+import android.view.MotionEvent
+import android.view.View
+import android.view.WindowManager
+import android.widget.LinearLayout
+import android.widget.TextView
+
 
 import com.example.netfloatmonitor.data.LinkStatus
 
 
 
+
 class FloatWindow(
+
     context: Context,
+
     private val windowManager: WindowManager,
+
     private val params: WindowManager.LayoutParams
+
+
 ) : LinearLayout(context) {
 
 
@@ -29,52 +39,52 @@ class FloatWindow(
     private val gndPanel =
         LinkPanelView(
             context,
-            "GROUND"
+            "GND"
         )
 
 
-    private val linkPanel =
-        LinkPanelView(
-            context,
-            "LINK"
-        )
+    private val infoText =
+        TextView(context)
 
 
 
-    private val chartView =
-        ChartView(context)
+    private var lastX = 0f
+
+    private var lastY = 0f
 
 
-
-    private var downX=0f
-    private var downY=0f
-
-
-
-    private var expanded=true
 
 
 
     init {
 
 
-        orientation =
-            VERTICAL
-
+        orientation = VERTICAL
 
 
         setPadding(
             15,
-            10,
             15,
-            10
+            15,
+            15
         )
 
 
-
         background =
-            createBackground()
+            GradientDrawable().apply {
 
+                setColor(
+                    Color.argb(
+                        220,
+                        15,
+                        18,
+                        22
+                    )
+                )
+
+                cornerRadius = 20f
+
+            }
 
 
 
@@ -83,28 +93,24 @@ class FloatWindow(
             TextView(context)
 
 
-
         title.text =
-            "NETFLOAT MONITOR"
-
+            "NetFloat Monitor"
 
 
         title.textSize =
-            18f
-
+            20f
 
 
         title.setTextColor(
-            Color.GREEN
+            Color.CYAN
         )
-
 
 
         addView(
             title,
             LayoutParams(
-                MATCH_PARENT,
-                50
+                LayoutParams.MATCH_PARENT,
+                LayoutParams.WRAP_CONTENT
             )
         )
 
@@ -112,152 +118,92 @@ class FloatWindow(
 
 
 
+        infoText.textSize = 14f
 
-        val panelRow =
+        infoText.setTextColor(
+            Color.WHITE
+        )
+
+
+        val infoLp =
+            LayoutParams(
+                LayoutParams.MATCH_PARENT,
+                LayoutParams.WRAP_CONTENT
+            )
+
+
+        infoLp.topMargin = 10
+
+
+        addView(
+            infoText,
+            infoLp
+        )
+
+
+
+
+
+
+
+        val linkLayout =
             LinearLayout(context)
 
 
-
-        panelRow.orientation =
+        linkLayout.orientation =
             HORIZONTAL
 
 
 
 
-        panelRow.addView(
+        linkLayout.addView(
+
             airPanel,
+
             LayoutParams(
-                320,
-                WRAP_CONTENT
+                420,
+                LayoutParams.WRAP_CONTENT
             )
+
         )
 
 
 
-        panelRow.addView(
+        linkLayout.addView(
+
             gndPanel,
+
             LayoutParams(
-                320,
-                WRAP_CONTENT
+                420,
+                LayoutParams.WRAP_CONTENT
             )
+
         )
 
 
 
-        panelRow.addView(
-            linkPanel,
+        val linkLp =
             LayoutParams(
-                320,
-                WRAP_CONTENT
+                LayoutParams.MATCH_PARENT,
+                LayoutParams.WRAP_CONTENT
             )
-        )
+
+
+        linkLp.topMargin = 10
 
 
 
         addView(
-            panelRow
+            linkLayout,
+            linkLp
         )
 
 
 
 
-
-
-
-        addView(
-            chartView,
-            LayoutParams(
-                MATCH_PARENT,
-                300
-            )
+        setOnTouchListener(
+            MoveListener()
         )
-
-
-
-
-
-
-
-        setOnTouchListener{
-
-                _,event ->
-
-
-            when(event.action){
-
-
-                MotionEvent.ACTION_DOWN->{
-
-
-                    downX =
-                        event.rawX
-
-
-                    downY =
-                        event.rawY
-
-
-                    true
-
-                }
-
-
-
-                MotionEvent.ACTION_MOVE->{
-
-
-                    params.x +=
-                        (
-                                event.rawX-downX
-                        ).toInt()
-
-
-
-                    params.y +=
-                        (
-                                event.rawY-downY
-                        ).toInt()
-
-
-
-                    downX =
-                        event.rawX
-
-
-                    downY =
-                        event.rawY
-
-
-
-
-                    windowManager
-                        .updateViewLayout(
-                            this,
-                            params
-                        )
-
-                    true
-
-                }
-
-
-                else ->
-                    true
-
-            }
-
-        }
-
-
-
-
-        setOnClickListener{
-
-
-            toggle()
-
-        }
-
 
 
     }
@@ -271,38 +217,69 @@ class FloatWindow(
 
 
     fun updateStatus(
-        status:LinkStatus
-    ){
+        status: LinkStatus
+    ) {
 
 
 
-        airPanel.updateAir(
-            status
+        airPanel.update(
+
+            status.airRssi1,
+
+            status.airRssi2,
+
+            status.airSnr,
+
+            status.airPass,
+
+            status.airFailed,
+
+            status.airAnt
+
+        )
+
+
+
+
+
+        gndPanel.update(
+
+            status.gndRssi1,
+
+            status.gndRssi2,
+
+            status.gndSnr,
+
+            status.gndPass,
+
+            status.gndFailed,
+
+            status.gndAnt
+
         )
 
 
 
-        gndPanel.updateGround(
-            status
-        )
 
 
+        infoText.text =
 
-        linkPanel.updateLink(
-            status
-        )
+            """
+IP       : ${status.sourceIp}
 
+FREQ     : ${status.freq}
 
+MCS      : ${status.mcs}
 
-        chartView.addData(
+POWER    : ${status.power}
 
-            status.airRssi1.toFloatOrNull(),
+DIST     : ${status.distance}
 
-            status.airRssi2.toFloatOrNull(),
+TX       : ${status.txRate}
 
-            status.airSnr.toFloatOrNull()
+RX       : ${status.rxRate}
 
-        )
+            """.trimIndent()
 
 
     }
@@ -315,95 +292,98 @@ class FloatWindow(
 
 
 
-    private fun toggle(){
+    private inner class MoveListener :
 
-
-        expanded =
-            !expanded
-
-
-
-        if(expanded){
+        OnTouchListener {
 
 
 
-            visibility =
-                VISIBLE
+        override fun onTouch(
+
+            v: View?,
+
+            event: MotionEvent?
+
+        ): Boolean {
 
 
 
-            params.width =
-                1000
+            when(event?.action){
 
 
 
-            params.height =
-                700
+                MotionEvent.ACTION_DOWN -> {
+
+
+                    lastX =
+                        event.rawX
+
+
+                    lastY =
+                        event.rawY
+
+                    return true
+
+                }
 
 
 
-        }
-        else{
+                MotionEvent.ACTION_MOVE -> {
 
 
 
-            params.width =
-                220
+                    params.x +=
+                        (
+                            event.rawX -
+                            lastX
+                        ).toInt()
 
 
 
-            params.height =
-                80
-
-
-
-        }
-
-
-
-        windowManager
-            .updateViewLayout(
-                this,
-                params
-            )
-
-
-    }
-
-
+                    params.y +=
+                        (
+                            event.rawY -
+                            lastY
+                        ).toInt()
 
 
 
 
+                    lastX =
+                        event.rawX
+
+
+                    lastY =
+                        event.rawY
 
 
 
-    private fun createBackground():
-            GradientDrawable{
 
+                    windowManager.updateViewLayout(
 
-        return GradientDrawable()
-            .apply{
+                        this@FloatWindow,
 
+                        params
 
-                setColor(
-                    Color.argb(
-                        220,
-                        15,
-                        15,
-                        15
                     )
-                )
 
 
-                cornerRadius =
-                    25f
+
+                    return true
+
+                }
+
+
 
             }
 
 
-    }
+            return true
 
+        }
+
+
+    }
 
 
 }
