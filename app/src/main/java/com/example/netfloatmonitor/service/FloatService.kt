@@ -32,7 +32,7 @@ class FloatService : Service() {
     private var udpReceiver:UdpReceiver? = null
 
 
-    private var floatView:FloatView? = null
+    private var floatWindow: FloatWindow? = null
 
 
 
