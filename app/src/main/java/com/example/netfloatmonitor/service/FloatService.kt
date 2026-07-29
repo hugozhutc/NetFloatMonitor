@@ -13,7 +13,7 @@ import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import com.example.netfloatmonitor.data.DataProcessor
 import com.example.netfloatmonitor.data.JsonParser
 import com.example.netfloatmonitor.log.LogManager
-import com.example.netfloatmonitor.net.UdpReceiver
+import com.example.netfloatmonitor.network.UdpReceiver
 import com.example.netfloatmonitor.ui.FloatWindow
 import java.util.Timer
 import java.util.TimerTask
