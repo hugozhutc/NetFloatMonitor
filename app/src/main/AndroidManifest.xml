@@ -3,61 +3,93 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
 
-    <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- UDP网络 -->
+    <uses-permission
+        android:name="android.permission.INTERNET"/>
 
 
-    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
+    <!-- 悬浮窗 -->
+    <uses-permission
+        android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
 
 
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
-
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"/>
-
-
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- 前台服务 -->
+    <uses-permission
+        android:name="android.permission.FOREGROUND_SERVICE"/>
 
 
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
+    <uses-permission
+        android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"/>
+
+
+
+    <!-- Android 13以下存储 -->
+    <uses-permission
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
 
 
 
     <application
 
+
         android:allowBackup="true"
 
+
         android:label="NetFloatMonitor"
+
 
         android:theme="@style/AppTheme">
 
 
 
+
+
         <activity
 
+
             android:name=".MainActivity"
+
 
             android:exported="true">
 
 
+
             <intent-filter>
+
 
                 <action android:name="android.intent.action.MAIN"/>
 
+
                 <category android:name="android.intent.category.LAUNCHER"/>
 
+
             </intent-filter>
+
 
 
         </activity>
 
 
 
+
+
+        <!-- 注意这里 -->
+
+        <!-- FloatService在service包里面 -->
+
+
         <service
+
 
             android:name=".service.FloatService"
 
+
             android:foregroundServiceType="specialUse"
 
+
             android:exported="false"/>
+
+
 
 
     </application>
