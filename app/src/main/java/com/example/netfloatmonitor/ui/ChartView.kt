@@ -10,7 +10,6 @@ import java.util.LinkedList
 
 
 
-
 class ChartView(
 
     context: Context
@@ -50,9 +49,11 @@ class ChartView(
                     255
                 )
 
-            strokeWidth =
-                1f
+            strokeWidth = 1f
+
         }
+
+
 
 
 
@@ -60,18 +61,18 @@ class ChartView(
     private val rssi1Paint =
         Paint().apply {
 
-            color =
-                Color.CYAN
+            color = Color.CYAN
 
-            strokeWidth =
-                3f
+            strokeWidth = 3f
 
             style =
                 Paint.Style.STROKE
 
-            isAntiAlias =
-                true
+            isAntiAlias = true
+
         }
+
+
 
 
 
@@ -79,18 +80,18 @@ class ChartView(
     private val rssi2Paint =
         Paint().apply {
 
-            color =
-                Color.BLUE
+            color = Color.BLUE
 
-            strokeWidth =
-                3f
+            strokeWidth = 3f
 
             style =
                 Paint.Style.STROKE
 
-            isAntiAlias =
-                true
+            isAntiAlias = true
+
         }
+
+
 
 
 
@@ -98,17 +99,15 @@ class ChartView(
     private val snrPaint =
         Paint().apply {
 
-            color =
-                Color.GREEN
+            color = Color.GREEN
 
-            strokeWidth =
-                3f
+            strokeWidth = 3f
 
             style =
                 Paint.Style.STROKE
 
-            isAntiAlias =
-                true
+            isAntiAlias = true
+
         }
 
 
@@ -119,14 +118,12 @@ class ChartView(
     private val textPaint =
         Paint().apply {
 
-            color =
-                Color.WHITE
+            color = Color.WHITE
 
-            textSize =
-                28f
+            textSize = 28f
 
-            isAntiAlias =
-                true
+            isAntiAlias = true
+
         }
 
 
@@ -139,11 +136,11 @@ class ChartView(
 
     fun addData(
 
-        rssi1:Float,
+        rssi1: Float,
 
-        rssi2:Float,
+        rssi2: Float,
 
-        snr:Float
+        snr: Float
 
     ){
 
@@ -166,7 +163,6 @@ class ChartView(
         )
 
 
-
         postInvalidate()
 
     }
@@ -178,18 +174,17 @@ class ChartView(
 
 
 
+
     private fun addValue(
 
-        list:LinkedList<Float>,
+        list: LinkedList<Float>,
 
-        value:Float
+        value: Float
 
     ){
 
 
-
         list.add(value)
-
 
 
         if(list.size > maxPoints){
@@ -211,9 +206,10 @@ class ChartView(
 
     override fun onDraw(
 
-        canvas:Canvas
+        canvas: Canvas
 
     ){
+
 
         super.onDraw(canvas)
 
@@ -223,23 +219,26 @@ class ChartView(
             width.toFloat()
 
 
+
         val h =
             height.toFloat()
 
 
 
-        if(w<=0 || h<=0)
+
+        if(w <= 0 || h <= 0)
+
             return
 
 
 
 
 
-        //背景
 
         canvas.drawColor(
             Color.TRANSPARENT
         )
+
 
 
 
@@ -252,9 +251,7 @@ class ChartView(
 
 
             val y =
-                h *
-                i /
-                5f
+                h * i / 5f
 
 
 
@@ -272,7 +269,9 @@ class ChartView(
 
             )
 
+
         }
+
 
 
 
@@ -296,6 +295,7 @@ class ChartView(
 
 
 
+
         drawCurve(
 
             canvas,
@@ -307,6 +307,7 @@ class ChartView(
             120f
 
         )
+
 
 
 
@@ -328,6 +329,8 @@ class ChartView(
 
 
 
+
+
         canvas.drawText(
 
             "RSSI1",
@@ -342,6 +345,8 @@ class ChartView(
 
 
 
+
+
         canvas.drawText(
 
             "RSSI2",
@@ -353,6 +358,8 @@ class ChartView(
             textPaint
 
         )
+
+
 
 
 
@@ -379,52 +386,65 @@ class ChartView(
 
 
 
+
+
+
     private fun drawCurve(
 
-        canvas:Canvas,
+        canvas: Canvas,
 
-        list:List<Float>,
+        list: List<Float>,
 
-        paint:Paint,
+        paint: Paint,
 
-        maxValue:Float
+        maxValue: Float
 
     ){
 
 
 
         if(list.size < 2)
+
             return
+
+
 
 
 
 
         val step =
 
-            width.toFloat()
-            /
-            (maxPoints-1)
+            width.toFloat() /
+                    (maxPoints - 1)
 
 
 
 
 
-        for(i in 0 until list.size-1){
+
+
+        for(i in 0 until list.size - 1){
+
+
+
 
 
 
             val x1 =
 
-                i *
-                step
+                i * step
+
+
+
 
 
 
             val x2 =
 
-                (i+1)
-                *
-                step
+                (i + 1) * step
+
+
+
 
 
 
@@ -432,14 +452,20 @@ class ChartView(
 
             val y1 =
 
-                height -
-                (
-                    list[i]
-                    /
-                    maxValue
-                    *
-                    height
-                )
+                height.toFloat() -
+
+                        (
+
+                                list[i]
+                                        /
+                                        maxValue
+                                        *
+                                        height.toFloat()
+
+                                )
+
+
+
 
 
 
@@ -447,14 +473,20 @@ class ChartView(
 
             val y2 =
 
-                height -
-                (
-                    list[i+1]
-                    /
-                    maxValue
-                    *
-                    height
-                )
+                height.toFloat() -
+
+                        (
+
+                                list[i + 1]
+                                        /
+                                        maxValue
+                                        *
+                                        height.toFloat()
+
+                                )
+
+
+
 
 
 
@@ -475,6 +507,7 @@ class ChartView(
             )
 
         }
+
 
     }
 
