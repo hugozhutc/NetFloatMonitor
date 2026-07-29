@@ -102,6 +102,8 @@ data class LinkStatus(
 
     var rawJson:String = ""
 
+    var sourceIp:String="--"
+
 
 
 )
