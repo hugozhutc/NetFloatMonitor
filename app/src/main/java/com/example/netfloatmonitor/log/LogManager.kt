@@ -1,102 +1,565 @@
+package com.example.netfloatmonitor.data
 
-package com.example.netfloatmonitor
 
 import android.content.Context
+import android.os.Environment
 import android.util.Log
+
 import org.json.JSONObject
+
+import java.io.BufferedWriter
 import java.io.File
+import java.io.FileWriter
+
 import java.text.SimpleDateFormat
 import java.util.*
+import java.util.concurrent.LinkedBlockingQueue
 
-class LogManager(private val context: Context) {
 
-    private val logDir = File(context.getExternalFilesDir(null), "NetFloatLogs").apply {
-        if (!exists()) {
-            mkdirs()
+
+class LogManager(
+    private val context:Context
+) {
+
+
+
+    private val TAG =
+        "LogManager"
+
+
+
+
+    // Android公共Documents目录
+
+    private val logDir =
+        File(
+            Environment
+                .getExternalStoragePublicDirectory(
+                    Environment.DIRECTORY_DOCUMENTS
+                ),
+            "NetFloatMonitor/log"
+        )
+
+
+
+
+    private var running=false
+
+
+
+    private var writerThread:Thread?=null
+
+
+
+    private var writer:BufferedWriter?=null
+
+
+
+    private var currentFile:File?=null
+
+
+
+    private val queue =
+        LinkedBlockingQueue<String>(5000)
+
+
+
+    private val headers =
+        LinkedHashSet<String>()
+
+
+
+    init {
+
+
+        if(
+            !logDir.exists()
+        ){
+
+            logDir.mkdirs()
+
         }
+
+
     }
 
-    private var isRecording = false
-    private var currentFileName: String? = null
-    private val csvHeaders = mutableListOf<String>()
 
-    private fun generateNewFileName(): String {
-        val sdf = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault())
-        return "log_${sdf.format(Date())}.csv"
+
+
+
+
+
+
+    fun getLogPath():String{
+
+
+        return logDir.absolutePath
+
     }
 
-    private fun getTime(): String {
-        val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.getDefault())
-        return sdf.format(Date())
+
+
+
+
+
+
+
+    fun getLogFiles():List<File>{
+
+
+        return logDir
+            .listFiles()
+            ?.filter {
+
+                it.extension=="csv"
+
+            }
+            ?: emptyList()
+
+
     }
 
-    fun getLogPath(): String = logDir.absolutePath
 
-    fun getLogFiles(): List<File> {
-        return logDir.listFiles()?.filter { it.isFile && it.name.endsWith(".csv") }?.toList() ?: emptyList()
+
+
+
+
+
+
+
+    fun getCurrentFileName():String{
+
+
+        return currentFile
+            ?.name
+            ?: "未开启监控"
+
+
     }
 
-    fun getCurrentFileName(): String {
-        return currentFileName ?: "未开启监控"
+
+
+
+
+
+
+
+
+    fun startNewSession(){
+
+
+
+        stopSession()
+
+
+
+        headers.clear()
+
+
+
+        val name =
+            "NetLog_" +
+                    SimpleDateFormat(
+                        "yyyyMMdd_HHmmss",
+                        Locale.getDefault()
+                    )
+                        .format(Date())
+                    +
+                    ".csv"
+
+
+
+        currentFile =
+            File(
+                logDir,
+                name
+            )
+
+
+
+        running=true
+
+
+
+        writerThread =
+            Thread {
+
+
+                writeLoop()
+
+
+            }
+
+
+
+        writerThread?.start()
+
+
+
+        Log.d(
+            TAG,
+            "日志开始:$name"
+        )
+
+
+
     }
 
-    @Synchronized
-    fun startNewSession() {
-        if (isRecording) {
-            stopSession()
-        }
-        csvHeaders.clear()
-        currentFileName = generateNewFileName()
-        isRecording = true
-        Log.d("LogManager", ">>> 新CSV会话开启: $currentFileName")
+
+
+
+
+
+
+
+
+    fun save(
+        json:String
+    ){
+
+
+        if(
+            !running
+        )
+            return
+
+
+
+        if(
+            json.isBlank()
+        )
+            return
+
+
+
+        queue.offer(
+            json
+        )
+
+
     }
 
-    @Synchronized
-    fun stopSession() {
-        if (!isRecording) return
-        isRecording = false
-        currentFileName = null
-        csvHeaders.clear()
-        Log.d("LogManager", ">>> CSV会话已安全关闭")
-    }
 
-    @Synchronized
-    fun save(jsonData: String) {
-        if (!isRecording || currentFileName == null || jsonData.isBlank()) return
 
-        try {
-            val jsonObject = JSONObject(jsonData)
-            val file = File(logDir, currentFileName!!)
 
-            // 遇到本批次文件的第一条有效数据，初始化表头
-            if (csvHeaders.isEmpty()) {
-                csvHeaders.add("Timestamp")
-                val keys = jsonObject.keys()
-                while (keys.hasNext()) {
-                    csvHeaders.add(keys.next())
+
+
+
+
+
+    private fun writeLoop(){
+
+
+
+        try{
+
+
+            writer =
+                BufferedWriter(
+                    FileWriter(
+                        currentFile,
+                        true
+                    )
+                )
+
+
+
+
+            while(
+                running ||
+                queue.isNotEmpty()
+            ){
+
+
+
+                val json =
+                    queue.poll()
+
+
+
+                if(
+                    json==null
+                ){
+
+                    Thread.sleep(20)
+
+                    continue
+
                 }
-                val headerLine = csvHeaders.joinToString(separator = ",") + "\n"
-                file.appendText(headerLine)
+
+
+
+                writeJson(
+                    json
+                )
+
+
             }
 
-            // 根据表头对齐填充数据
-            val rowData = mutableListOf<String>()
-            rowData.add(getTime())
 
-            for (i in 1 until csvHeaders.size) {
-                val key = csvHeaders[i]
-                val value = jsonObject.optString(key, "")
-                
-                // 处理可能存在的内部逗号以包裹双引号，防止CSV错位
-                val cleanValue = if (value.contains(",")) "\"$value\"" else value
-                rowData.add(cleanValue)
-            }
 
-            val dataLine = rowData.joinToString(separator = ",") + "\n"
-            file.appendText(dataLine)
-
-        } catch (e: Exception) {
-            Log.e("LogManager", "解析JSON并写入CSV失败: ${e.message}")
         }
+        catch(e:Exception){
+
+
+            Log.e(
+                TAG,
+                "写日志异常:${e.message}"
+            )
+
+
+        }
+        finally{
+
+
+            try{
+
+
+                writer?.flush()
+
+                writer?.close()
+
+
+            }
+            catch(_:Exception){}
+
+
+        }
+
+
+
     }
+
+
+
+
+
+
+
+
+
+    private fun writeJson(
+        json:String
+    ){
+
+
+
+        val obj =
+            JSONObject(json)
+
+
+
+
+        //第一次收到数据
+
+        if(
+            headers.isEmpty()
+        ){
+
+
+            headers.add(
+                "Timestamp"
+            )
+
+
+            val keys =
+                obj.keys()
+
+
+            while(
+                keys.hasNext()
+            ){
+
+                headers.add(
+                    keys.next()
+                )
+
+            }
+
+
+
+            writer?.write(
+                headers.joinToString(",")
+            )
+
+
+            writer?.newLine()
+
+
+        }
+
+
+
+
+
+        //检查新增字段
+
+        val keys =
+            obj.keys()
+
+
+
+        while(
+            keys.hasNext()
+        ){
+
+            headers.add(
+                keys.next()
+            )
+
+        }
+
+
+
+
+
+
+
+        val row =
+            ArrayList<String>()
+
+
+
+        row.add(
+            time()
+        )
+
+
+
+        headers
+            .drop(1)
+            .forEach {
+
+
+                val value =
+                    obj.optString(
+                        it,
+                        ""
+                    )
+
+
+                row.add(
+                    escape(value)
+                )
+
+
+            }
+
+
+
+        writer?.write(
+            row.joinToString(",")
+        )
+
+
+        writer?.newLine()
+
+
+
+        writer?.flush()
+
+
+
+    }
+
+
+
+
+
+
+
+
+
+    private fun escape(
+        value:String
+    ):String{
+
+
+        return if(
+            value.contains(",") ||
+            value.contains("\"")
+        ){
+
+            "\"" +
+                    value.replace(
+                        "\"",
+                        "\"\""
+                    )
+                    +
+                    "\""
+
+        }
+        else
+            value
+
+
+    }
+
+
+
+
+
+
+
+
+
+    private fun time():String{
+
+
+        return SimpleDateFormat(
+            "yyyy-MM-dd HH:mm:ss.SSS",
+            Locale.getDefault()
+        )
+            .format(
+                Date()
+            )
+
+
+    }
+
+
+
+
+
+
+
+
+
+    fun stopSession(){
+
+
+
+        running=false
+
+
+
+        try{
+
+            writerThread?.join(
+                500
+            )
+
+        }
+        catch(_:Exception){}
+
+
+
+        writerThread=null
+
+
+
+        writer?.close()
+
+        writer=null
+
+
+
+        queue.clear()
+
+
+
+    }
+
+
+
 }
