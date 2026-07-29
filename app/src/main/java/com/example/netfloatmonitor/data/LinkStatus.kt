@@ -8,17 +8,17 @@ data class LinkStatus(
     // AIR 天空端
     // ==========================
 
-    var airRssi1:String = "--",
+    var airRssi1: String = "--",
 
-    var airRssi2:String = "--",
+    var airRssi2: String = "--",
 
-    var airSnr:String = "--",
+    var airSnr: String = "--",
 
-    var airPass:String = "0",
+    var airPass: String = "0",
 
-    var airFailed:String = "0",
+    var airFailed: String = "0",
 
-    var airAnt:String = "--",
+    var airAnt: String = "--",
 
 
 
@@ -27,83 +27,74 @@ data class LinkStatus(
     // GROUND 地面端
     // ==========================
 
-    var gndRssi1:String = "--",
+    var gndRssi1: String = "--",
 
-    var gndRssi2:String = "--",
+    var gndRssi2: String = "--",
 
-    var gndSnr:String = "--",
+    var gndSnr: String = "--",
 
-    var gndPass:String = "0",
+    var gndPass: String = "0",
 
-    var gndFailed:String = "0",
+    var gndFailed: String = "0",
 
-    var gndAnt:String = "--",
-
-
-
-
-
-    // ==========================
-    // 公共参数
-    // ==========================
-
-
-    var freq:String="--",
-
-    var mcs:String="--",
-
-    var power:String="--",
-
-    var distance:String="0",
-
-
-    var txRate:String="0",
-
-    var rxRate:String="0",
-
+    var gndAnt: String = "--",
 
 
 
 
     // ==========================
-    // 噪声
+    // 公共链路参数
     // ==========================
 
+    var freq: String = "--",
 
-    var airNoise:Array<String> =
-        emptyArray(),
+    var mcs: String = "--",
 
+    var power: String = "--",
 
-    var gndNoise:Array<String> =
-        emptyArray(),
-
-
+    var distance: String = "0",
 
 
+    var txRate: String = "0",
 
-    // ==========================
-    // 统计参数
-    // ==========================
-
-
-    var linkQuality:Int = 0,
-
-
-    var lossRate:Float = 0f,
-
+    var rxRate: String = "0",
 
 
 
 
     // ==========================
-    // 原始JSON
+    // 底噪
     // ==========================
 
+    var airNoise: Array<String> = emptyArray(),
 
-    var rawJson:String = ""
+    var gndNoise: Array<String> = emptyArray(),
 
-    var sourceIp:String="--"
 
+
+
+    // ==========================
+    // 新增扩展字段
+    // ==========================
+
+    // 数据来源IP
+    var sourceIp: String = "--",
+
+
+    // 接收时间
+    var timestamp: String = "--",
+
+
+    // 数据包统计
+    var packetCount: Long = 0,
+
+
+    // 链路质量百分比
+    var quality: Int = 0,
+
+
+    // 在线状态
+    var online: Boolean = false
 
 
 )
