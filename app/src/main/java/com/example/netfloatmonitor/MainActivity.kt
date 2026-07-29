@@ -1,19 +1,19 @@
 package com.example.netfloatmonitor
 
 
-import android.content.*
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.widget.*
-
 import androidx.appcompat.app.AppCompatActivity
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
-
-import com.example.netfloatmonitor.data.LogManager
+import com.example.netfloatmonitor.log.LogManager
 import com.example.netfloatmonitor.service.FloatService
-
 import java.io.File
 
 
@@ -21,30 +21,35 @@ import java.io.File
 class MainActivity : AppCompatActivity() {
 
 
-    private lateinit var ipEdit:EditText
-    private lateinit var portEdit:EditText
+    private lateinit var ipEdit: EditText
 
-    private lateinit var tvStatus:TextView
-    private lateinit var tvLogPath:TextView
+    private lateinit var portEdit: EditText
 
+    private lateinit var logPath: TextView
 
-    private lateinit var logManager:LogManager
-
+    private lateinit var tvStatusInfo: TextView
 
 
+    private lateinit var logManager: LogManager
 
 
-    private val receiver =
-        object:BroadcastReceiver(){
+
+
+    private val statusReceiver =
+        object : BroadcastReceiver(){
 
 
             override fun onReceive(
-                context:Context?,
-                intent:Intent?
-            ){
+
+                context: Context?,
+
+                intent: Intent?
+
+            ) {
 
 
                 if(intent==null)
+
                     return
 
 
@@ -57,9 +62,17 @@ class MainActivity : AppCompatActivity() {
                 ){
 
 
-                    updateStatus(
-                        "● STOPPED\n\n没有运行"
-                    )
+                    tvStatusInfo.text =
+                        """
+                        状态: 已停止
+                        
+                        文件:
+                        未开启
+                        
+                        数据:
+                        0 packet
+                        """.trimIndent()
+
 
                     return
 
@@ -67,15 +80,16 @@ class MainActivity : AppCompatActivity() {
 
 
 
-
                 val total =
-                    intent.getIntExtra(
+
+                    intent.getLongExtra(
                         "TOTAL_PACKETS",
                         0
                     )
 
 
                 val hz =
+
                     intent.getIntExtra(
                         "HZ",
                         0
@@ -83,34 +97,24 @@ class MainActivity : AppCompatActivity() {
 
 
 
-                val file =
-                    intent.getStringExtra(
-                        "FILE"
-                    )
-                    ?: "--"
+                tvStatusInfo.text =
 
-
-
-
-                updateStatus(
                     """
-                    ● ONLINE
+                    状态: 运行中
                     
-                    接收:
-                    $total packets
+                    文件:
+                    ${logManager.getCurrentFileName()}
+                    
+                    数据:
+                    $total packet
                     
                     速率:
                     $hz Hz
                     
-                    文件:
-                    $file
-                    
                     """.trimIndent()
-                )
 
 
             }
-
 
 
         }
@@ -119,17 +123,13 @@ class MainActivity : AppCompatActivity() {
 
 
 
-
-
-
-
     override fun onCreate(
-        savedInstanceState:Bundle?
+
+        savedInstanceState: Bundle?
+
     ){
 
-        super.onCreate(
-            savedInstanceState
-        )
+        super.onCreate(savedInstanceState)
 
 
         setContentView(
@@ -139,9 +139,8 @@ class MainActivity : AppCompatActivity() {
 
 
         logManager =
-            LogManager(
-                this
-            )
+            LogManager(this)
+
 
 
 
@@ -157,33 +156,33 @@ class MainActivity : AppCompatActivity() {
             )
 
 
-        tvStatus =
-            findViewById(
-                R.id.tvStatusInfo
-            )
-
-
-        tvLogPath =
+        logPath =
             findViewById(
                 R.id.logPath
             )
 
 
+        tvStatusInfo =
+            findViewById(
+                R.id.tvStatusInfo
+            )
 
 
-        val start =
+
+
+        val startBtn =
             findViewById<Button>(
                 R.id.startBtn
             )
 
 
-        val stop =
+        val stopBtn =
             findViewById<Button>(
                 R.id.stopBtn
             )
 
 
-        val clear =
+        val clearBtn =
             findViewById<Button>(
                 R.id.clearBtn
             )
@@ -195,7 +194,7 @@ class MainActivity : AppCompatActivity() {
         loadConfig()
 
 
-        tvLogPath.text =
+        logPath.text =
             """
             日志目录:
             ${logManager.getLogPath()}
@@ -203,22 +202,48 @@ class MainActivity : AppCompatActivity() {
 
 
 
-        updateStatus(
-            "● READY\n\n等待启动"
-        )
+        tvStatusInfo.text =
+            """
+            状态: 待机
+            
+            等待UDP数据...
+            """.trimIndent()
 
 
 
 
 
-
-        start.setOnClickListener{
+        startBtn.setOnClickListener{
 
 
             if(
-                !checkFloatPermission()
-            )
+                !Settings.canDrawOverlays(this)
+            ){
+
+
+                val intent =
+                    Intent(
+                        Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                        Uri.parse(
+                            "package:$packageName"
+                        )
+                    )
+
+
+                startActivity(intent)
+
+
+                Toast.makeText(
+                    this,
+                    "请开启悬浮窗权限",
+                    Toast.LENGTH_SHORT
+                ).show()
+
+
                 return@setOnClickListener
+
+            }
+
 
 
 
@@ -228,6 +253,7 @@ class MainActivity : AppCompatActivity() {
 
 
             val port =
+
                 portEdit.text
                     .toString()
                     .toIntOrNull()
@@ -237,44 +263,48 @@ class MainActivity : AppCompatActivity() {
 
 
 
-            val intent =
+            val serviceIntent =
+
                 Intent(
                     this,
                     FloatService::class.java
-                )
+                ).apply{
 
 
-            intent.putExtra(
-                "PORT",
-                port
-            )
+                    putExtra(
+                        "PORT",
+                        port
+                    )
 
 
-            intent.putExtra(
-                "IP",
-                ipEdit.text.toString()
-            )
+                    putExtra(
+                        "IP",
+                        ipEdit.text.toString()
+                    )
+
+
+                }
+
 
 
 
 
             if(
-                Build.VERSION.SDK_INT>=26
+                Build.VERSION.SDK_INT >=26
             ){
 
                 startForegroundService(
-                    intent
+                    serviceIntent
                 )
 
-            }
-            else{
+            }else{
+
 
                 startService(
-                    intent
+                    serviceIntent
                 )
 
             }
-
 
 
 
@@ -286,18 +316,13 @@ class MainActivity : AppCompatActivity() {
             ).show()
 
 
-
         }
 
 
 
 
 
-
-
-
-
-        stop.setOnClickListener{
+        stopBtn.setOnClickListener{
 
 
             stopService(
@@ -308,6 +333,13 @@ class MainActivity : AppCompatActivity() {
             )
 
 
+            Toast.makeText(
+                this,
+                "监听停止",
+                Toast.LENGTH_SHORT
+            ).show()
+
+
         }
 
 
@@ -315,12 +347,10 @@ class MainActivity : AppCompatActivity() {
 
 
 
+        clearBtn.setOnClickListener{
 
 
-        clear.setOnClickListener{
-
-
-            clearLogs()
+            clearLog()
 
 
         }
@@ -345,16 +375,16 @@ class MainActivity : AppCompatActivity() {
         LocalBroadcastManager
             .getInstance(this)
             .registerReceiver(
-                receiver,
+
+                statusReceiver,
+
                 IntentFilter(
                     "com.example.netfloatmonitor.STATUS_UPDATE"
                 )
+
             )
 
-
     }
-
-
 
 
 
@@ -370,76 +400,10 @@ class MainActivity : AppCompatActivity() {
         LocalBroadcastManager
             .getInstance(this)
             .unregisterReceiver(
-                receiver
+                statusReceiver
             )
 
-
     }
-
-
-
-
-
-
-
-
-
-    private fun checkFloatPermission():Boolean{
-
-
-        if(
-            Settings.canDrawOverlays(this)
-        )
-            return true
-
-
-
-
-
-        val intent =
-            Intent(
-                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                Uri.parse(
-                    "package:$packageName"
-                )
-            )
-
-
-        startActivity(
-            intent
-        )
-
-
-        Toast.makeText(
-            this,
-            "请开启悬浮窗权限",
-            Toast.LENGTH_SHORT
-        ).show()
-
-
-
-        return false
-
-
-    }
-
-
-
-
-
-
-
-
-
-    private fun updateStatus(
-        text:String
-    ){
-
-        tvStatus.text =
-            text
-
-    }
-
 
 
 
@@ -467,9 +431,7 @@ class MainActivity : AppCompatActivity() {
             .apply()
 
 
-
     }
-
 
 
 
@@ -488,19 +450,24 @@ class MainActivity : AppCompatActivity() {
             )
 
 
+
         ipEdit.setText(
+
             sp.getString(
                 "ip",
                 "192.168.144.33"
             )
+
         )
 
 
         portEdit.setText(
+
             sp.getString(
                 "port",
                 "16789"
             )
+
         )
 
 
@@ -513,36 +480,37 @@ class MainActivity : AppCompatActivity() {
 
 
 
+    private fun clearLog(){
 
-    private fun clearLogs(){
+
+        val files:List<File> =
+            logManager.getLogFiles()
 
 
         var count=0
 
 
 
-        logManager
-            .getLogFiles()
-            .forEach{
+        files.forEach{
 
 
-                if(
-                    it.delete()
-                )
-                    count++
+            if(it.delete())
 
+                count++
 
-            }
-
+        }
 
 
 
         Toast.makeText(
-            this,
-            "删除 $count 个日志文件",
-            Toast.LENGTH_SHORT
-        ).show()
 
+            this,
+
+            "删除 $count 个日志",
+
+            Toast.LENGTH_SHORT
+
+        ).show()
 
 
     }
