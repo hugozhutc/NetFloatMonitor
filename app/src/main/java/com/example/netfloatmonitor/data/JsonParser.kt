@@ -1,5 +1,4 @@
-
-package com.example.netfloatmonitor
+package com.example.netfloatmonitor.data
 
 
 import org.json.JSONObject
@@ -13,7 +12,8 @@ object JsonParser {
     fun parse(json:String):LinkStatus{
 
 
-        val obj = JSONObject(json)
+        val obj =
+            JSONObject(json)
 
 
 
@@ -21,143 +21,205 @@ object JsonParser {
 
 
 
+            // =====================
             // AIR
+            // =====================
+
 
             airRssi1 =
-                obj.optString("rssi1_a","--"),
+                getValue(
+                    obj,
+                    "rssi1_a",
+                    "air_rssi1",
+                    "airRssi1"
+                ),
 
 
             airRssi2 =
-                obj.optString("rssi2_a","--"),
+                getValue(
+                    obj,
+                    "rssi2_a",
+                    "air_rssi2",
+                    "airRssi2"
+                ),
 
 
             airSnr =
-                obj.optString("snr_a","--"),
+                getValue(
+                    obj,
+                    "snr_a",
+                    "air_snr",
+                    "airSnr"
+                ),
 
 
             airPass =
-                obj.optString("pass_a","0"),
+                getValue(
+                    obj,
+                    "pass_a",
+                    "air_pass"
+                ),
 
 
             airFailed =
-                obj.optString("failed_a","0"),
+                getValue(
+                    obj,
+                    "failed_a",
+                    "air_failed"
+                ),
 
 
             airAnt =
-                obj.optString("ant_a","--"),
+                getValue(
+                    obj,
+                    "ant_a",
+                    "air_ant"
+                ),
 
 
 
 
 
+            // =====================
             // GROUND
+            // =====================
 
 
             gndRssi1 =
-                obj.optString("rssi1_g","--"),
+                getValue(
+                    obj,
+                    "rssi1_g",
+                    "ground_rssi1",
+                    "gnd_rssi1"
+                ),
 
 
             gndRssi2 =
-                obj.optString("rssi2_g","--"),
+                getValue(
+                    obj,
+                    "rssi2_g",
+                    "ground_rssi2",
+                    "gnd_rssi2"
+                ),
 
 
             gndSnr =
-                obj.optString("snr_g","--"),
+                getValue(
+                    obj,
+                    "snr_g",
+                    "ground_snr",
+                    "gnd_snr"
+                ),
 
 
             gndPass =
-                obj.optString("pass_g","0"),
+                getValue(
+                    obj,
+                    "pass_g",
+                    "ground_pass"
+                ),
 
 
             gndFailed =
-                obj.optString("failed_g","0"),
+                getValue(
+                    obj,
+                    "failed_g",
+                    "ground_failed"
+                ),
 
 
             gndAnt =
-                obj.optString("ant_g","--"),
+                getValue(
+                    obj,
+                    "ant_g",
+                    "ground_ant"
+                ),
 
 
 
 
 
-
-            //公共参数
+            // =====================
+            // LINK
+            // =====================
 
 
             freq =
-                obj.optString(
+                getValue(
+                    obj,
                     "freq_tx",
-                    "--"
+                    "freq",
+                    "frequency"
                 ),
 
 
 
             mcs =
-                obj.optString(
-                    "mcs",
-                    "--"
+                getValue(
+                    obj,
+                    "mcs"
                 ),
 
 
 
             power =
-                obj.optString(
+                getValue(
+                    obj,
                     "power",
-                    "--"
+                    "tx_power"
                 ),
 
 
 
             distance =
-                obj.optString(
+                getValue(
+                    obj,
                     "distance",
-                    "0"
+                    "dist"
                 ),
 
 
 
-
             txRate =
-                obj.optString(
+                getValue(
+                    obj,
                     "ethTx",
-                    "0"
+                    "txRate"
                 ),
 
 
 
             rxRate =
-                obj.optString(
+                getValue(
+                    obj,
                     "ethRx",
-                    "0"
+                    "rxRate"
                 ),
 
 
 
 
-
-            //噪声
+            // =====================
+            // NOISE
+            // =====================
 
 
             airNoise =
                 parseNoise(
-
-                    obj.optString(
-                        "noiseFloor_a",
-                        ""
+                    getValue(
+                        obj,
+                        "noiseFloor_a"
                     )
-
                 ),
 
 
 
             gndNoise =
                 parseNoise(
-
-                    obj.optString(
-                        "noiseFloor_g",
-                        ""
+                    getValue(
+                        obj,
+                        "noiseFloor_g"
                     )
-
                 )
 
 
@@ -172,27 +234,80 @@ object JsonParser {
 
 
 
+
+    /**
+     * 多字段匹配
+     */
+    private fun getValue(
+        obj:JSONObject,
+        vararg keys:String
+    ):String{
+
+
+        val names =
+            obj.keys()
+
+
+        while(names.hasNext()){
+
+
+            val jsonKey =
+                names.next()
+
+
+
+            for(key in keys){
+
+
+                if(
+                    jsonKey.equals(
+                        key,
+                        ignoreCase = true
+                    )
+                ){
+
+
+                    return obj
+                        .opt(jsonKey)
+                        ?.toString()
+                        ?: "--"
+
+                }
+
+
+            }
+
+        }
+
+
+        return "--"
+
+    }
+
+
+
+
+
+
+
     private fun parseNoise(
-
         value:String
-
     ):Array<String>{
 
 
         if(
-
+            value=="--" ||
             value.isEmpty()
-
-        )
+        ){
 
             return emptyArray()
+
+        }
 
 
 
         return value
-
             .split(",")
-
             .toTypedArray()
 
 
