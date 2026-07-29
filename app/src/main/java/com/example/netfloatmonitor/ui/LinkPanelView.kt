@@ -1,31 +1,49 @@
-
 package com.example.netfloatmonitor.ui
 
 
 import android.content.Context
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
-import android.view.Gravity
 import android.widget.LinearLayout
 import android.widget.TextView
 
-import com.example.netfloatmonitor.data.LinkStatus
 
 
 
 class LinkPanelView(
+
     context: Context,
+
     private val title:String
-) : LinearLayout(context){
+
+) : LinearLayout(context) {
 
 
 
-    private val titleView =
+    private val rssi1Text =
         TextView(context)
 
 
-    private val contentView =
+    private val rssi2Text =
         TextView(context)
+
+
+    private val snrText =
+        TextView(context)
+
+
+    private val passText =
+        TextView(context)
+
+
+    private val failText =
+        TextView(context)
+
+
+    private val antText =
+        TextView(context)
+
+
 
 
 
@@ -38,16 +56,37 @@ class LinkPanelView(
 
 
         setPadding(
-            15,
             12,
-            15,
-            12
+            10,
+            12,
+            10
         )
 
 
 
         background =
-            createBackground()
+            GradientDrawable().apply {
+
+                setColor(
+                    Color.rgb(
+                        35,
+                        38,
+                        42
+                    )
+                )
+
+                cornerRadius =
+                    12f
+
+            }
+
+
+
+
+
+
+        val titleView =
+            TextView(context)
 
 
 
@@ -62,45 +101,73 @@ class LinkPanelView(
 
 
         titleView.setTextColor(
-            Color.CYAN
+            Color.GREEN
         )
-
-
-
-        titleView.gravity =
-            Gravity.CENTER
 
 
 
         addView(
-            titleView
+            titleView,
+            createParams()
         )
 
 
 
 
+        addText(rssi1Text)
 
-        contentView.textSize =
+        addText(rssi2Text)
+
+        addText(snrText)
+
+        addText(passText)
+
+        addText(failText)
+
+        addText(antText)
+
+
+
+        setDefault()
+
+
+
+    }
+
+
+
+
+
+
+
+
+
+    private fun addText(
+        view:TextView
+    ){
+
+
+        view.textSize =
             14f
 
 
-
-        contentView.setTextColor(
+        view.setTextColor(
             Color.WHITE
         )
 
 
-        contentView.setPadding(
+        view.setPadding(
             0,
-            10,
+            4,
             0,
-            0
+            4
         )
 
 
 
         addView(
-            contentView
+            view,
+            createParams()
         )
 
 
@@ -114,160 +181,116 @@ class LinkPanelView(
 
 
 
-    fun updateAir(
-        status:LinkStatus
+    private fun createParams():
+
+            LayoutParams {
+
+
+
+        return LayoutParams(
+
+            LayoutParams.MATCH_PARENT,
+
+            LayoutParams.WRAP_CONTENT
+
+        )
+
+    }
+
+
+
+
+
+
+
+
+
+    private fun setDefault(){
+
+
+        rssi1Text.text =
+            "RSSI1 : --"
+
+
+        rssi2Text.text =
+            "RSSI2 : --"
+
+
+        snrText.text =
+            "SNR   : --"
+
+
+        passText.text =
+            "PASS  : --"
+
+
+        failText.text =
+            "FAIL  : --"
+
+
+        antText.text =
+            "ANT   : --"
+
+
+    }
+
+
+
+
+
+
+
+
+
+    fun update(
+
+        rssi1:String,
+
+        rssi2:String,
+
+        snr:String,
+
+        pass:String,
+
+        fail:String,
+
+        ant:String
+
     ){
 
 
-        contentView.text =
-            """
-RSSI1 : ${status.airRssi1}
 
-RSSI2 : ${status.airRssi2}
-
-SNR   : ${status.airSnr}
-
-PASS  : ${status.airPass}
-
-FAIL  : ${status.airFailed}
-
-ANT   : ${status.airAnt}
-            """.trimIndent()
-
-
-    }
+        rssi1Text.text =
+            "RSSI1 : $rssi1"
 
 
 
+        rssi2Text.text =
+            "RSSI2 : $rssi2"
 
 
 
+        snrText.text =
+            "SNR   : $snr"
 
 
 
-    fun updateGround(
-        status:LinkStatus
-    ){
-
-
-        contentView.text =
-            """
-RSSI1 : ${status.gndRssi1}
-
-RSSI2 : ${status.gndRssi2}
-
-SNR   : ${status.gndSnr}
-
-PASS  : ${status.gndPass}
-
-FAIL  : ${status.gndFailed}
-
-ANT   : ${status.gndAnt}
-            """.trimIndent()
-
-
-    }
+        passText.text =
+            "PASS  : $pass"
 
 
 
+        failText.text =
+            "FAIL  : $fail"
 
 
 
-
-
-
-    fun updateLink(
-        status:LinkStatus
-    ){
-
-
-        val qualityColor =
-            when{
-
-
-                status.linkQuality >=80 ->
-                    "GOOD"
-
-
-                status.linkQuality >=50 ->
-                    "WARN"
-
-
-                else ->
-                    "BAD"
-
-            }
-
-
-
-
-        contentView.text =
-            """
-QUALITY : ${status.linkQuality}%
-
-
-STATUS  : $qualityColor
-
-
-FREQ    : ${status.freq}
-
-
-MCS     : ${status.mcs}
-
-
-POWER   : ${status.power}
-
-
-DIST    : ${status.distance}
-
-
-TX      : ${status.txRate}
-
-
-RX      : ${status.rxRate}
-
-
-LOSS    : %.2f%%
-            """.trimIndent()
-                .format(status.lossRate)
+        antText.text =
+            "ANT   : $ant"
 
 
 
     }
-
-
-
-
-
-
-
-
-
-    private fun createBackground():
-            GradientDrawable{
-
-
-        return GradientDrawable()
-            .apply{
-
-
-                setColor(
-                    Color.argb(
-                        120,
-                        255,
-                        255,
-                        255
-                    )
-                )
-
-
-                cornerRadius =
-                    15f
-
-            }
-
-    }
-
 
 
 }
