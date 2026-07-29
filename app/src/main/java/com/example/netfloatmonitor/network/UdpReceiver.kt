@@ -10,153 +10,146 @@ import java.net.InetSocketAddress
 
 class UdpReceiver(
 
-    private val port:Int,
+    private val port: Int,
 
-    private val onData:(String)->Unit
+    private val onData: (String) -> Unit
 
 ) {
 
 
-
-    private var socket:DatagramSocket? = null
+    private var socket: DatagramSocket? = null
 
 
     @Volatile
-    private var running=false
+    private var running = false
 
 
-
-    private var thread:Thread? = null
-
-
-
+    private var thread: Thread? = null
 
 
 
 
-    fun start(){
+    fun start() {
 
 
-        if(running)
+        if (running) {
+
+            Log.e(
+                "UdpReceiver",
+                "UDP已经运行"
+            )
+
             return
+        }
 
 
 
-        running=true
+        running = true
 
 
 
         thread = Thread {
 
 
+            Log.e(
+                "UdpReceiver",
+                "UDP线程启动"
+            )
+
+
+
             try {
 
 
-
                 socket = DatagramSocket(
-
                     null
-
                 ).apply {
 
 
-                    reuseAddress=true
+                    reuseAddress = true
+
 
 
                     bind(
 
                         InetSocketAddress(
+                            "0.0.0.0",
                             port
                         )
 
                     )
+
+
+
+                    Log.e(
+
+                        "UdpReceiver",
+
+                        "UDP绑定成功 port=$localPort address=$localAddress"
+
+                    )
+
 
                 }
 
 
 
 
-                Log.d(
-
-                    "UdpReceiver",
-
-                    "UDP监听启动 port=$port"
-
-                )
+                val buffer = ByteArray(8192)
 
 
 
+                while (running) {
 
 
 
-                val buffer =
+                    val packet = DatagramPacket(
 
-                    ByteArray(
-                        8192
+                        buffer,
+
+                        buffer.size
+
                     )
-
-
-
-
-
-                while(running){
-
-
-
-                    val packet =
-
-                        DatagramPacket(
-
-                            buffer,
-
-                            buffer.size
-
-                        )
-
 
 
 
                     socket?.receive(
-
                         packet
-
                     )
 
 
 
+                    if (!running) {
 
-
-                    if(!running)
                         break
 
+                    }
 
 
 
 
 
-                    val data =
+                    val data = String(
 
-                        String(
+                        packet.data,
 
-                            packet.data,
+                        0,
 
-                            0,
+                        packet.length,
 
-                            packet.length,
+                        Charsets.UTF_8
 
-                            Charsets.UTF_8
-
-                        ).trim()
+                    ).trim()
 
 
 
 
 
-                    Log.d(
+                    Log.e(
 
                         "UdpReceiver",
 
-                        "RX ${packet.address.hostAddress} len=${packet.length}"
+                        "收到UDP ${packet.address.hostAddress}:${packet.port} len=${packet.length}"
 
                     )
 
@@ -164,7 +157,7 @@ class UdpReceiver(
 
 
 
-                    if(data.isNotEmpty()){
+                    if (data.isNotEmpty()) {
 
 
                         onData(data)
@@ -173,33 +166,37 @@ class UdpReceiver(
                     }
 
 
-
                 }
 
 
 
 
 
-            }catch(e:Exception){
+            } catch (e: Exception) {
+
+
+                Log.e(
+
+                    "UdpReceiver",
+
+                    "UDP异常",
+
+                    e
+
+                )
 
 
 
-                if(running){
+            } finally {
 
 
-                    Log.e(
+                Log.e(
 
-                        "UdpReceiver",
+                    "UdpReceiver",
 
-                        "UDP异常:${e.message}"
+                    "UDP线程退出"
 
-                    )
-
-
-                }
-
-
-            }finally{
+                )
 
 
                 close()
@@ -209,11 +206,12 @@ class UdpReceiver(
 
 
 
-
         }
 
 
 
+
+        thread?.name = "NetFloat-UDP"
 
 
         thread?.start()
@@ -227,28 +225,40 @@ class UdpReceiver(
 
 
 
+    fun stop() {
 
 
-    fun stop(){
+        Log.e(
+
+            "UdpReceiver",
+
+            "停止UDP"
+
+        )
 
 
-        running=false
+
+        running = false
 
 
-        try{
 
+        try {
 
             socket?.close()
 
-
-        }catch(_:Exception){}
-
+        } catch (_: Exception) {
 
 
-        socket=null
+
+        }
 
 
-        thread=null
+
+        socket = null
+
+
+
+        thread = null
 
 
     }
@@ -259,21 +269,21 @@ class UdpReceiver(
 
 
 
+    private fun close() {
 
 
-    private fun close(){
-
-
-        try{
-
+        try {
 
             socket?.close()
 
+        } catch (_: Exception) {
 
-        }catch(_:Exception){}
 
 
-        socket=null
+        }
+
+
+        socket = null
 
 
     }
