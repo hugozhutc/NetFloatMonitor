@@ -1,88 +1,68 @@
-package com.example.netfloatmonitor.data
+package com.example.netfloatmonitor.log
 
 
 import android.content.Context
-import android.os.Environment
 import android.util.Log
-
 import org.json.JSONObject
-
-import java.io.BufferedWriter
 import java.io.File
 import java.io.FileWriter
-
 import java.text.SimpleDateFormat
-import java.util.*
-import java.util.concurrent.LinkedBlockingQueue
+import java.util.Date
+import java.util.Locale
+
 
 
 
 class LogManager(
-    private val context:Context
+
+    private val context: Context
+
 ) {
 
 
 
-    private val TAG =
-        "LogManager"
+    private val logDir:File =
 
-
-
-
-    // Android公共Documents目录
-
-    private val logDir =
         File(
-            Environment
-                .getExternalStoragePublicDirectory(
-                    Environment.DIRECTORY_DOCUMENTS
-                ),
-            "NetFloatMonitor/log"
-        )
+
+            context.getExternalFilesDir(null),
+
+            "NetFloatLogs"
+
+        ).apply {
 
 
+            if(!exists()){
 
+                mkdirs()
 
-    private var running=false
-
-
-
-    private var writerThread:Thread?=null
-
-
-
-    private var writer:BufferedWriter?=null
-
-
-
-    private var currentFile:File?=null
-
-
-
-    private val queue =
-        LinkedBlockingQueue<String>(5000)
-
-
-
-    private val headers =
-        LinkedHashSet<String>()
-
-
-
-    init {
-
-
-        if(
-            !logDir.exists()
-        ){
-
-            logDir.mkdirs()
+            }
 
         }
 
 
-    }
 
+
+
+    private var currentFile:File? = null
+
+
+
+    private var headers =
+
+        mutableListOf<String>()
+
+
+
+    private var recording=false
+
+
+
+
+
+    private val maxFileSize =
+
+        100 * 1024 * 1024
 
 
 
@@ -95,7 +75,9 @@ class LogManager(
 
         return logDir.absolutePath
 
+
     }
+
 
 
 
@@ -107,13 +89,14 @@ class LogManager(
     fun getLogFiles():List<File>{
 
 
-        return logDir
-            .listFiles()
+        return logDir.listFiles()
+
             ?.filter {
 
                 it.extension=="csv"
 
             }
+
             ?: emptyList()
 
 
@@ -130,8 +113,7 @@ class LogManager(
     fun getCurrentFileName():String{
 
 
-        return currentFile
-            ?.name
+        return currentFile?.name
             ?: "未开启监控"
 
 
@@ -145,6 +127,8 @@ class LogManager(
 
 
 
+    @Synchronized
+
     fun startNewSession(){
 
 
@@ -157,83 +141,23 @@ class LogManager(
 
 
 
-        val name =
-            "NetLog_" +
-                    SimpleDateFormat(
-                        "yyyyMMdd_HHmmss",
-                        Locale.getDefault()
-                    )
-                        .format(Date())
-                    +
-                    ".csv"
-
-
-
         currentFile =
-            File(
-                logDir,
-                name
-            )
+
+            createNewFile()
 
 
 
-        running=true
+        recording=true
 
-
-
-        writerThread =
-            Thread {
-
-
-                writeLoop()
-
-
-            }
-
-
-
-        writerThread?.start()
 
 
 
         Log.d(
-            TAG,
-            "日志开始:$name"
-        )
 
+            "LogManager",
 
+            "开始记录:${currentFile?.name}"
 
-    }
-
-
-
-
-
-
-
-
-
-    fun save(
-        json:String
-    ){
-
-
-        if(
-            !running
-        )
-            return
-
-
-
-        if(
-            json.isBlank()
-        )
-            return
-
-
-
-        queue.offer(
-            json
         )
 
 
@@ -247,319 +171,425 @@ class LogManager(
 
 
 
-    private fun writeLoop(){
-
-
-
-        try{
-
-
-            writer =
-                BufferedWriter(
-                    FileWriter(
-                        currentFile,
-                        true
-                    )
-                )
-
-
-
-
-            while(
-                running ||
-                queue.isNotEmpty()
-            ){
-
-
-
-                val json =
-                    queue.poll()
-
-
-
-                if(
-                    json==null
-                ){
-
-                    Thread.sleep(20)
-
-                    continue
-
-                }
-
-
-
-                writeJson(
-                    json
-                )
-
-
-            }
-
-
-
-        }
-        catch(e:Exception){
-
-
-            Log.e(
-                TAG,
-                "写日志异常:${e.message}"
-            )
-
-
-        }
-        finally{
-
-
-            try{
-
-
-                writer?.flush()
-
-                writer?.close()
-
-
-            }
-            catch(_:Exception){}
-
-
-        }
-
-
-
-    }
-
-
-
-
-
-
-
-
-
-    private fun writeJson(
-        json:String
-    ){
-
-
-
-        val obj =
-            JSONObject(json)
-
-
-
-
-        //第一次收到数据
-
-        if(
-            headers.isEmpty()
-        ){
-
-
-            headers.add(
-                "Timestamp"
-            )
-
-
-            val keys =
-                obj.keys()
-
-
-            while(
-                keys.hasNext()
-            ){
-
-                headers.add(
-                    keys.next()
-                )
-
-            }
-
-
-
-            writer?.write(
-                headers.joinToString(",")
-            )
-
-
-            writer?.newLine()
-
-
-        }
-
-
-
-
-
-        //检查新增字段
-
-        val keys =
-            obj.keys()
-
-
-
-        while(
-            keys.hasNext()
-        ){
-
-            headers.add(
-                keys.next()
-            )
-
-        }
-
-
-
-
-
-
-
-        val row =
-            ArrayList<String>()
-
-
-
-        row.add(
-            time()
-        )
-
-
-
-        headers
-            .drop(1)
-            .forEach {
-
-
-                val value =
-                    obj.optString(
-                        it,
-                        ""
-                    )
-
-
-                row.add(
-                    escape(value)
-                )
-
-
-            }
-
-
-
-        writer?.write(
-            row.joinToString(",")
-        )
-
-
-        writer?.newLine()
-
-
-
-        writer?.flush()
-
-
-
-    }
-
-
-
-
-
-
-
-
-
-    private fun escape(
-        value:String
-    ):String{
-
-
-        return if(
-            value.contains(",") ||
-            value.contains("\"")
-        ){
-
-            "\"" +
-                    value.replace(
-                        "\"",
-                        "\"\""
-                    )
-                    +
-                    "\""
-
-        }
-        else
-            value
-
-
-    }
-
-
-
-
-
-
-
-
-
-    private fun time():String{
-
-
-        return SimpleDateFormat(
-            "yyyy-MM-dd HH:mm:ss.SSS",
-            Locale.getDefault()
-        )
-            .format(
-                Date()
-            )
-
-
-    }
-
-
-
-
-
-
-
-
+    @Synchronized
 
     fun stopSession(){
 
 
 
-        running=false
+        recording=false
 
 
 
-        try{
-
-            writerThread?.join(
-                500
-            )
-
-        }
-        catch(_:Exception){}
+        headers.clear()
 
 
 
-        writerThread=null
-
-
-
-        writer?.close()
-
-        writer=null
-
-
-
-        queue.clear()
+        currentFile=null
 
 
 
     }
 
+
+
+
+
+
+
+
+
+    @Synchronized
+
+    fun save(json:String){
+
+
+
+        if(!recording)
+            return
+
+
+
+        if(json.isBlank())
+            return
+
+
+
+
+
+        try{
+
+
+            val obj =
+
+                JSONObject(json)
+
+
+
+
+
+            checkFileSize()
+
+
+
+
+
+            if(headers.isEmpty()){
+
+
+                buildHeader(obj)
+
+
+            }
+
+
+
+
+
+            val row =
+
+                mutableListOf<String>()
+
+
+
+
+
+            row.add(
+
+                getTime()
+
+            )
+
+
+
+
+
+            headers.drop(1).forEach{
+
+
+                key ->
+
+
+                row.add(
+
+                    csvEscape(
+
+                        obj.optString(
+
+                            key,
+
+                            ""
+
+                        )
+
+                    )
+
+                )
+
+
+            }
+
+
+
+
+
+            appendLine(
+
+                row.joinToString(",")
+
+            )
+
+
+
+
+
+        }catch(e:Exception){
+
+
+            Log.e(
+
+                "LogManager",
+
+                "CSV保存失败:${e.message}"
+
+            )
+
+
+        }
+
+
+
+    }
+
+
+
+
+
+
+
+
+
+    private fun buildHeader(
+
+        obj:JSONObject
+
+    ){
+
+
+
+        headers.clear()
+
+
+
+        headers.add(
+
+            "Timestamp"
+
+        )
+
+
+
+        val keys =
+
+            obj.keys()
+
+
+
+        while(keys.hasNext()){
+
+
+            headers.add(
+
+                keys.next()
+
+            )
+
+
+        }
+
+
+
+
+
+        appendLine(
+
+            headers.joinToString(",")
+
+        )
+
+
+    }
+
+
+
+
+
+
+
+
+
+    private fun appendLine(
+
+        text:String
+
+    ){
+
+
+
+        currentFile?.let{
+
+
+            FileWriter(
+
+                it,
+
+                true
+
+            ).use { writer ->
+
+
+                writer.append(
+
+                    text
+
+                )
+
+                writer.append(
+
+                    "\n"
+
+                )
+
+
+            }
+
+
+        }
+
+
+    }
+
+
+
+
+
+
+
+
+
+    private fun createNewFile():File{
+
+
+        val sdf =
+
+            SimpleDateFormat(
+
+                "yyyyMMdd_HHmmss",
+
+                Locale.getDefault()
+
+            )
+
+
+
+        return File(
+
+            logDir,
+
+            "NetFloat_${sdf.format(Date())}.csv"
+
+        )
+
+
+    }
+
+
+
+
+
+
+
+
+
+    private fun checkFileSize(){
+
+
+
+        currentFile?.let{
+
+
+
+            if(
+
+                it.exists()
+
+                &&
+
+                it.length()>maxFileSize
+
+            ){
+
+
+
+                currentFile =
+
+                    createNewFile()
+
+
+
+                headers.clear()
+
+
+
+            }
+
+
+        }
+
+
+    }
+
+
+
+
+
+
+
+
+
+    private fun csvEscape(
+
+        value:String
+
+    ):String{
+
+
+        if(
+
+            value.contains(",")
+
+            ||
+
+            value.contains("\"")
+
+            ||
+
+            value.contains("\n")
+
+        ){
+
+
+            return "\"" +
+
+                    value.replace(
+
+                        "\"",
+
+                        "\"\""
+
+                    )
+
+                    +
+
+                    "\""
+
+
+        }
+
+
+
+        return value
+
+
+    }
+
+
+
+
+
+
+
+
+
+    private fun getTime():String{
+
+
+        return SimpleDateFormat(
+
+            "yyyy-MM-dd HH:mm:ss.SSS",
+
+            Locale.getDefault()
+
+        )
+
+            .format(
+
+                Date()
+
+            )
+
+
+    }
 
 
 }
