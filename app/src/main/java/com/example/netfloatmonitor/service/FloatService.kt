@@ -187,10 +187,9 @@ class FloatService : Service() {
 
 
                     val status =
-
-                        JsonParser.parse(
-                            data
-                        )
+                        DataProcessor.process(
+                            JsonParser.parse(data)
+                                        )   
 
 
 
