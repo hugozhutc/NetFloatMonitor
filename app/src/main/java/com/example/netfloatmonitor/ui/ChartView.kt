@@ -1,16 +1,20 @@
-
 package com.example.netfloatmonitor.ui
 
 
 import android.content.Context
-import android.graphics.*
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
 import android.view.View
 import java.util.LinkedList
 
 
 
+
 class ChartView(
+
     context: Context
+
 ) : View(context) {
 
 
@@ -19,16 +23,17 @@ class ChartView(
 
 
 
-    private val rssi1 =
+    private val rssi1List =
         LinkedList<Float>()
 
 
-    private val rssi2 =
+    private val rssi2List =
         LinkedList<Float>()
 
 
-    private val snr =
+    private val snrList =
         LinkedList<Float>()
+
 
 
 
@@ -37,18 +42,16 @@ class ChartView(
     private val gridPaint =
         Paint().apply {
 
-
             color =
                 Color.argb(
-                    50,
+                    60,
                     255,
                     255,
                     255
                 )
 
-
-            strokeWidth=1f
-
+            strokeWidth =
+                1f
         }
 
 
@@ -57,51 +60,36 @@ class ChartView(
     private val rssi1Paint =
         Paint().apply {
 
-
             color =
-                Color.rgb(
-                    52,
-                    152,
-                    219
-                )
+                Color.CYAN
 
-
-            strokeWidth=3f
-
+            strokeWidth =
+                3f
 
             style =
                 Paint.Style.STROKE
 
-
-            isAntiAlias=true
-
-
+            isAntiAlias =
+                true
         }
+
 
 
 
     private val rssi2Paint =
         Paint().apply {
 
-
             color =
-                Color.rgb(
-                    46,
-                    204,
-                    113
-                )
+                Color.BLUE
 
-
-            strokeWidth=3f
-
+            strokeWidth =
+                3f
 
             style =
                 Paint.Style.STROKE
 
-
-            isAntiAlias=true
-
-
+            isAntiAlias =
+                true
         }
 
 
@@ -110,26 +98,18 @@ class ChartView(
     private val snrPaint =
         Paint().apply {
 
-
             color =
-                Color.rgb(
-                    241,
-                    196,
-                    15
-                )
+                Color.GREEN
 
-
-            strokeWidth=3f
-
+            strokeWidth =
+                3f
 
             style =
                 Paint.Style.STROKE
 
-
-            isAntiAlias=true
-
+            isAntiAlias =
+                true
         }
-
 
 
 
@@ -139,17 +119,14 @@ class ChartView(
     private val textPaint =
         Paint().apply {
 
-
             color =
                 Color.WHITE
 
+            textSize =
+                28f
 
-            textSize=26f
-
-
-            isAntiAlias=true
-
-
+            isAntiAlias =
+                true
         }
 
 
@@ -157,35 +134,40 @@ class ChartView(
 
 
 
+
+
+
     fun addData(
-        r1:Float?,
-        r2:Float?,
-        s:Float?
+
+        rssi1:Float,
+
+        rssi2:Float,
+
+        snr:Float
+
     ){
 
 
-
-        addPoint(
-            rssi1,
-            r1
+        addValue(
+            rssi1List,
+            rssi1
         )
 
 
-        addPoint(
-            rssi2,
-            r2
+        addValue(
+            rssi2List,
+            rssi2
         )
 
 
-        addPoint(
-            snr,
-            s
+        addValue(
+            snrList,
+            snr
         )
 
 
 
-        invalidate()
-
+        postInvalidate()
 
     }
 
@@ -195,22 +177,22 @@ class ChartView(
 
 
 
-    private fun addPoint(
+
+    private fun addValue(
+
         list:LinkedList<Float>,
-        value:Float?
+
+        value:Float
+
     ){
 
 
-        list.addLast(
-            value
-                ?: list.lastOrNull()
-                ?:0f
-        )
+
+        list.add(value)
 
 
-        if(
-            list.size>maxPoints
-        ){
+
+        if(list.size > maxPoints){
 
             list.removeFirst()
 
@@ -226,10 +208,12 @@ class ChartView(
 
 
 
-    override fun onDraw(
-        canvas:Canvas
-    ){
 
+    override fun onDraw(
+
+        canvas:Canvas
+
+    ){
 
         super.onDraw(canvas)
 
@@ -244,13 +228,8 @@ class ChartView(
 
 
 
-        if(
-            w<=0 ||
-            h<=0
-        )
+        if(w<=0 || h<=0)
             return
-
-
 
 
 
@@ -265,22 +244,32 @@ class ChartView(
 
 
 
-        //网格
+
+
+        // 网格
 
         for(i in 1..4){
 
 
             val y =
-                h*i/5f
+                h *
+                i /
+                5f
 
 
 
             canvas.drawLine(
+
                 0f,
+
                 y,
+
                 w,
+
                 y,
+
                 gridPaint
+
             )
 
         }
@@ -291,28 +280,47 @@ class ChartView(
 
 
 
+
         drawCurve(
+
             canvas,
-            rssi1,
+
+            rssi1List,
+
             rssi1Paint,
+
             120f
+
         )
 
 
+
+
         drawCurve(
+
             canvas,
-            rssi2,
+
+            rssi2List,
+
             rssi2Paint,
+
             120f
+
         )
+
 
 
 
         drawCurve(
+
             canvas,
-            snr,
+
+            snrList,
+
             snrPaint,
+
             50f
+
         )
 
 
@@ -320,29 +328,46 @@ class ChartView(
 
 
 
-
         canvas.drawText(
+
             "RSSI1",
+
             10f,
-            30f,
-            rssi1Paint
+
+            35f,
+
+            textPaint
+
         )
 
 
+
         canvas.drawText(
+
             "RSSI2",
-            120f,
-            30f,
-            rssi2Paint
+
+            150f,
+
+            35f,
+
+            textPaint
+
         )
+
 
 
         canvas.drawText(
+
             "SNR",
-            230f,
-            30f,
-            snrPaint
+
+            290f,
+
+            35f,
+
+            textPaint
+
         )
+
 
     }
 
@@ -355,79 +380,101 @@ class ChartView(
 
 
     private fun drawCurve(
+
         canvas:Canvas,
-        data:List<Float>,
+
+        list:List<Float>,
+
         paint:Paint,
-        max:Float
+
+        maxValue:Float
+
     ){
 
 
 
-        if(
-            data.size<2
-        )
+        if(list.size < 2)
             return
 
 
 
 
         val step =
+
             width.toFloat()
             /
             (maxPoints-1)
 
 
 
-        for(
-            i in 0 until data.size-1
-        ){
+
+
+        for(i in 0 until list.size-1){
+
 
 
             val x1 =
-                i*step
+
+                i *
+                step
+
 
 
             val x2 =
-                (i+1)*step
+
+                (i+1)
+                *
+                step
 
 
 
 
 
             val y1 =
+
                 height -
                 (
-                 data[i]
-                 /
-                 max
-                 *
-                 height
+                    list[i]
+                    /
+                    maxValue
+                    *
+                    height
                 )
+
+
 
 
 
             val y2 =
+
                 height -
                 (
-                 data[i+1]
-                 /
-                 max
-                 *
-                 height
+                    list[i+1]
+                    /
+                    maxValue
+                    *
+                    height
                 )
 
 
 
+
+
             canvas.drawLine(
+
                 x1,
+
                 y1,
+
                 x2,
+
                 y2,
+
                 paint
+
             )
 
         }
-
 
     }
 
