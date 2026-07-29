@@ -18,7 +18,7 @@ import com.example.netfloatmonitor.data.JsonParser
 import com.example.netfloatmonitor.data.LinkStatus
 import com.example.netfloatmonitor.data.LogManager
 import com.example.netfloatmonitor.net.UdpReceiver
-import com.example.netfloatmonitor.ui.FloatView
+import com.example.netfloatmonitor.ui.FloatWindow
 
 
 
