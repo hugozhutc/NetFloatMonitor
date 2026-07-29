@@ -2,267 +2,138 @@ package com.example.netfloatmonitor.data
 
 
 import org.json.JSONObject
-
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 
 object JsonParser {
 
 
-
     fun parse(
-        json:String
-    ):LinkStatus{
+        json: String
+    ): LinkStatus {
 
 
-        val obj =
-            JSONObject(json)
+        val status = LinkStatus()
 
 
 
-        val status =
-            LinkStatus()
+        try {
 
 
+            val obj =
+                JSONObject(json)
 
-        status.rawJson =
-            json
 
 
+            // =========================
+            // AIR
+            // =========================
 
-
-
-        // =====================
-        // AIR
-        // =====================
-
-
-        status.airRssi1 =
-            find(
-                obj,
-                "rssi1_a",
-                "air_rssi1",
-                "airRssi1"
-            )
-
-
-        status.airRssi2 =
-            find(
-                obj,
-                "rssi2_a",
-                "air_rssi2",
-                "airRssi2"
-            )
-
-
-        status.airSnr =
-            find(
-                obj,
-                "snr_a",
-                "air_snr",
-                "airSnr"
-            )
-
-
-        status.airPass =
-            find(
-                obj,
-                "pass_a",
-                "air_pass",
-                "airPass"
-            )
-
-
-
-        status.airFailed =
-            find(
-                obj,
-                "failed_a",
-                "air_failed",
-                "airFailed"
-            )
-
-
-
-        status.airAnt =
-            find(
-                obj,
-                "ant_a",
-                "air_ant",
-                "airAnt"
-            )
-
-
-
-
-
-
-
-
-
-        // =====================
-        // GROUND
-        // =====================
-
-
-        status.gndRssi1 =
-            find(
-                obj,
-                "rssi1_g",
-                "gnd_rssi1",
-                "ground_rssi1",
-                "gndRssi1"
-            )
-
-
-
-        status.gndRssi2 =
-            find(
-                obj,
-                "rssi2_g",
-                "gnd_rssi2",
-                "ground_rssi2",
-                "gndRssi2"
-            )
-
-
-
-        status.gndSnr =
-            find(
-                obj,
-                "snr_g",
-                "gnd_snr",
-                "ground_snr",
-                "gndSnr"
-            )
-
-
-
-        status.gndPass =
-            find(
-                obj,
-                "pass_g",
-                "gnd_pass",
-                "gndPass"
-            )
-
-
-
-        status.gndFailed =
-            find(
-                obj,
-                "failed_g",
-                "gnd_failed",
-                "gndFailed"
-            )
-
-
-        status.gndAnt =
-            find(
-                obj,
-                "ant_g",
-                "gnd_ant",
-                "gndAnt"
-            )
-
-
-
-
-
-
-
-
-
-        // =====================
-        // 公共参数
-        // =====================
-
-
-        status.freq =
-            find(
-                obj,
-                "freq_tx",
-                "freq",
-                "frequency"
-            )
-
-
-
-        status.mcs =
-            find(
-                obj,
-                "mcs",
-                "MCS"
-            )
-
-
-
-        status.power =
-            find(
-                obj,
-                "power",
-                "txPower"
-            )
-
-
-
-        status.distance =
-            find(
-                obj,
-                "distance",
-                "dist"
-            )
-
-
-
-        status.txRate =
-            find(
-                obj,
-                "ethTx",
-                "txRate",
-                "tx_rate"
-            )
-
-
-
-        status.rxRate =
-            find(
-                obj,
-                "ethRx",
-                "rxRate",
-                "rx_rate"
-            )
-
-
-
-
-
-
-
-
-
-        // =====================
-        // 噪声
-        // =====================
-
-
-        status.airNoise =
-            parseNoise(
-                find(
+            status.airRssi1 =
+                getValue(
                     obj,
-                    "noiseFloor_a",
-                    "airNoise"
+                    "rssi1_a",
+                    "air_rssi1"
                 )
-            )
 
 
-        status.gndNoise =
-            parseNoise(
-                find(
+            status.airRssi2 =
+                getValue(
                     obj,
-                    "noiseFloor_g",
-                    "gndNoise"
+                    "rssi2_a",
+                    "air_rssi2"
                 )
-            )
+
+
+            status.airSnr =
+                getValue(
+                    obj,
+                    "snr_a",
+                    "air_snr"
+                )
+
+
+            status.airPass =
+                getValue(
+                    obj,
+                    "pass_a",
+                    "air_pass"
+                )
+
+
+            status.airFailed =
+                getValue(
+                    obj,
+                    "failed_a",
+                    "air_failed"
+                )
+
+
+            status.airAnt =
+                getValue(
+                    obj,
+                    "ant_a",
+                    "air_ant"
+                )
+
+
+
+
+
+
+            // =========================
+            // GND
+            // =========================
+
+
+            status.gndRssi1 =
+                getValue(
+                    obj,
+                    "rssi1_g",
+                    "gnd_rssi1"
+                )
+
+
+            status.gndRssi2 =
+                getValue(
+                    obj,
+                    "rssi2_g",
+                    "gnd_rssi2"
+                )
+
+
+            status.gndSnr =
+                getValue(
+                    obj,
+                    "snr_g",
+                    "gnd_snr"
+                )
+
+
+            status.gndPass =
+                getValue(
+                    obj,
+                    "pass_g",
+                    "gnd_pass"
+                )
+
+
+            status.gndFailed =
+                getValue(
+                    obj,
+                    "failed_g",
+                    "gnd_failed"
+                )
+
+
+            status.gndAnt =
+                getValue(
+                    obj,
+                    "ant_g",
+                    "gnd_ant"
+                )
 
 
 
@@ -270,25 +141,130 @@ object JsonParser {
 
 
 
-        // =====================
-        // 计算链路质量
-        // =====================
+
+            // =========================
+            // 公共参数
+            // =========================
 
 
-        status.linkQuality =
-            calculateQuality(
-                status.airSnr
-            )
+            status.freq =
+                getValue(
+                    obj,
+                    "freq_tx",
+                    "freq",
+                    "frequency"
+                )
+
+
+
+            status.mcs =
+                getValue(
+                    obj,
+                    "mcs",
+                    "rate"
+                )
+
+
+
+            status.power =
+                getValue(
+                    obj,
+                    "power",
+                    "txPower"
+                )
+
+
+
+            status.distance =
+                getValue(
+                    obj,
+                    "distance",
+                    "dist"
+                )
+
+
+
+            status.txRate =
+                getValue(
+                    obj,
+                    "ethTx",
+                    "txRate"
+                )
+
+
+
+            status.rxRate =
+                getValue(
+                    obj,
+                    "ethRx",
+                    "rxRate"
+                )
 
 
 
 
-        status.lossRate =
-            calculateLoss(
-                status.airPass,
-                status.airFailed
-            )
 
+
+
+            // =========================
+            // 噪声
+            // =========================
+
+
+            status.airNoise =
+                parseNoise(
+                    getValue(
+                        obj,
+                        "noiseFloor_a"
+                    )
+                )
+
+
+
+            status.gndNoise =
+                parseNoise(
+                    getValue(
+                        obj,
+                        "noiseFloor_g"
+                    )
+                )
+
+
+
+
+
+
+
+
+            // =========================
+            // 扩展字段
+            // =========================
+
+
+            status.timestamp =
+                now()
+
+
+
+            status.online =
+                true
+
+
+
+            status.quality =
+                calculateQuality(
+                    status
+                )
+
+
+
+        } catch(e:Exception){
+
+
+            status.online=false
+
+
+        }
 
 
 
@@ -305,62 +281,29 @@ object JsonParser {
 
 
 
-    private fun find(
+    private fun getValue(
+
         obj:JSONObject,
+
         vararg keys:String
-    ):String{
+
+    ):String {
 
 
-        for(
-            key in keys
-        ){
+        for(key in keys){
 
 
-            if(
-                obj.has(key)
-            ){
+            if(obj.has(key)){
 
 
                 return obj.optString(
+
                     key,
+
                     "--"
+
                 )
 
-
-            }
-
-
-
-            //忽略大小写匹配
-
-            val iterator =
-                obj.keys()
-
-
-            while(
-                iterator.hasNext()
-            ){
-
-
-                val realKey =
-                    iterator.next()
-
-
-
-                if(
-                    realKey.equals(
-                        key,
-                        true
-                    )
-                ){
-
-
-                    return obj.optString(
-                        realKey,
-                        "--"
-                    )
-
-                }
 
             }
 
@@ -369,7 +312,6 @@ object JsonParser {
 
 
         return "--"
-
 
     }
 
@@ -382,21 +324,33 @@ object JsonParser {
 
 
     private fun parseNoise(
+
         value:String
+
     ):Array<String>{
 
 
+
         if(
-            value=="--" ||
-            value.isEmpty()
-        )
+
+            value.isBlank()
+
+            ||
+
+            value=="--"
+
+        ){
+
             return emptyArray()
 
+        }
 
 
-        return value
-            .split(",")
+
+        return value.split(",")
+
             .toTypedArray()
+
 
     }
 
@@ -409,37 +363,38 @@ object JsonParser {
 
 
     private fun calculateQuality(
-        snr:String
+
+        status:LinkStatus
+
     ):Int{
 
 
-        val value =
-            snr.toFloatOrNull()
-                ?: return 0
+        val snr =
+
+            status.airSnr
+
+                .toFloatOrNull()
+
+                ?:0f
 
 
 
         return when{
 
 
-            value>=30 ->
-                100
+            snr >= 30 -> 100
 
 
-            value>=20 ->
-                80
+            snr >= 20 -> 80
 
 
-            value>=10 ->
-                60
+            snr >= 10 -> 60
 
 
-            value>=5 ->
-                40
+            snr > 0 -> 40
 
 
-            else ->
-                20
+            else -> 0
 
 
         }
@@ -455,41 +410,25 @@ object JsonParser {
 
 
 
-    private fun calculateLoss(
-        pass:String,
-        fail:String
-    ):Float{
+    private fun now():String{
 
 
-        val p =
-            pass.toFloatOrNull()
-                ?:0f
+        return SimpleDateFormat(
 
+            "HH:mm:ss.SSS",
 
+            Locale.getDefault()
 
-        val f =
-            fail.toFloatOrNull()
-                ?:0f
-
-
-
-
-        if(
-            p+f<=0
         )
-            return 0f
 
+            .format(
 
+                Date()
 
-
-        return f /
-                (p+f)
-                *
-                100f
+            )
 
 
     }
-
 
 
 }
