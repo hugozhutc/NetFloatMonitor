@@ -16,6 +16,7 @@ import com.example.netfloatmonitor.data.JsonParser
 import com.example.netfloatmonitor.log.LogManager
 import com.example.netfloatmonitor.net.UdpReceiver
 import com.example.netfloatmonitor.ui.FloatWindow
+import com.example.netfloatmonitor.data.DataProcessor
 
 import java.util.Timer
 import java.util.TimerTask
