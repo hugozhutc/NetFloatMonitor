@@ -1,56 +1,325 @@
+package com.example.netfloatmonitor.net
 
-package com.example.netfloatmonitor
 
 import android.util.Log
+
 import java.net.DatagramPacket
 import java.net.DatagramSocket
-import java.lang.Exception
+import java.net.InetAddress
+import java.net.SocketException
 
-class UdpReceiver(private val port: Int, private val onData: (String) -> Unit) {
 
-    private var socket: DatagramSocket? = null
-    private var running = false
-    private var thread: Thread? = null
 
-    fun start() {
-        if (running) return
-        running = true
-        
-        thread = Thread {
-            val buffer = ByteArray(2048)
-            try {
-                socket = DatagramSocket(port)
-                Log.d("UdpReceiver", "UDP 服务已在端口 $port 启动监听...")
+class UdpReceiver(
+    private val port:Int,
+    private val onData:(String, String)->Unit
+) {
 
-                while (running) {
-                    val packet = DatagramPacket(buffer, buffer.size)
-                    socket?.receive(packet)
-                    
-                    val ip = packet.address?.hostAddress ?: "未知IP"
-                    val data = String(packet.data, 0, packet.length, Charsets.UTF_8).trim()
 
-                    Log.d("UdpReceiver", "收到来自 $ip 的原始数据: $data")
-                    
-                    // 直接回调分发所有收到的网络数据，不做强行丢弃
-                    onData(data)
-                }
-            } catch (e: Exception) {
-                Log.e("UdpReceiver", "UDP 服务运行异常: ${e.message}", e)
-            } finally {
-                stop()
+
+    private val TAG =
+        "UdpReceiver"
+
+
+
+    private var socket:DatagramSocket? =
+        null
+
+
+
+    private var thread:Thread? =
+        null
+
+
+
+    @Volatile
+    private var running=false
+
+
+
+    private var packetCount=0L
+
+
+
+
+
+
+
+    fun start(){
+
+
+        if(running)
+            return
+
+
+
+        running=true
+
+
+
+        thread =
+            Thread{
+
+
+                receiveLoop()
+
+
             }
-        }
+
+
+
         thread?.start()
+
+
+
     }
 
-    fun stop() {
-        running = false
-        try {
-            socket?.close()
-        } catch (e: Exception) {
-            Log.e("UdpReceiver", "关闭 Socket 异常: ${e.message}")
+
+
+
+
+
+
+
+
+    private fun receiveLoop(){
+
+
+        try{
+
+
+            socket =
+                DatagramSocket(
+                    port
+                )
+
+
+
+            // 增大UDP接收缓存
+
+            socket?.receiveBufferSize =
+                1024*1024
+
+
+
+
+
+            Log.d(
+                TAG,
+                "UDP监听启动:$port"
+            )
+
+
+
+
+
+            val buffer =
+                ByteArray(
+                    65535
+                )
+
+
+
+
+
+            while(
+                running
+            ){
+
+
+
+                try{
+
+
+                    val packet =
+                        DatagramPacket(
+                            buffer,
+                            buffer.size
+                        )
+
+
+
+                    socket?.receive(
+                        packet
+                    )
+
+
+
+                    val data =
+                        String(
+                            packet.data,
+                            0,
+                            packet.length,
+                            Charsets.UTF_8
+                        )
+                            .trim()
+
+
+
+
+
+                    if(
+                        data.isEmpty()
+                    )
+                        continue
+
+
+
+
+
+                    packetCount++
+
+
+
+
+
+                    val ip =
+                        packet.address
+                            ?.hostAddress
+                            ?: "unknown"
+
+
+
+
+                    onData(
+                        data,
+                        ip
+                    )
+
+
+
+                }
+                catch(e:SocketException){
+
+
+                    if(running){
+
+
+                        Log.e(
+                            TAG,
+                            "Socket异常:${e.message}"
+                        )
+
+                    }
+
+
+                    break
+
+
+                }
+
+
+            }
+
+
+
         }
-        socket = null
-        thread = null
+        catch(e:Exception){
+
+
+            Log.e(
+                TAG,
+                "UDP启动失败:${e.message}"
+            )
+
+
+        }
+        finally{
+
+
+            closeSocket()
+
+
+        }
+
+
+
     }
+
+
+
+
+
+
+
+
+
+    fun stop(){
+
+
+        running=false
+
+
+
+        closeSocket()
+
+
+
+        try{
+
+
+            thread?.join(
+                300
+            )
+
+
+        }
+        catch(_:Exception){}
+
+
+
+        thread=null
+
+
+
+    }
+
+
+
+
+
+
+
+
+
+    private fun closeSocket(){
+
+
+
+        try{
+
+
+            socket?.close()
+
+
+
+        }
+        catch(_:Exception){}
+
+
+
+        socket=null
+
+
+
+    }
+
+
+
+
+
+
+
+
+
+    fun getPacketCount():Long{
+
+
+        return packetCount
+
+
+    }
+
+
+
 }
