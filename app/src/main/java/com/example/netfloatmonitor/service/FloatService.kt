@@ -10,15 +10,16 @@ import android.util.Log
 import android.view.WindowManager
 
 import androidx.core.app.NotificationCompat
+import androidx.localbroadcastmanager.content.LocalBroadcastManager
 
 import com.example.netfloatmonitor.R
-import com.example.netfloatmonitor.JsonParser
-import com.example.netfloatmonitor.LogManager
-import com.example.netfloatmonitor.UdpReceiver
+import com.example.netfloatmonitor.data.LogManager
+import com.example.netfloatmonitor.net.UdpReceiver
+import com.example.netfloatmonitor.ui.FloatView
 
-import com.example.netfloatmonitor.ui.FloatWindow
 
-import com.example.netfloatmonitor.data.LinkStatus
+import java.util.Timer
+import java.util.TimerTask
 
 
 
@@ -26,28 +27,57 @@ class FloatService : Service() {
 
 
 
-    private var udpReceiver: UdpReceiver? = null
-
-
-    private var floatWindow: FloatWindow? = null
-
-
-    private lateinit var logManager: LogManager
+    private val TAG =
+        "FloatService"
 
 
 
-    private var packetCount = 0
+    private var floatView:FloatView? =
+        null
 
 
 
-    override fun onCreate() {
+    private var udpReceiver:UdpReceiver? =
+        null
+
+
+
+    private lateinit var logManager:LogManager
+
+
+
+
+
+
+    private var totalPackets=0
+
+
+
+    private var packetsLastSecond=0
+
+
+
+    private var currentHz=0
+
+
+
+    private var statusTimer:Timer? =
+        null
+
+
+
+
+
+
+    override fun onCreate(){
 
         super.onCreate()
 
 
         logManager =
-            LogManager(this)
-
+            LogManager(
+                this
+            )
 
 
         createNotificationChannel()
@@ -59,10 +89,12 @@ class FloatService : Service() {
         )
 
 
+
         Log.d(
-            "FloatService",
-            "服务启动"
+            TAG,
+            "Service创建"
         )
+
 
     }
 
@@ -73,12 +105,12 @@ class FloatService : Service() {
 
 
 
+
     override fun onStartCommand(
-        intent: Intent?,
+        intent:Intent?,
         flags:Int,
         startId:Int
-    ):Int {
-
+    ):Int{
 
 
         val port =
@@ -86,8 +118,46 @@ class FloatService : Service() {
                 "PORT",
                 16789
             )
-                ?:16789
+            ?:16789
 
+
+
+
+
+        restartMonitor(
+            port
+        )
+
+
+
+        return START_NOT_STICKY
+
+
+    }
+
+
+
+
+
+
+
+
+
+    private fun restartMonitor(
+        port:Int
+    ){
+
+
+
+        stopUdp()
+
+
+
+        totalPackets=0
+
+        packetsLastSecond=0
+
+        currentHz=0
 
 
 
@@ -100,11 +170,26 @@ class FloatService : Service() {
 
 
 
-        startUdp(port)
+        startUdp(
+            port
+        )
 
 
 
-        return START_NOT_STICKY
+        startStatusTimer()
+
+
+
+        sendStatus()
+
+
+
+        Log.d(
+            TAG,
+            "UDP监听:$port"
+        )
+
+
 
     }
 
@@ -122,21 +207,61 @@ class FloatService : Service() {
 
 
 
-        udpReceiver?.stop()
-
-
-
         udpReceiver =
             UdpReceiver(
                 port
-            ){ json ->
+            )
+            { json, ip ->
+
+
+                try{
+
+
+                    totalPackets++
+
+                    packetsLastSecond++
 
 
 
-                processData(json)
+                    //保存原始数据
+
+                    logManager.save(
+                        json
+                    )
+
+
+
+
+                    floatView?.post{
+
+
+                        floatView?.updateJson(
+                            json
+                        )
+
+
+                    }
+
+
+
+
+
+                }
+                catch(e:Exception){
+
+
+                    Log.e(
+                        TAG,
+                        "数据处理异常:${e.message}"
+                    )
+
+
+                }
+
 
 
             }
+
 
 
 
@@ -154,59 +279,107 @@ class FloatService : Service() {
 
 
 
-    private fun processData(
-        json:String
-    ){
+    private fun startStatusTimer(){
 
 
-        try {
+        statusTimer?.cancel()
 
 
-            //1.保存原始数据
 
-            logManager.save(
-                json
+        statusTimer =
+            Timer()
+
+
+
+        statusTimer?.scheduleAtFixedRate(
+
+
+            object:TimerTask(){
+
+
+                override fun run(){
+
+
+
+                    currentHz =
+                        packetsLastSecond
+
+
+
+                    packetsLastSecond=0
+
+
+
+
+                    sendStatus()
+
+
+
+                }
+
+
+
+            },
+
+
+            1000,
+
+
+            1000
+
+
+
+        )
+
+
+    }
+
+
+
+
+
+
+
+
+
+    private fun sendStatus(){
+
+
+
+        val intent =
+            Intent(
+                "com.example.netfloatmonitor.STATUS_UPDATE"
             )
 
 
 
-
-            //2.JSON转换
-
-            val status:LinkStatus =
-                JsonParser.parse(
-                    json
-                )
+        intent.putExtra(
+            "TOTAL_PACKETS",
+            totalPackets
+        )
 
 
 
+        intent.putExtra(
+            "HZ",
+            currentHz
+        )
 
 
-            packetCount++
+
+        intent.putExtra(
+            "FILE",
+            logManager.getCurrentFileName()
+        )
 
 
 
 
-
-            //3.刷新悬浮窗
-
-            floatWindow?.updateStatus(
-                status
+        LocalBroadcastManager
+            .getInstance(this)
+            .sendBroadcast(
+                intent
             )
-
-
-
-        }
-        catch(e:Exception){
-
-
-            Log.e(
-                "FloatService",
-                "数据处理失败:${e.message}"
-            )
-
-
-        }
 
 
     }
@@ -222,8 +395,12 @@ class FloatService : Service() {
     private fun showFloatWindow(){
 
 
-        if(floatWindow!=null)
+
+        if(
+            floatView!=null
+        )
             return
+
 
 
 
@@ -231,7 +408,8 @@ class FloatService : Service() {
             getSystemService(
                 WINDOW_SERVICE
             )
-                    as WindowManager
+            as WindowManager
+
 
 
 
@@ -241,35 +419,30 @@ class FloatService : Service() {
 
 
 
-
-
         params.width =
-            1000
+            1300
+
 
 
         params.height =
-            700
-
-
-
-        params.x =
-            50
-
-
-        params.y =
-            200
+            540
 
 
 
 
         params.type =
-            if(Build.VERSION.SDK_INT>=26)
+            if(
+                Build.VERSION.SDK_INT>=26
+            ){
 
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
 
-            else
+            }
+            else{
 
                 WindowManager.LayoutParams.TYPE_PHONE
+
+            }
 
 
 
@@ -279,15 +452,24 @@ class FloatService : Service() {
 
 
 
+
+
         params.format =
             PixelFormat.TRANSLUCENT
 
 
 
+        params.x=50
+
+        params.y=200
 
 
-        floatWindow =
-            FloatWindow(
+
+
+
+
+        floatView =
+            FloatView(
                 this,
                 wm,
                 params
@@ -296,7 +478,7 @@ class FloatService : Service() {
 
 
         wm.addView(
-            floatWindow,
+            floatView,
             params
         )
 
@@ -313,14 +495,22 @@ class FloatService : Service() {
 
     override fun onDestroy(){
 
-        super.onDestroy()
+
+        Log.d(
+            TAG,
+            "Service停止"
+        )
 
 
 
-        udpReceiver?.stop()
+        statusTimer?.cancel()
 
-        udpReceiver=null
+        statusTimer=null
 
+
+
+
+        stopUdp()
 
 
 
@@ -329,8 +519,56 @@ class FloatService : Service() {
 
 
 
+        sendStopStatus()
 
-        floatWindow?.let{
+
+
+
+
+        removeFloatWindow()
+
+
+
+        super.onDestroy()
+
+
+    }
+
+
+
+
+
+
+
+
+
+    private fun stopUdp(){
+
+
+
+        udpReceiver?.stop()
+
+
+        udpReceiver=null
+
+
+    }
+
+
+
+
+
+
+
+
+
+    private fun removeFloatWindow(){
+
+
+
+        if(
+            floatView!=null
+        ){
 
 
             try{
@@ -340,10 +578,13 @@ class FloatService : Service() {
                     getSystemService(
                         WINDOW_SERVICE
                     )
-                            as WindowManager
+                    as WindowManager
 
 
-                wm.removeView(it)
+
+                wm.removeView(
+                    floatView
+                )
 
 
             }
@@ -351,25 +592,58 @@ class FloatService : Service() {
 
 
 
+                Log.e(
+                    TAG,
+                    "移除悬浮窗失败:${e.message}"
+                )
+
+
             }
+
+
+
+            floatView=null
 
 
         }
 
 
 
-        floatWindow=null
+    }
 
 
 
-        Log.d(
-            "FloatService",
-            "服务停止"
+
+
+
+
+
+
+    private fun sendStopStatus(){
+
+
+        val intent =
+            Intent(
+                "com.example.netfloatmonitor.STATUS_UPDATE"
+            )
+
+
+        intent.putExtra(
+            "IS_STOPPED",
+            true
         )
 
 
 
+        LocalBroadcastManager
+            .getInstance(this)
+            .sendBroadcast(
+                intent
+            )
+
+
     }
+
 
 
 
@@ -391,6 +665,7 @@ class FloatService : Service() {
     private fun createNotificationChannel(){
 
 
+
         if(
             Build.VERSION.SDK_INT>=26
         ){
@@ -398,9 +673,13 @@ class FloatService : Service() {
 
             val channel =
                 NotificationChannel(
+
                     "net_monitor",
+
                     "NetFloat Monitor",
+
                     NotificationManager.IMPORTANCE_LOW
+
                 )
 
 
@@ -418,6 +697,7 @@ class FloatService : Service() {
 
 
         }
+
 
 
     }
@@ -438,27 +718,25 @@ class FloatService : Service() {
             "net_monitor"
         )
 
-
             .setContentTitle(
                 "NetFloat Monitor"
             )
-
 
             .setContentText(
                 "UDP链路监控运行中"
             )
 
-
             .setSmallIcon(
                 android.R.drawable.ic_menu_info_details
             )
 
+            .setOngoing(true)
 
             .build()
 
 
-
     }
+
 
 
 }
