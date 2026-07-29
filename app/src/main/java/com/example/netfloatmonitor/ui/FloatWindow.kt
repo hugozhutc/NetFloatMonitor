@@ -386,4 +386,39 @@ RX       : ${status.rxRate}
     }
 
 
+fun update(status: LinkStatus) {
+
+    post {
+
+        // 更新天空端
+        airPanel.update(
+            status.airRssi1,
+            status.airRssi2,
+            status.airSnr,
+            status.airPass,
+            status.airFailed,
+            status.airAnt
+        )
+
+
+        // 更新地面端
+        gndPanel.update(
+            status.gndRssi1,
+            status.gndRssi2,
+            status.gndSnr,
+            status.gndPass,
+            status.gndFailed,
+            status.gndAnt
+        )
+
+
+        // 更新曲线
+        chartView.update(
+            status
+        )
+
+    }
+
+}
+        
 }
