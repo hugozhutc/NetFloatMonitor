@@ -7,7 +7,6 @@ import android.graphics.drawable.GradientDrawable
 import android.view.*
 import android.widget.*
 
-
 import com.example.netfloatmonitor.data.LinkStatus
 
 
@@ -16,26 +15,34 @@ class FloatWindow(
     context: Context,
     private val windowManager: WindowManager,
     private val params: WindowManager.LayoutParams
-
 ) : LinearLayout(context) {
 
 
 
-    private val airText =
-        TextView(context)
+    private val airPanel =
+        LinkPanelView(
+            context,
+            "AIR"
+        )
 
 
-    private val gndText =
-        TextView(context)
+    private val gndPanel =
+        LinkPanelView(
+            context,
+            "GROUND"
+        )
 
 
-    private val linkText =
-        TextView(context)
+    private val linkPanel =
+        LinkPanelView(
+            context,
+            "LINK"
+        )
 
 
 
-    private val infoText =
-        TextView(context)
+    private val chartView =
+        ChartView(context)
 
 
 
@@ -48,11 +55,6 @@ class FloatWindow(
 
 
 
-    private val root =
-        this
-
-
-
     init {
 
 
@@ -62,9 +64,9 @@ class FloatWindow(
 
 
         setPadding(
-            12,
+            15,
             10,
-            12,
+            15,
             10
         )
 
@@ -72,6 +74,8 @@ class FloatWindow(
 
         background =
             createBackground()
+
+
 
 
 
@@ -85,7 +89,9 @@ class FloatWindow(
 
 
 
-        title.textSize=16f
+        title.textSize =
+            18f
+
 
 
         title.setTextColor(
@@ -93,82 +99,86 @@ class FloatWindow(
         )
 
 
-        title.setPadding(
-            0,
-            0,
-            0,
-            8
+
+        addView(
+            title,
+            LayoutParams(
+                MATCH_PARENT,
+                50
+            )
         )
 
 
-        addView(title)
 
 
 
 
-
-        val row =
+        val panelRow =
             LinearLayout(context)
 
 
-        row.orientation =
+
+        panelRow.orientation =
             HORIZONTAL
 
 
 
 
-        addCard(
-            row,
-            "AIR",
-            airText
-        )
-
-
-        addCard(
-            row,
-            "GROUND",
-            gndText
-        )
-
-
-        addCard(
-            row,
-            "LINK",
-            linkText
+        panelRow.addView(
+            airPanel,
+            LayoutParams(
+                320,
+                WRAP_CONTENT
+            )
         )
 
 
 
-        addView(row)
-
-
-
-
-
-        infoText.textSize=14f
-
-
-        infoText.setTextColor(
-            Color.WHITE
-        )
-
-
-        infoText.setPadding(
-            0,
-            12,
-            0,
-            0
+        panelRow.addView(
+            gndPanel,
+            LayoutParams(
+                320,
+                WRAP_CONTENT
+            )
         )
 
 
 
-        addView(infoText)
+        panelRow.addView(
+            linkPanel,
+            LayoutParams(
+                320,
+                WRAP_CONTENT
+            )
+        )
+
+
+
+        addView(
+            panelRow
+        )
 
 
 
 
-        setOnTouchListener {
 
+
+
+        addView(
+            chartView,
+            LayoutParams(
+                MATCH_PARENT,
+                300
+            )
+        )
+
+
+
+
+
+
+
+        setOnTouchListener{
 
                 _,event ->
 
@@ -187,6 +197,8 @@ class FloatWindow(
                         event.rawY
 
 
+                    true
+
                 }
 
 
@@ -196,14 +208,14 @@ class FloatWindow(
 
                     params.x +=
                         (
-                         event.rawX-downX
+                                event.rawX-downX
                         ).toInt()
 
 
 
                     params.y +=
                         (
-                         event.rawY-downY
+                                event.rawY-downY
                         ).toInt()
 
 
@@ -217,23 +229,25 @@ class FloatWindow(
 
 
 
+
                     windowManager
                         .updateViewLayout(
                             this,
                             params
                         )
 
+                    true
 
                 }
 
 
+                else ->
+                    true
 
             }
 
-
-            true
-
         }
+
 
 
 
@@ -244,100 +258,6 @@ class FloatWindow(
 
         }
 
-
-    }
-
-
-
-
-
-
-
-
-
-    private fun addCard(
-        parent:LinearLayout,
-        title:String,
-        textView:TextView
-    ){
-
-
-        val box =
-            LinearLayout(context)
-
-
-
-        box.orientation =
-            VERTICAL
-
-
-
-        box.setPadding(
-            15,
-            8,
-            15,
-            8
-        )
-
-
-
-        val titleView =
-            TextView(context)
-
-
-
-        titleView.text =
-            title
-
-
-        titleView.textSize=15f
-
-
-        titleView.setTextColor(
-            Color.CYAN
-        )
-
-
-
-        box.addView(titleView)
-
-
-
-        textView.textSize=14f
-
-
-        textView.setTextColor(
-            Color.WHITE
-        )
-
-
-
-        box.addView(
-            textView
-        )
-
-
-
-        val lp =
-            LayoutParams(
-                320,
-                LayoutParams.WRAP_CONTENT
-            )
-
-
-        lp.setMargins(
-            5,
-            0,
-            5,
-            0
-        )
-
-
-
-        parent.addView(
-            box,
-            lp
-        )
 
 
     }
@@ -355,64 +275,34 @@ class FloatWindow(
     ){
 
 
-        post {
+
+        airPanel.updateAir(
+            status
+        )
 
 
 
-            airText.text =
-                """
-RSSI1 ${status.airRssi1}
-RSSI2 ${status.airRssi2}
-SNR  ${status.airSnr}
-PASS ${status.airPass}
-ANT  ${status.airAnt}
-                """.trimIndent()
+        gndPanel.updateGround(
+            status
+        )
 
 
 
-
-            gndText.text =
-                """
-RSSI1 ${status.gndRssi1}
-RSSI2 ${status.gndRssi2}
-SNR  ${status.gndSnr}
-PASS ${status.gndPass}
-ANT  ${status.gndAnt}
-                """.trimIndent()
+        linkPanel.updateLink(
+            status
+        )
 
 
 
+        chartView.addData(
 
-            linkText.text =
-                """
-质量 ${status.linkQuality}%
+            status.airRssi1.toFloatOrNull(),
 
-MCS ${status.mcs}
+            status.airRssi2.toFloatOrNull(),
 
-${status.freq} MHz
-                """.trimIndent()
+            status.airSnr.toFloatOrNull()
 
-
-
-
-
-            infoText.text =
-                """
-DISTANCE : ${status.distance} m
-
-POWER : ${status.power}
-
-TX : ${status.txRate}
-
-RX : ${status.rxRate}
-
-LOSS : %.2f %%
-                """.trimIndent()
-                    .format(status.lossRate)
-
-
-
-        }
+        )
 
 
     }
@@ -428,29 +318,42 @@ LOSS : %.2f %%
     private fun toggle(){
 
 
-        expanded=!expanded
+        expanded =
+            !expanded
 
 
 
         if(expanded){
 
 
-            params.width=1300
 
-            params.height=600
-
-
-
-            visibility=
+            visibility =
                 VISIBLE
 
 
-        }else{
+
+            params.width =
+                1000
 
 
-            params.width=180
 
-            params.height=80
+            params.height =
+                700
+
+
+
+        }
+        else{
+
+
+
+            params.width =
+                220
+
+
+
+            params.height =
+                80
 
 
 
@@ -460,9 +363,10 @@ LOSS : %.2f %%
 
         windowManager
             .updateViewLayout(
-                root,
+                this,
                 params
             )
+
 
     }
 
@@ -484,20 +388,22 @@ LOSS : %.2f %%
 
                 setColor(
                     Color.argb(
-                        210,
-                        10,
-                        10,
-                        10
+                        220,
+                        15,
+                        15,
+                        15
                     )
                 )
 
 
                 cornerRadius =
-                    20f
+                    25f
 
             }
 
+
     }
+
 
 
 }
