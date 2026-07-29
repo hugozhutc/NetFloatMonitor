@@ -9,7 +9,9 @@ object JsonParser {
 
 
 
-    fun parse(json:String):LinkStatus{
+    fun parse(
+        json:String
+    ):LinkStatus{
 
 
         val obj =
@@ -17,214 +19,280 @@ object JsonParser {
 
 
 
-        return LinkStatus(
+        val status =
+            LinkStatus()
 
 
 
-            // =====================
-            // AIR
-            // =====================
+        status.rawJson =
+            json
 
 
-            airRssi1 =
-                getValue(
+
+
+
+        // =====================
+        // AIR
+        // =====================
+
+
+        status.airRssi1 =
+            find(
+                obj,
+                "rssi1_a",
+                "air_rssi1",
+                "airRssi1"
+            )
+
+
+        status.airRssi2 =
+            find(
+                obj,
+                "rssi2_a",
+                "air_rssi2",
+                "airRssi2"
+            )
+
+
+        status.airSnr =
+            find(
+                obj,
+                "snr_a",
+                "air_snr",
+                "airSnr"
+            )
+
+
+        status.airPass =
+            find(
+                obj,
+                "pass_a",
+                "air_pass",
+                "airPass"
+            )
+
+
+
+        status.airFailed =
+            find(
+                obj,
+                "failed_a",
+                "air_failed",
+                "airFailed"
+            )
+
+
+
+        status.airAnt =
+            find(
+                obj,
+                "ant_a",
+                "air_ant",
+                "airAnt"
+            )
+
+
+
+
+
+
+
+
+
+        // =====================
+        // GROUND
+        // =====================
+
+
+        status.gndRssi1 =
+            find(
+                obj,
+                "rssi1_g",
+                "gnd_rssi1",
+                "ground_rssi1",
+                "gndRssi1"
+            )
+
+
+
+        status.gndRssi2 =
+            find(
+                obj,
+                "rssi2_g",
+                "gnd_rssi2",
+                "ground_rssi2",
+                "gndRssi2"
+            )
+
+
+
+        status.gndSnr =
+            find(
+                obj,
+                "snr_g",
+                "gnd_snr",
+                "ground_snr",
+                "gndSnr"
+            )
+
+
+
+        status.gndPass =
+            find(
+                obj,
+                "pass_g",
+                "gnd_pass",
+                "gndPass"
+            )
+
+
+
+        status.gndFailed =
+            find(
+                obj,
+                "failed_g",
+                "gnd_failed",
+                "gndFailed"
+            )
+
+
+        status.gndAnt =
+            find(
+                obj,
+                "ant_g",
+                "gnd_ant",
+                "gndAnt"
+            )
+
+
+
+
+
+
+
+
+
+        // =====================
+        // 公共参数
+        // =====================
+
+
+        status.freq =
+            find(
+                obj,
+                "freq_tx",
+                "freq",
+                "frequency"
+            )
+
+
+
+        status.mcs =
+            find(
+                obj,
+                "mcs",
+                "MCS"
+            )
+
+
+
+        status.power =
+            find(
+                obj,
+                "power",
+                "txPower"
+            )
+
+
+
+        status.distance =
+            find(
+                obj,
+                "distance",
+                "dist"
+            )
+
+
+
+        status.txRate =
+            find(
+                obj,
+                "ethTx",
+                "txRate",
+                "tx_rate"
+            )
+
+
+
+        status.rxRate =
+            find(
+                obj,
+                "ethRx",
+                "rxRate",
+                "rx_rate"
+            )
+
+
+
+
+
+
+
+
+
+        // =====================
+        // 噪声
+        // =====================
+
+
+        status.airNoise =
+            parseNoise(
+                find(
                     obj,
-                    "rssi1_a",
-                    "air_rssi1",
-                    "airRssi1"
-                ),
-
-
-            airRssi2 =
-                getValue(
-                    obj,
-                    "rssi2_a",
-                    "air_rssi2",
-                    "airRssi2"
-                ),
-
-
-            airSnr =
-                getValue(
-                    obj,
-                    "snr_a",
-                    "air_snr",
-                    "airSnr"
-                ),
-
-
-            airPass =
-                getValue(
-                    obj,
-                    "pass_a",
-                    "air_pass"
-                ),
-
-
-            airFailed =
-                getValue(
-                    obj,
-                    "failed_a",
-                    "air_failed"
-                ),
-
-
-            airAnt =
-                getValue(
-                    obj,
-                    "ant_a",
-                    "air_ant"
-                ),
-
-
-
-
-
-            // =====================
-            // GROUND
-            // =====================
-
-
-            gndRssi1 =
-                getValue(
-                    obj,
-                    "rssi1_g",
-                    "ground_rssi1",
-                    "gnd_rssi1"
-                ),
-
-
-            gndRssi2 =
-                getValue(
-                    obj,
-                    "rssi2_g",
-                    "ground_rssi2",
-                    "gnd_rssi2"
-                ),
-
-
-            gndSnr =
-                getValue(
-                    obj,
-                    "snr_g",
-                    "ground_snr",
-                    "gnd_snr"
-                ),
-
-
-            gndPass =
-                getValue(
-                    obj,
-                    "pass_g",
-                    "ground_pass"
-                ),
-
-
-            gndFailed =
-                getValue(
-                    obj,
-                    "failed_g",
-                    "ground_failed"
-                ),
-
-
-            gndAnt =
-                getValue(
-                    obj,
-                    "ant_g",
-                    "ground_ant"
-                ),
-
-
-
-
-
-            // =====================
-            // LINK
-            // =====================
-
-
-            freq =
-                getValue(
-                    obj,
-                    "freq_tx",
-                    "freq",
-                    "frequency"
-                ),
-
-
-
-            mcs =
-                getValue(
-                    obj,
-                    "mcs"
-                ),
-
-
-
-            power =
-                getValue(
-                    obj,
-                    "power",
-                    "tx_power"
-                ),
-
-
-
-            distance =
-                getValue(
-                    obj,
-                    "distance",
-                    "dist"
-                ),
-
-
-
-            txRate =
-                getValue(
-                    obj,
-                    "ethTx",
-                    "txRate"
-                ),
-
-
-
-            rxRate =
-                getValue(
-                    obj,
-                    "ethRx",
-                    "rxRate"
-                ),
-
-
-
-
-            // =====================
-            // NOISE
-            // =====================
-
-
-            airNoise =
-                parseNoise(
-                    getValue(
-                        obj,
-                        "noiseFloor_a"
-                    )
-                ),
-
-
-
-            gndNoise =
-                parseNoise(
-                    getValue(
-                        obj,
-                        "noiseFloor_g"
-                    )
+                    "noiseFloor_a",
+                    "airNoise"
                 )
+            )
+
+
+        status.gndNoise =
+            parseNoise(
+                find(
+                    obj,
+                    "noiseFloor_g",
+                    "gndNoise"
+                )
+            )
 
 
 
-        )
+
+
+
+
+        // =====================
+        // 计算链路质量
+        // =====================
+
+
+        status.linkQuality =
+            calculateQuality(
+                status.airSnr
+            )
+
+
+
+
+        status.lossRate =
+            calculateLoss(
+                status.airPass,
+                status.airFailed
+            )
+
+
+
+
+        return status
 
 
     }
@@ -235,54 +303,77 @@ object JsonParser {
 
 
 
-    /**
-     * 多字段匹配
-     */
-    private fun getValue(
+
+
+    private fun find(
         obj:JSONObject,
         vararg keys:String
     ):String{
 
 
-        val names =
-            obj.keys()
+        for(
+            key in keys
+        ){
 
 
-        while(names.hasNext()){
+            if(
+                obj.has(key)
+            ){
 
 
-            val jsonKey =
-                names.next()
+                return obj.optString(
+                    key,
+                    "--"
+                )
+
+
+            }
 
 
 
-            for(key in keys){
+            //忽略大小写匹配
+
+            val iterator =
+                obj.keys()
+
+
+            while(
+                iterator.hasNext()
+            ){
+
+
+                val realKey =
+                    iterator.next()
+
 
 
                 if(
-                    jsonKey.equals(
+                    realKey.equals(
                         key,
-                        ignoreCase = true
+                        true
                     )
                 ){
 
 
-                    return obj
-                        .opt(jsonKey)
-                        ?.toString()
-                        ?: "--"
+                    return obj.optString(
+                        realKey,
+                        "--"
+                    )
 
                 }
 
-
             }
+
 
         }
 
 
         return "--"
 
+
     }
+
+
 
 
 
@@ -298,17 +389,103 @@ object JsonParser {
         if(
             value=="--" ||
             value.isEmpty()
-        ){
-
+        )
             return emptyArray()
-
-        }
 
 
 
         return value
             .split(",")
             .toTypedArray()
+
+    }
+
+
+
+
+
+
+
+
+
+    private fun calculateQuality(
+        snr:String
+    ):Int{
+
+
+        val value =
+            snr.toFloatOrNull()
+                ?: return 0
+
+
+
+        return when{
+
+
+            value>=30 ->
+                100
+
+
+            value>=20 ->
+                80
+
+
+            value>=10 ->
+                60
+
+
+            value>=5 ->
+                40
+
+
+            else ->
+                20
+
+
+        }
+
+
+    }
+
+
+
+
+
+
+
+
+
+    private fun calculateLoss(
+        pass:String,
+        fail:String
+    ):Float{
+
+
+        val p =
+            pass.toFloatOrNull()
+                ?:0f
+
+
+
+        val f =
+            fail.toFloatOrNull()
+                ?:0f
+
+
+
+
+        if(
+            p+f<=0
+        )
+            return 0f
+
+
+
+
+        return f /
+                (p+f)
+                *
+                100f
 
 
     }
