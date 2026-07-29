@@ -1,4 +1,4 @@
-package com.example.netfloatmonitor.net
+package com.example.netfloatmonitor.network
 
 
 import android.util.Log
