@@ -11,94 +11,60 @@ import java.util.Date
 import java.util.Locale
 
 
-
-
 class LogManager(
-
     private val context: Context
-
 ) {
 
 
+    private val logDir = File(
+        context.getExternalFilesDir(null),
+        "NetFloatLogs"
+    ).apply {
 
-    private val logDir:File =
-
-        File(
-
-            context.getExternalFilesDir(null),
-
-            "NetFloatLogs"
-
-        ).apply {
-
-
-            if(!exists()){
-
-                mkdirs()
-
-            }
-
+        if (!exists()) {
+            mkdirs()
         }
 
+    }
 
 
 
-
-    private var currentFile:File? = null
-
+    private var currentFile: File? = null
 
 
-    private var headers =
-
+    private val headers =
         mutableListOf<String>()
 
 
-
-    private var recording=false
-
-
+    private var recording = false
 
 
 
     private val maxFileSize =
-
         100 * 1024 * 1024
 
 
 
 
-
-
-
-    fun getLogPath():String{
-
+    fun getLogPath(): String {
 
         return logDir.absolutePath
 
-
     }
 
 
 
 
 
-
-
-
-
-    fun getLogFiles():List<File>{
-
+    fun getLogFiles(): List<File> {
 
         return logDir.listFiles()
-
             ?.filter {
 
-                it.extension=="csv"
+                it.extension.lowercase() == "csv"
 
             }
-
             ?: emptyList()
-
 
     }
 
@@ -106,58 +72,38 @@ class LogManager(
 
 
 
-
-
-
-
-    fun getCurrentFileName():String{
-
+    fun getCurrentFileName(): String {
 
         return currentFile?.name
             ?: "未开启监控"
 
-
     }
-
-
-
-
 
 
 
 
 
     @Synchronized
-
-    fun startNewSession(){
-
+    fun startNewSession() {
 
 
         stopSession()
 
 
-
         headers.clear()
 
 
-
         currentFile =
-
             createNewFile()
 
 
-
-        recording=true
-
+        recording = true
 
 
 
         Log.d(
-
             "LogManager",
-
-            "开始记录:${currentFile?.name}"
-
+            "开始记录 ${currentFile?.absolutePath}"
         )
 
 
@@ -168,25 +114,17 @@ class LogManager(
 
 
 
-
-
-
     @Synchronized
-
-    fun stopSession(){
-
+    fun stopSession() {
 
 
-        recording=false
-
+        recording = false
 
 
         headers.clear()
 
 
-
-        currentFile=null
-
+        currentFile = null
 
 
     }
@@ -198,33 +136,26 @@ class LogManager(
 
 
 
-
     @Synchronized
-
-    fun save(json:String){
-
+    fun save(json: String) {
 
 
-        if(!recording)
+        if (!recording) {
             return
+        }
 
 
-
-        if(json.isBlank())
+        if (json.isBlank()) {
             return
+        }
 
 
 
-
-
-        try{
+        try {
 
 
             val obj =
-
                 JSONObject(json)
-
-
 
 
 
@@ -232,9 +163,7 @@ class LogManager(
 
 
 
-
-
-            if(headers.isEmpty()){
+            if (headers.isEmpty()) {
 
 
                 buildHeader(obj)
@@ -245,29 +174,23 @@ class LogManager(
 
 
 
-
             val row =
-
                 mutableListOf<String>()
 
 
 
-
-
             row.add(
-
                 getTime()
-
             )
 
 
 
 
+            for (i in 1 until headers.size) {
 
-            headers.drop(1).forEach{
 
-
-                key ->
+                val key =
+                    headers[i]
 
 
                 row.add(
@@ -275,11 +198,8 @@ class LogManager(
                     csvEscape(
 
                         obj.optString(
-
                             key,
-
                             ""
-
                         )
 
                     )
@@ -292,31 +212,22 @@ class LogManager(
 
 
 
-
             appendLine(
-
                 row.joinToString(",")
-
             )
 
 
 
-
-
-        }catch(e:Exception){
+        } catch (e: Exception) {
 
 
             Log.e(
-
                 "LogManager",
-
-                "CSV保存失败:${e.message}"
-
+                "保存失败:${e.message}"
             )
 
 
         }
-
 
 
     }
@@ -330,11 +241,8 @@ class LogManager(
 
 
     private fun buildHeader(
-
-        obj:JSONObject
-
-    ){
-
+        obj: JSONObject
+    ) {
 
 
         headers.clear()
@@ -342,26 +250,21 @@ class LogManager(
 
 
         headers.add(
-
             "Timestamp"
-
         )
 
 
 
-        val keys =
-
+        val iterator =
             obj.keys()
 
 
 
-        while(keys.hasNext()){
+        while (iterator.hasNext()) {
 
 
             headers.add(
-
-                keys.next()
-
+                iterator.next()
             )
 
 
@@ -369,12 +272,8 @@ class LogManager(
 
 
 
-
-
         appendLine(
-
             headers.joinToString(",")
-
         )
 
 
@@ -389,40 +288,39 @@ class LogManager(
 
 
     private fun appendLine(
-
         text:String
-
-    ){
-
+    ) {
 
 
-        currentFile?.let{
+        val file =
+            currentFile ?: return
+
+
+
+        try {
 
 
             FileWriter(
-
-                it,
-
+                file,
                 true
-
             ).use { writer ->
 
 
-                writer.append(
+                writer.append(text)
 
-                    text
-
-                )
-
-                writer.append(
-
-                    "\n"
-
-                )
+                writer.append("\n")
 
 
             }
 
+
+        } catch (e:Exception) {
+
+
+            Log.e(
+                "LogManager",
+                "写文件失败:${e.message}"
+            )
 
         }
 
@@ -437,17 +335,13 @@ class LogManager(
 
 
 
-    private fun createNewFile():File{
+    private fun createNewFile():File {
 
 
         val sdf =
-
             SimpleDateFormat(
-
                 "yyyyMMdd_HHmmss",
-
                 Locale.getDefault()
-
             )
 
 
@@ -471,37 +365,26 @@ class LogManager(
 
 
 
-    private fun checkFileSize(){
+    private fun checkFileSize() {
+
+
+        val file =
+            currentFile ?: return
 
 
 
-        currentFile?.let{
+        if (
+            file.exists()
+            &&
+            file.length() > maxFileSize
+        ) {
 
 
-
-            if(
-
-                it.exists()
-
-                &&
-
-                it.length()>maxFileSize
-
-            ){
+            currentFile =
+                createNewFile()
 
 
-
-                currentFile =
-
-                    createNewFile()
-
-
-
-                headers.clear()
-
-
-
-            }
+            headers.clear()
 
 
         }
@@ -518,39 +401,24 @@ class LogManager(
 
 
     private fun csvEscape(
-
         value:String
+    ):String {
 
-    ):String{
 
-
-        if(
-
+        if (
             value.contains(",")
-
             ||
-
             value.contains("\"")
-
             ||
-
             value.contains("\n")
-
-        ){
+        ) {
 
 
             return "\"" +
-
                     value.replace(
-
                         "\"",
-
                         "\"\""
-
-                    )
-
-                    +
-
+                    ) +
                     "\""
 
 
@@ -571,7 +439,7 @@ class LogManager(
 
 
 
-    private fun getTime():String{
+    private fun getTime():String {
 
 
         return SimpleDateFormat(
@@ -580,13 +448,9 @@ class LogManager(
 
             Locale.getDefault()
 
+        ).format(
+            Date()
         )
-
-            .format(
-
-                Date()
-
-            )
 
 
     }
