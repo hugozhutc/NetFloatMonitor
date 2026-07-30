@@ -6,6 +6,8 @@ import org.json.JSONObject
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
+import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.atomic.AtomicBoolean
 
 class LogManager(private val context: Context) {
 
@@ -15,9 +17,13 @@ class LogManager(private val context: Context) {
         }
     }
 
-    private var isRecording = false
+    private val isRecording = AtomicBoolean(false)
     private var currentFileName: String? = null
     private val csvHeaders = mutableListOf<String>()
+    
+    // 线程安全高频并发数据流缓冲队列
+    private val dataQueue = LinkedBlockingQueue<String>()
+    private var consumerThread: Thread? = null
 
     private fun generateNewFileName(): String {
         val sdf = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault())
@@ -39,35 +45,62 @@ class LogManager(private val context: Context) {
         return currentFileName ?: "未开启监控"
     }
 
-    @Synchronized
     fun startNewSession() {
-        if (isRecording) {
+        if (isRecording.get()) {
             stopSession()
         }
         csvHeaders.clear()
+        dataQueue.clear()
+        
         currentFileName = generateNewFileName()
-        isRecording = true
+        isRecording.set(true)
+        
+        // 启动专属异步消费者线程，完全脱离网卡网络线程
+        consumerThread = Thread({
+            Log.d("LogManager", ">>> 异步日志消费线程启动成功")
+            while (isRecording.get() || dataQueue.isNotEmpty()) {
+                try {
+                    val data = dataQueue.poll(500, java.util.concurrent.TimeUnit.MILLISECONDS)
+                    if (data != null) {
+                        processAndWrite(data)
+                    }
+                } catch (e: InterruptedException) {
+                    break
+                } catch (e: Exception) {
+                    Log.e("LogManager", "异步处理日志异常: ${e.message}")
+                }
+            }
+            Log.d("LogManager", ">>> 异步日志消费线程安全退出")
+        }, "NetLogConsumer-Thread").apply {
+            priority = Thread.MIN_PRIORITY // 低优先级，优先保证网络收包与主线程UI
+            start()
+        }
+        
         Log.d("LogManager", ">>> 新CSV会话开启: $currentFileName")
     }
 
-    @Synchronized
     fun stopSession() {
-        if (!isRecording) return
-        isRecording = false
+        if (!isRecording.get()) return
+        isRecording.set(false)
+        consumerThread?.interrupt()
+        consumerThread = null
         currentFileName = null
         csvHeaders.clear()
-        Log.d("LogManager", ">>> CSV会话已安全关闭")
+        Log.d("LogManager", ">>> CSV会话已关闭，触发消费者线程退出信号")
     }
 
-    @Synchronized
     fun save(jsonData: String) {
-        if (!isRecording || currentFileName == null || jsonData.isBlank()) return
+        if (!isRecording.get() || currentFileName == null || jsonData.isBlank()) return
+        // 仅仅做高响应入队，网络接收线程无感，绝不发生磁盘阻塞
+        dataQueue.offer(jsonData)
+    }
 
+    private fun processAndWrite(jsonData: String) {
+        val name = currentFileName ?: return
         try {
             val jsonObject = JSONObject(jsonData)
-            val file = File(logDir, currentFileName!!)
+            val file = File(logDir, name)
 
-            // 遇到本批次文件的第一条有效数据，初始化表头
             if (csvHeaders.isEmpty()) {
                 csvHeaders.add("Timestamp")
                 val keys = jsonObject.keys()
@@ -78,15 +111,12 @@ class LogManager(private val context: Context) {
                 file.appendText(headerLine)
             }
 
-            // 根据表头对齐填充数据
-            val rowData = mutableListOf<String>()
+            val rowData = ArrayList<String>(csvHeaders.size)
             rowData.add(getTime())
 
             for (i in 1 until csvHeaders.size) {
                 val key = csvHeaders[i]
                 val value = jsonObject.optString(key, "")
-                
-                // 处理可能存在的内部逗号以包裹双引号，防止CSV错位
                 val cleanValue = if (value.contains(",")) "\"$value\"" else value
                 rowData.add(cleanValue)
             }
@@ -95,7 +125,7 @@ class LogManager(private val context: Context) {
             file.appendText(dataLine)
 
         } catch (e: Exception) {
-            Log.e("LogManager", "解析JSON并写入CSV失败: ${e.message}")
+            Log.e("LogManager", "落盘写入失败: ${e.message}")
         }
     }
 }
