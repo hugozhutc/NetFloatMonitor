@@ -45,7 +45,7 @@ class FloatView(
     private val contentFrame = FrameLayout(context)
     private val contentPanel = LinearLayout(context)
     
-    // 核心性能优化：静态缓存已存在的 Text 视图，规避 removeAllViews()
+    // 核心性能优化：静态缓存所有动态 Key 的 TextView，完美支持全量字段且无需 removeAllViews()
     private val airTextViewMap = HashMap<String, TextView>()
     private val gndTextViewMap = HashMap<String, TextView>()
 
@@ -293,44 +293,58 @@ class FloatView(
         return box
     }
 
-    // 接收强类型消费，杜绝高频二次反序列化开销
-    fun updateData(status: LinkStatus) {
-        // 更新图表
-        val aR1 = status.airRssi1.toFloatOrNull()?.let { Math.abs(it) }
-        val aR2 = status.airRssi2.toFloatOrNull()?.let { Math.abs(it) }
-        val aSnr = status.airSnr.toFloatOrNull()?.let { Math.abs(it) }
-        airChartView.addData(aR1, aR2, aSnr)
+    /**
+     * 【终极优化】全动态高保真文本流刷新函数。
+     * 直接动态遍历原始 JSON 字符串的所有 Key，如果 TextView 存在则局部更新文本内容，
+     * 不存在则动态创建并塞进缓存 Map 中。彻底解决字段缺失问题，同时规避 removeAllViews 导致的重绘卡顿。
+     */
+    fun updateJsonDynamic(rawJson: String) {
+        try {
+            val obj = JSONObject(rawJson)
+            
+            // 提取用于折线图绘制的核心信号参数（根据命名特征智能映射）
+            var airR1: Float? = null
+            var airR2: Float? = null
+            var airSnr: Float? = null
+            var gndR1: Float? = null
+            var gndR2: Float? = null
+            var gndSnr: Float? = null
 
-        val gR1 = status.gndRssi1.toFloatOrNull()?.let { Math.abs(it) }
-        val gR2 = status.gndRssi2.toFloatOrNull()?.let { Math.abs(it) }
-        val gSnr = status.gndSnr.toFloatOrNull()?.let { Math.abs(it) }
-        gndChartView.addData(gR1, gR2, gSnr)
+            val keys = obj.keys()
+            while (keys.hasNext()) {
+                val key = keys.next()
+                val valueStr = obj.optString(key, "")
 
-        // 精准刷新左侧文本列，规避销毁
-        updateOrAddText(airLayout, airTextViewMap, "airRssi1", status.airRssi1)
-        updateOrAddText(airLayout, airTextViewMap, "airRssi2", status.airRssi2)
-        updateOrAddText(airLayout, airTextViewMap, "airSnr", status.airSnr)
-        updateOrAddText(airLayout, airTextViewMap, "airPass", status.airPass)
-        updateOrAddText(airLayout, airTextViewMap, "airFailed", status.airFailed)
-        updateOrAddText(airLayout, airTextViewMap, "airAnt", status.airAnt)
-        updateOrAddText(airLayout, airTextViewMap, "airNoise", status.airNoise.joinToString(","))
+                // 根据原始规则自动识别天空端还是地面端数据分配面板
+                if (key.endsWith("_a") || key.startsWith("air_")) {
+                    updateOrAddText(airLayout, airTextViewMap, key, valueStr)
+                    // 提取曲线数据
+                    if (key.contains("rssi1")) airR1 = valueStr.toFloatOrNull()?.let { Math.abs(it) }
+                    if (key.contains("rssi2")) airR2 = valueStr.toFloatOrNull()?.let { Math.abs(it) }
+                    if (key.contains("snr")) airSnr = valueStr.toFloatOrNull()?.let { Math.abs(it) }
+                } else if (key.endsWith("_g") || key.startsWith("gnd_")) {
+                    updateOrAddText(gndLayout, gndTextViewMap, key, valueStr)
+                    // 提取曲线数据
+                    if (key.contains("rssi1")) gndR1 = valueStr.toFloatOrNull()?.let { Math.abs(it) }
+                    if (key.contains("rssi2")) gndR2 = valueStr.toFloatOrNull()?.let { Math.abs(it) }
+                    if (key.contains("snr")) gndSnr = valueStr.toFloatOrNull()?.let { Math.abs(it) }
+                } else {
+                    // 没有明确阵营标签的公共属性，默认丢进左侧 AIR 面板下方动态追加显示
+                    updateOrAddText(airLayout, airTextViewMap, key, valueStr)
+                }
+            }
 
-        // 精准刷新中间文本列
-        updateOrAddText(gndLayout, gndTextViewMap, "gndRssi1", status.gndRssi1)
-        updateOrAddText(gndLayout, gndTextViewMap, "gndRssi2", status.gndRssi2)
-        updateOrAddText(gndLayout, gndTextViewMap, "gndSnr", status.gndSnr)
-        updateOrAddText(gndLayout, gndTextViewMap, "gndPass", status.gndPass)
-        updateOrAddText(gndLayout, gndTextViewMap, "gndFailed", status.gndFailed)
-        updateOrAddText(gndLayout, gndTextViewMap, "gndAnt", status.gndAnt)
-        updateOrAddText(gndLayout, gndTextViewMap, "gndNoise", status.gndNoise.joinToString(","))
+            // 更新波形图
+            if (airR1 != null || airR2 != null || airSnr != null) {
+                airChartView.addData(airR1, airR2, airSnr)
+            }
+            if (gndR1 != null || gndR2 != null || gndSnr != null) {
+                gndChartView.addData(gndR1, gndR2, gndSnr)
+            }
 
-        // 公共属性动态追加在Air栏下部作为公共面板显示
-        updateOrAddText(airLayout, airTextViewMap, "freq", status.freq)
-        updateOrAddText(airLayout, airTextViewMap, "mcs", status.mcs)
-        updateOrAddText(airLayout, airTextViewMap, "power", status.power)
-        updateOrAddText(airLayout, airTextViewMap, "distance", status.distance)
-        updateOrAddText(airLayout, airTextViewMap, "txRate", status.txRate)
-        updateOrAddText(airLayout, airTextViewMap, "rxRate", status.rxRate)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     private fun updateOrAddText(layout: LinearLayout, map: HashMap<String, TextView>, key: String, value: String) {
