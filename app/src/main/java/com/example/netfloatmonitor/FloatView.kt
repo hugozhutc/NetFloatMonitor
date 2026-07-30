@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
 import android.view.MotionEvent
@@ -15,7 +16,7 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import org.json.JSONObject
-import java.util.LinkedList
+import java.util.concurrent.CopyOnWriteArrayList
 
 class FloatView(
     context: Context,
@@ -30,7 +31,6 @@ class FloatView(
     private val airChartView = WaveformView(context, isAir = true)
     private val gndChartView = WaveformView(context, isAir = false)
     
-    // 天空与地面多频点底噪曲线图（内部集成了彩色图例）
     private val airNoiseChartView = NoiseFloorChartView(context, isAir = true)
     private val gndNoiseChartView = NoiseFloorChartView(context, isAir = false)
 
@@ -49,9 +49,6 @@ class FloatView(
     private var lastX = 0f
     private var lastY = 0f
     private var resize = false
-
-    @Volatile
-    private var isUpdatingLayout = false
 
     private val topBar = LinearLayout(context)
     private val contentFrame = FrameLayout(context)
@@ -102,7 +99,7 @@ class FloatView(
         addView(collapsedPanel)
 
         topBar.orientation = LinearLayout.HORIZONTAL
-        topBar.gravity = Gravity.RIGHT or Gravity.CENTER_VERTICAL
+        topBar.gravity = Gravity.END or Gravity.CENTER_VERTICAL
         topBar.setPadding(0, 0, 4, 6)
         
         val btnLp = LinearLayout.LayoutParams(48, 48)
@@ -116,7 +113,6 @@ class FloatView(
         contentPanel.addView(createPanel("AIR TELEMETRY", airLayout))
         contentPanel.addView(createPanel("GND TELEMETRY", gndLayout))
         
-        // 组装 4 个波形曲线图
         chartContainer.orientation = LinearLayout.VERTICAL
         val subChartLp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f).apply { setMargins(0, 0, 0, 6) }
         val lastChartLp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f)
@@ -130,7 +126,7 @@ class FloatView(
         contentPanel.addView(chartContainer, chartContainerLp)
         
         contentFrame.addView(contentPanel, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
-        contentFrame.addView(resizeIndicator, FrameLayout.LayoutParams(18, 18).apply { gravity = Gravity.BOTTOM or Gravity.RIGHT; setMargins(0, 0, 2, 2) })
+        contentFrame.addView(resizeIndicator, FrameLayout.LayoutParams(18, 18).apply { gravity = Gravity.BOTTOM or Gravity.END; setMargins(0, 0, 2, 2) })
         addView(contentFrame, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.MATCH_PARENT))
 
         toggleBtn.setOnClickListener {
@@ -141,6 +137,8 @@ class FloatView(
             private var isDragging = false
 
             override fun onTouch(v: View?, event: MotionEvent): Boolean {
+                if (!isAttachedToWindow) return false
+                
                 when (event.action) {
                     MotionEvent.ACTION_DOWN -> {
                         downX = event.rawX
@@ -153,8 +151,6 @@ class FloatView(
                         isDragging = false
                     }
                     MotionEvent.ACTION_MOVE -> {
-                        if (isUpdatingLayout) return true
-
                         if (isExpanded && resize) {
                             val totalDx = event.rawX - downX
                             val totalDy = event.rawY - downY
@@ -181,17 +177,11 @@ class FloatView(
                         lastX = event.rawX
                         lastY = event.rawY
                         
-                        isUpdatingLayout = true
-                        post {
-                            try {
-                                if (parent != null) {
-                                    windowManager.updateViewLayout(this@FloatView, params)
-                                }
-                            } catch (e: Exception) {
-                                e.printStackTrace()
-                            } finally {
-                                isUpdatingLayout = false
-                            }
+                        // 移除原有的危险 post 异步块，改为同步安全刷新，防止排队引起的闪烁与死锁
+                        try {
+                            windowManager.updateViewLayout(this@FloatView, params)
+                        } catch (e: Exception) {
+                            e.printStackTrace()
                         }
                     }
                     MotionEvent.ACTION_UP -> {
@@ -206,6 +196,7 @@ class FloatView(
     }
 
     private fun performToggle() {
+        if (!isAttachedToWindow) return
         val panelBg = GradientDrawable()
         if (isExpanded) {
             isExpanded = false
@@ -220,7 +211,6 @@ class FloatView(
             
             params.width = collapsedWidth
             params.height = collapsedHeight
-            windowManager.updateViewLayout(this@FloatView, params)
         } else {
             isExpanded = true
             collapsedPanel.visibility = View.GONE
@@ -234,7 +224,11 @@ class FloatView(
             
             params.width = lastExpandedWidth
             params.height = lastExpandedHeight
+        }
+        try {
             windowManager.updateViewLayout(this@FloatView, params)
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
 
@@ -243,18 +237,19 @@ class FloatView(
         val titleView = TextView(context).apply {
             text = title
             textSize = 12f
-            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            typeface = Typeface.DEFAULT_BOLD
             setTextColor(Color.parseColor("#E67E22"))
             setPadding(4, 2, 4, 6)
         }
         box.addView(titleView)
-        val scroll = ScrollView(context).apply { setVerticalScrollBarEnabled(false) }
+        val scroll = ScrollView(context).apply { isVerticalScrollBarEnabled = false }
         scroll.addView(containerLayout)
         box.addView(scroll, LinearLayout.LayoutParams(310, LinearLayout.LayoutParams.MATCH_PARENT))
         return box
     }
 
     fun updateJsonDynamic(rawJson: String) {
+        if (!isAttachedToWindow) return
         post {
             try {
                 val obj = JSONObject(rawJson)
@@ -266,7 +261,6 @@ class FloatView(
                 var gndR2: Float? = null
                 var gndSnr: Float? = null
 
-                // 核心预设全局曲线颜色池，确保左侧文本和右侧 Chart 完美互通
                 val noiseColors = arrayOf("#E74C3C", "#F1C40F", "#3498DB", "#9B59B6", "#1ABC9C", "#E67E22")
 
                 val keys = obj.keys()
@@ -274,7 +268,6 @@ class FloatView(
                     val key = keys.next()
                     val valueStr = obj.optString(key, "")
 
-                    // 拦截底噪键，对其进行动态多路拆解与色彩精准绑定
                     if (key == "noiseFloor_a" || key == "noiseFloor_g") {
                         val isAir = key == "noiseFloor_a"
                         val targetLayout = if (isAir) airLayout else gndLayout
@@ -305,10 +298,9 @@ class FloatView(
                                 targetMap[subKey] = tv
                             }
                         }
-                        continue // 跳过通用添加处理，防止整串数据重复出现
+                        continue 
                     }
 
-                    // 常规遥测数据流分流解析
                     if (key.endsWith("_a") || key.startsWith("air_")) {
                         updateOrAddTextWithColor(airLayout, airTextViewMap, key, valueStr)
                         if (key.contains("rssi1")) airR1 = valueStr.toFloatOrNull()
@@ -332,7 +324,6 @@ class FloatView(
 
             } catch (e: Exception) {
                 android.util.Log.e("FloatViewError", "数据刷新渲染异常: ${e.message}")
-                e.printStackTrace()
             }
         }
     }
@@ -461,9 +452,10 @@ class FloatView(
         private val maxDataPoints = 100
         private val yAxisWidth = 85f 
 
-        private val rssi1List = LinkedList<Float>()
-        private val rssi2List = LinkedList<Float>()
-        private val snrList = LinkedList<Float>()
+        // 引入并发安全的线程安全队列，杜绝高频网口/网口回调非主线程写数据导致的并发异常
+        private val rssi1List = CopyOnWriteArrayList<Float>()
+        private val rssi2List = CopyOnWriteArrayList<Float>()
+        private val snrList = CopyOnWriteArrayList<Float>()
 
         private val axisTextPaint = Paint().apply { color = Color.parseColor("#95A5A6"); textSize = 13f; isAntiAlias = true }
         private val prefixTextPaint = Paint().apply { 
@@ -494,12 +486,13 @@ class FloatView(
         private val snrMax = 50f
 
         fun addData(r1: Float?, r2: Float?, snr: Float?) {
-            rssi1List.addLast(r1 ?: rssi1List.lastOrNull() ?: 0f)
-            rssi2List.addLast(r2 ?: rssi2List.lastOrNull() ?: 0f)
-            snrList.addLast(snr ?: snrList.lastOrNull() ?: 0f)
-            if (rssi1List.size > maxDataPoints) rssi1List.removeFirst()
-            if (rssi2List.size > maxDataPoints) rssi2List.removeFirst()
-            if (snrList.size > maxDataPoints) snrList.removeFirst()
+            rssi1List.add(r1 ?: rssi1List.lastOrNull() ?: 0f)
+            rssi2List.add(r2 ?: rssi2List.lastOrNull() ?: 0f)
+            snrList.add(snr ?: snrList.lastOrNull() ?: 0f)
+            
+            if (rssi1List.size > maxDataPoints) rssi1List.removeAt(0)
+            if (rssi2List.size > maxDataPoints) rssi2List.removeAt(0)
+            if (snrList.size > maxDataPoints) snrList.removeAt(0)
             postInvalidate()
         }
 
@@ -541,10 +534,11 @@ class FloatView(
         }
 
         private fun drawNormalCurve(canvas: Canvas, list: List<Float>, minVal: Float, maxVal: Float, leftOffset: Float, cWidth: Float, h: Float, paint: Paint) {
-            if (list.size < 2) return
+            val size = list.size
+            if (size < 2) return
             val stepX = cWidth / (maxDataPoints - 1)
             val range = maxVal - minVal
-            for (i in 0 until list.size - 1) {
+            for (i in 0 until size - 1) {
                 val startX = leftOffset + (i * stepX)
                 val endX = leftOffset + ((i + 1) * stepX)
                 val valStart = list[i].coerceIn(minVal, maxVal)
@@ -558,21 +552,21 @@ class FloatView(
         private val maxDataPoints = 100
         private val yAxisWidth = 85f
         
-        private val historyList = LinkedList<FloatArray>()
+        // 使用 CopyOnWriteArrayList 防止非 UI 线程添加引发并发修改死锁
+        private val historyList = CopyOnWriteArrayList<FloatArray>()
         
         private val axisTextPaint = Paint().apply { color = Color.parseColor("#95A5A6"); textSize = 13f; isAntiAlias = true }
         private val headerTextPaint = Paint().apply { color = Color.parseColor("#E67E22"); textSize = 14f; isFakeBoldText = true; isAntiAlias = true }
         private val gridPaint = Paint().apply { color = Color.argb(30, 255, 255, 255); strokeWidth = 1f }
         private val bgPaint = Paint().apply { color = Color.argb(20, 230, 126, 34) } 
 
-        // 核心色彩池定义，完全与全局解析逻辑对齐
         private val curveColors = intArrayOf(
-            Color.parseColor("#E74C3C"), // CH1 红
-            Color.parseColor("#F1C40F"), // CH2 黄
-            Color.parseColor("#3498DB"), // CH3 蓝
-            Color.parseColor("#9B59B6"), // CH4 紫
-            Color.parseColor("#1ABC9C"), // CH5 青
-            Color.parseColor("#E67E22")  // CH6 橙
+            Color.parseColor("#E74C3C"), 
+            Color.parseColor("#F1C40F"), 
+            Color.parseColor("#3498DB"), 
+            Color.parseColor("#9B59B6"), 
+            Color.parseColor("#1ABC9C"), 
+            Color.parseColor("#E67E22")  
         )
         private val curvePaints = Array(curveColors.size) { i ->
             Paint().apply { color = curveColors[i]; strokeWidth = 2f; style = Paint.Style.STROKE; isAntiAlias = true }
@@ -588,8 +582,8 @@ class FloatView(
                 for (i in parts.indices) {
                     floatArray[i] = parts[i].trim().toFloatOrNull() ?: 0f
                 }
-                historyList.addLast(floatArray)
-                if (historyList.size > maxDataPoints) historyList.removeFirst()
+                historyList.add(floatArray)
+                if (historyList.size > maxDataPoints) historyList.removeAt(0)
                 postInvalidate()
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -607,7 +601,6 @@ class FloatView(
             val chartWidth = chartRight - chartLeft
             canvas.drawRect(chartLeft, 0f, chartRight, h, bgPaint)
 
-            // 1. 绘制底噪网格与 Y 轴刻度
             val yPositions = floatArrayOf(h * 0.2f, h * 0.5f, h * 0.8f)
             val labels = arrayOf("140", "90", "40")
             for (i in yPositions.indices) {
@@ -616,21 +609,20 @@ class FloatView(
                 canvas.drawText(labels[i], 20f, y + 5f, axisTextPaint)
             }
 
-            // 2. 绘制头部标题
             val title = if (isAir) "[AIR NOISE]" else "[GND NOISE]"
             canvas.drawText(title, chartLeft + 15f, 22f, headerTextPaint)
 
-            if (historyList.isEmpty()) return
+            val historySize = historyList.size
+            if (historySize == 0) return
             
-            val currentChannels = historyList.last.size
+            val currentChannels = historyList[historySize - 1].size
             val stepX = chartWidth / (maxDataPoints - 1)
             val range = noiseMax - noiseMin
 
-            // 3. 绘制多路底噪核心曲线轨迹
             for (ch in 0 until currentChannels) {
                 val paint = curvePaints[ch % curvePaints.size]
                 
-                for (i in 0 until historyList.size - 1) {
+                for (i in 0 until historySize - 1) {
                     val startArray = historyList[i]
                     val endArray = historyList[i + 1]
                     
@@ -650,28 +642,23 @@ class FloatView(
                 }
             }
 
-            // 4. 新增：图表右上角彩色动态图例指示器（Legend）
             val legendPaint = Paint().apply { isAntiAlias = true; style = Paint.Style.FILL }
             val legendTextPaint = Paint().apply { color = Color.parseColor("#BDC3C7"); textSize = 11f; isAntiAlias = true }
             
             var legendRightX = w - 15f
-            val legendY = 22f // 与主标题处于同一水平线
+            val legendY = 22f
 
             for (ch in (currentChannels - 1) downTo 0) {
                 val chColor = curveColors[ch % curveColors.size]
-                val labelStr = "P${ch + 1}" // 对应频点(Point)通道号
+                val labelStr = "P${ch + 1}"
                 
                 val textWidth = legendTextPaint.measureText(labelStr)
                 val itemWidth = textWidth + 14f
                 
-                // 绘制图例彩色指示小方块
                 legendPaint.color = chColor
                 canvas.drawRect(legendRightX - itemWidth, legendY - 8f, legendRightX - itemWidth + 8f, legendY, legendPaint)
-                
-                // 绘制指示通道文字
                 canvas.drawText(labelStr, legendRightX - itemWidth + 12f, legendY, legendTextPaint)
                 
-                // 指针动态向左移位，防止图例重叠
                 legendRightX -= (itemWidth + 14f)
             }
         }
