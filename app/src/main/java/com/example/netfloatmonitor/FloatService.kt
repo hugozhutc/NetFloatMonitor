@@ -61,18 +61,15 @@ class FloatService : Service() {
                 totalPackets++
                 packetsInLastSecond++
 
-                // 1. 投递到异步落盘缓冲队列，耗时接近 0ms，彻底避开网卡线程卡顿
+                // 1. 异步落盘，完全不阻塞
                 logger.save(data)
                 
-                // 2. 在子线程中直接完成高性能解析，减轻主线程压力
-                val parsedStatus = JsonParser.parse(data)
-                
-                // 3. 将解析后的强类型实体单向派发给 UI 面板静态复用刷新
+                // 2. 抛给主线程，用新编写的动态复用映射进行高保真全动态数据刷新
                 mainHandler.post {
-                    floatView?.updateData(parsedStatus)
+                    floatView?.updateJsonDynamic(data)
                 }
             } catch (e: Exception) {
-                Log.e("FloatService", "网络数据流高速分发路由异常", e)
+                Log.e("FloatService", "网络数据流分发路由异常", e)
             }
         }
         receiver?.start()
