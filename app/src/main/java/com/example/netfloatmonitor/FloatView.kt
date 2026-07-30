@@ -40,8 +40,12 @@ class FloatView(
 
     private var startWidth = 0
     private var startHeight = 0
+    
+    // 核心修正：downX/Y 用于记录 ACTION_DOWN 初始点；lastX/Y 用于记录上一帧位置以计算移动增量
     private var downX = 0f
     private var downY = 0f
+    private var lastX = 0f
+    private var lastY = 0f
     private var resize = false
 
     private val topBar = LinearLayout(context)
@@ -126,7 +130,7 @@ class FloatView(
             if (isExpanded) performToggle()
         }
 
-        // 纯粹的自由拖动逻辑：绝不锁定边界，不干扰UI刷新线程
+        // 纯粹的自由拖动与平滑缩放逻辑：拒绝干扰UI刷新线程，全屏位置不设限，无任何吸附
         setOnTouchListener(object : OnTouchListener {
             private var isDragging = false
 
@@ -135,45 +139,53 @@ class FloatView(
                     MotionEvent.ACTION_DOWN -> {
                         downX = event.rawX
                         downY = event.rawY
+                        lastX = event.rawX
+                        lastY = event.rawY
                         startWidth = width
                         startHeight = height
+                        // 右下角 120 像素区域触发拉伸
                         resize = isExpanded && (event.x > (width - 120)) && (event.y > (height - 120))
                         isDragging = false
                     }
                     MotionEvent.ACTION_MOVE -> {
-                        val dx = event.rawX - downX
-                        val dy = event.rawY - downY
-                        
-                        if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
-                            isDragging = true
-                        }
-
                         if (isExpanded && resize) {
-                            // 展开态拉伸逻辑
-                            val newWidth = (startWidth + dx).toInt().coerceAtLeast(600)
-                            val newHeight = (startHeight + dy).toInt().coerceAtLeast(260)
+                            // 【模式 A：缩放窗口】基于最初的按下点计算总位移，防止反复重置导致缩水
+                            val totalDx = event.rawX - downX
+                            val totalDy = event.rawY - downY
+                            
+                            val newWidth = (startWidth + totalDx).toInt().coerceAtLeast(600)
+                            val newHeight = (startHeight + totalDy).toInt().coerceAtLeast(260)
+                            
                             params.width = newWidth
                             params.height = newHeight
                             lastExpandedWidth = newWidth
                             lastExpandedHeight = newHeight
                         } else {
-                            // 自由移动逻辑：完全不加任何吸附与限制限制
+                            // 【模式 B：自由拖动】基于上一帧的位置计算步进增量，并实时平移
+                            val dx = event.rawX - lastX
+                            val dy = event.rawY - lastY
+                            
+                            if (Math.abs(event.rawX - downX) > 5 || Math.abs(event.rawY - downY) > 5) {
+                                isDragging = true
+                            }
+                            
                             params.x += dx.toInt()
                             params.y += dy.toInt()
                         }
                         
-                        // 核心修正：无论哪种模式，更新当前锚点坐标，防止计算级联放大导致卡死
-                        downX = event.rawX
-                        downY = event.rawY
+                        // 始终更新 lastX/Y 用于计算下一帧的移动增量
+                        lastX = event.rawX
+                        lastY = event.rawY
                         
+                        // 安全刷新窗口布局
                         windowManager.updateViewLayout(this@FloatView, params)
                     }
                     MotionEvent.ACTION_UP -> {
                         if (!isExpanded && !isDragging) {
-                            // 收纳态下且没发生拖动时被点击，才触发展开
+                            // 收纳态下被纯粹点击时，触发展开
                             performToggle()
                         }
-                        // 移除所有的吸附和自动贴边动画，停在松手位置
+                        // 完全移除了所有的吸附操作，松手在哪就停在哪
                     }
                 }
                 return true
@@ -196,7 +208,6 @@ class FloatView(
             
             params.width = collapsedWidth
             params.height = collapsedHeight
-            // 切换状态时不改变原本的 x, y，防止位置乱跳
             windowManager.updateViewLayout(this@FloatView, params)
         } else {
             isExpanded = true
@@ -318,9 +329,6 @@ class FloatView(
         }
     }
 
-    /**
-     * 小巧版信号格图标 + 底部特意放大加粗的详细参数文本
-     */
     private class SignalIconView(context: Context, private val label: String) : View(context) {
         private var r1 = 0f
         private var r2 = 0f
@@ -396,9 +404,6 @@ class FloatView(
         }
     }
 
-    /**
-     * 历史波形图（展开态）
-     */
     private class WaveformView(context: Context, private val isAir: Boolean) : View(context) {
         private val maxDataPoints = 100
         private val yAxisWidth = 85f 
