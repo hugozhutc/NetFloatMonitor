@@ -24,11 +24,12 @@ class FloatService : Service() {
     private var packetsInLastSecond = 0
     private var currentHz = 0
     private var statusTimer: Timer? = null
+    
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     override fun onCreate() {
         super.onCreate()
         logger = LogManager(this)
-        
         Log.d("FloatService", "Service onCreate 触发")
         createNotificationChannel()
         startForeground(1001, createNotification())
@@ -45,8 +46,7 @@ class FloatService : Service() {
         startUdpReceive(port)
         startStatusTimer()
 
-        // 【新增优化】延迟 200ms 发送第一帧广播，确保前台 Activity 的 BroadcastReceiver 已经完全注册完成
-        Handler(Looper.getMainLooper()).postDelayed({
+        mainHandler.postDelayed({
             sendStatusBroadcast()
         }, 200)
         
@@ -61,16 +61,20 @@ class FloatService : Service() {
                 totalPackets++
                 packetsInLastSecond++
 
+                // 1. 投递到异步落盘缓冲队列，耗时接近 0ms，彻底避开网卡线程卡顿
                 logger.save(data)
                 
-                floatView?.post {
-                    floatView?.updateJson(data)
+                // 2. 在子线程中直接完成高性能解析，减轻主线程压力
+                val parsedStatus = JsonParser.parse(data)
+                
+                // 3. 将解析后的强类型实体单向派发给 UI 面板静态复用刷新
+                mainHandler.post {
+                    floatView?.updateData(parsedStatus)
                 }
             } catch (e: Exception) {
-                Log.e("FloatService", "数据流转处理异常", e)
+                Log.e("FloatService", "网络数据流高速分发路由异常", e)
             }
         }
-        
         receiver?.start()
     }
 
@@ -86,7 +90,6 @@ class FloatService : Service() {
         }, 1000, 1000)
     }
 
-    // 抽取为独立方法，方便复用
     private fun sendStatusBroadcast() {
         val intent = Intent("com.example.netfloatmonitor.STATUS_UPDATE").apply {
             putExtra("TOTAL_PACKETS", totalPackets)
@@ -140,6 +143,7 @@ class FloatService : Service() {
             }
             floatView = null
         }
+        mainHandler.removeCallbacksAndMessages(null)
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -162,5 +166,5 @@ class FloatService : Service() {
             .setContentText("UDP监听运行中")
             .setSmallIcon(android.R.drawable.ic_menu_info_details)
             .build()
-    }
+        }
 }
