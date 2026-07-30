@@ -305,6 +305,10 @@ class FloatView(
                                 targetMap[subKey] = tv
                             }
                         }
+
+                        if (key == "noiseFloor_a") airNoiseChartView.postInvalidate()
+                        if (key == "noiseFloor_g") gndNoiseChartView.postInvalidate()
+                        
                         continue // 跳过通用添加处理，防止整串数据重复出现
                     }
 
