@@ -29,26 +29,27 @@ class FloatView(
     private val chartContainer = LinearLayout(context)
     private val airChartView = WaveformView(context, isAir = true)
     private val gndChartView = WaveformView(context, isAir = false)
+    
+    // 新增：天空与地面多频点底噪曲线图
+    private val airNoiseChartView = NoiseFloorChartView(context, isAir = true)
+    private val gndNoiseChartView = NoiseFloorChartView(context, isAir = false)
 
     private var isExpanded = true
-    private var lastExpandedWidth = 1350
-    private var lastExpandedHeight = 520
+    private var lastExpandedWidth = 1380
+    private var lastExpandedHeight = 650 // 适当增加高度以完美容纳4个曲线图
     
-    // 收纳看板物理尺寸
     private val collapsedWidth = 220
     private val collapsedHeight = 130
 
     private var startWidth = 0
     private var startHeight = 0
     
-    // 坐标核心修正：downX/Y 用于记录 ACTION_DOWN 初始基准点；lastX/Y 用于计算移动增量
     private var downX = 0f
     private var downY = 0f
     private var lastX = 0f
     private var lastY = 0f
     private var resize = false
 
-    // 高频跨进程 Window 更新锁：防止高频手势将 UI 线程与通信通道顶死导致数据无法刷新
     @Volatile
     private var isUpdatingLayout = false
 
@@ -56,7 +57,6 @@ class FloatView(
     private val contentFrame = FrameLayout(context)
     private val contentPanel = LinearLayout(context)
     
-    // 收纳态：左右并排的双路信号栏看板
     private val collapsedPanel = LinearLayout(context)
     private val airSignalIconView = SignalIconView(context, "AIR")
     private val gndSignalIconView = SignalIconView(context, "GND")
@@ -92,7 +92,6 @@ class FloatView(
         bg.cornerRadius = 14f
         this.background = bg
 
-        // 组装收纳态小看板布局
         collapsedPanel.orientation = LinearLayout.HORIZONTAL
         collapsedPanel.gravity = Gravity.CENTER
         collapsedPanel.visibility = View.GONE
@@ -117,13 +116,17 @@ class FloatView(
         contentPanel.addView(createPanel("AIR TELEMETRY", airLayout))
         contentPanel.addView(createPanel("GND TELEMETRY", gndLayout))
         
+        // 组装 4 个波形曲线图
         chartContainer.orientation = LinearLayout.VERTICAL
-        val airChartLp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f).apply { setMargins(0, 0, 0, 10) }
-        val gndChartLp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f)
-        chartContainer.addView(airChartView, airChartLp)
-        chartContainer.addView(gndChartView, gndChartLp)
+        val subChartLp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f).apply { setMargins(0, 0, 0, 6) }
+        val lastChartLp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f)
         
-        val chartContainerLp = LinearLayout.LayoutParams(720, LinearLayout.LayoutParams.MATCH_PARENT).apply { setMargins(16, 0, 4, 0) }
+        chartContainer.addView(airChartView, subChartLp)
+        chartContainer.addView(gndChartView, subChartLp)
+        chartContainer.addView(airNoiseChartView, subChartLp)
+        chartContainer.addView(gndNoiseChartView, lastChartLp)
+        
+        val chartContainerLp = LinearLayout.LayoutParams(750, LinearLayout.LayoutParams.MATCH_PARENT).apply { setMargins(16, 0, 4, 0) }
         contentPanel.addView(chartContainer, chartContainerLp)
         
         contentFrame.addView(contentPanel, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
@@ -134,7 +137,6 @@ class FloatView(
             if (isExpanded) performToggle()
         }
 
-        // 纯粹的自由拖动与平滑缩放逻辑
         setOnTouchListener(object : OnTouchListener {
             private var isDragging = false
 
@@ -147,28 +149,24 @@ class FloatView(
                         lastY = event.rawY
                         startWidth = width
                         startHeight = height
-                        // 右下角宽容区域触发拉伸
                         resize = isExpanded && (event.x > (width - 120)) && (event.y > (height - 120))
                         isDragging = false
                     }
                     MotionEvent.ACTION_MOVE -> {
-                        // 如果上一帧的 Window 刷新还在阻塞排队，直接跳过此帧，给数据刷新腾出通道
                         if (isUpdatingLayout) return true
 
                         if (isExpanded && resize) {
-                            // 【模式 A：缩放窗口】永远基于最初按下点计算总位移，彻底杜绝瞬间变小或画面抖动
                             val totalDx = event.rawX - downX
                             val totalDy = event.rawY - downY
                             
-                            val newWidth = (startWidth + totalDx).toInt().coerceAtLeast(600)
-                            val newHeight = (startHeight + totalDy).toInt().coerceAtLeast(260)
+                            val newWidth = (startWidth + totalDx).toInt().coerceAtLeast(650)
+                            val newHeight = (startHeight + totalDy).toInt().coerceAtLeast(350)
                             
                             params.width = newWidth
                             params.height = newHeight
                             lastExpandedWidth = newWidth
                             lastExpandedHeight = newHeight
                         } else {
-                            // 【模式 B：自由拖动】基于上一帧的位置计算步进增量
                             val dx = event.rawX - lastX
                             val dy = event.rawY - lastY
                             
@@ -183,7 +181,6 @@ class FloatView(
                         lastX = event.rawX
                         lastY = event.rawY
                         
-                        // 采用队列锁机制，将更新异步投递给主线程，防止阻塞网络数据回调
                         isUpdatingLayout = true
                         post {
                             try {
@@ -257,7 +254,6 @@ class FloatView(
         return box
     }
 
-    // 终极保证：不论外部在后台哪个子线程或数据轮询线程调用，内部强行切回 UI 线程渲染数据
     fun updateJsonDynamic(rawJson: String) {
         post {
             try {
@@ -275,16 +271,21 @@ class FloatView(
                     val key = keys.next()
                     val valueStr = obj.optString(key, "")
 
-                    if (key.endsWith("_a") || key.startsWith("air_")) {
+                    // 分流解析并添加文本
+                    if (key.endsWith("_a") || key.startsWith("air_") || key == "noiseFloor_a") {
                         updateOrAddTextWithColor(airLayout, airTextViewMap, key, valueStr)
                         if (key.contains("rssi1")) airR1 = valueStr.toFloatOrNull()
                         if (key.contains("rssi2")) airR2 = valueStr.toFloatOrNull()
                         if (key.contains("snr")) airSnr = valueStr.toFloatOrNull()
-                    } else if (key.endsWith("_g") || key.startsWith("gnd_")) {
+                        // 馈送天空底噪数据给波形图
+                        if (key == "noiseFloor_a") airNoiseChartView.addNoiseData(valueStr)
+                    } else if (key.endsWith("_g") || key.startsWith("gnd_") || key == "noiseFloor_g") {
                         updateOrAddTextWithColor(gndLayout, gndTextViewMap, key, valueStr)
                         if (key.contains("rssi1")) gndR1 = valueStr.toFloatOrNull()
                         if (key.contains("rssi2")) gndR2 = valueStr.toFloatOrNull()
                         if (key.contains("snr")) gndSnr = valueStr.toFloatOrNull()
+                        // 馈送地面底噪数据给波形图
+                        if (key == "noiseFloor_g") gndNoiseChartView.addNoiseData(valueStr)
                     } else {
                         updateOrAddTextWithColor(airLayout, airTextViewMap, key, valueStr)
                     }
@@ -324,6 +325,7 @@ class FloatView(
                     else -> Color.parseColor("#2ECC71")
                 }
             }
+            key.contains("noiseFloor", ignoreCase = true) -> Color.parseColor("#E67E22") // 底噪文字高亮显眼橙
             key.contains("failed", ignoreCase = true) -> {
                 val failedCount = value.toIntOrNull() ?: 0
                 if (failedCount > 0) Color.parseColor("#E74C3C") else Color.WHITE
@@ -431,10 +433,10 @@ class FloatView(
         private val rssi2List = LinkedList<Float>()
         private val snrList = LinkedList<Float>()
 
-        private val axisTextPaint = Paint().apply { color = Color.parseColor("#95A5A6"); textSize = 15f; isAntiAlias = true }
+        private val axisTextPaint = Paint().apply { color = Color.parseColor("#95A5A6"); textSize = 13f; isAntiAlias = true }
         private val prefixTextPaint = Paint().apply { 
             color = Color.parseColor("#ECF0F1")
-            textSize = 17f
+            textSize = 14f
             isFakeBoldText = true
             isAntiAlias = true 
         }
@@ -443,16 +445,16 @@ class FloatView(
         private val colorRssi2 = Color.parseColor("#3498DB")
         private val colorSnr   = Color.parseColor("#2ECC71")
 
-        private val paintRssi1 = Paint().apply { color = colorRssi1; strokeWidth = 4f; style = Paint.Style.STROKE; isAntiAlias = true }
-        private val paintRssi2 = Paint().apply { color = colorRssi2; strokeWidth = 2.5f; style = Paint.Style.STROKE; isAntiAlias = true }
-        private val paintSnr   = Paint().apply { color = colorSnr; strokeWidth = 3f; style = Paint.Style.STROKE; isAntiAlias = true }
+        private val paintRssi1 = Paint().apply { color = colorRssi1; strokeWidth = 3f; style = Paint.Style.STROKE; isAntiAlias = true }
+        private val paintRssi2 = Paint().apply { color = colorRssi2; strokeWidth = 2f; style = Paint.Style.STROKE; isAntiAlias = true }
+        private val paintSnr   = Paint().apply { color = colorSnr; strokeWidth = 2.5f; style = Paint.Style.STROKE; isAntiAlias = true }
 
-        private val paintTextRssi1 = Paint().apply { color = colorRssi1; textSize = 17f; isAntiAlias = true }
-        private val paintTextRssi2 = Paint().apply { color = colorRssi2; textSize = 17f; isAntiAlias = true }
-        private val paintTextSnr   = Paint().apply { color = colorSnr; textSize = 17f; isAntiAlias = true }
+        private val paintTextRssi1 = Paint().apply { color = colorRssi1; textSize = 14f; isAntiAlias = true }
+        private val paintTextRssi2 = Paint().apply { color = colorRssi2; textSize = 14f; isAntiAlias = true }
+        private val paintTextSnr   = Paint().apply { color = colorSnr; textSize = 14f; isAntiAlias = true }
 
-        private val gridPaint = Paint().apply { color = Color.argb(35, 255, 255, 255); strokeWidth = 1f }
-        private val bgPaint = Paint().apply { color = Color.argb(20, 255, 255, 255) }
+        private val gridPaint = Paint().apply { color = Color.argb(30, 255, 255, 255); strokeWidth = 1f }
+        private val bgPaint = Paint().apply { color = Color.argb(15, 255, 255, 255) }
 
         private val rssiMin = 0f
         private val rssiMax = 120f
@@ -480,7 +482,7 @@ class FloatView(
             val chartWidth = chartRight - chartLeft
             canvas.drawRect(chartLeft, 0f, chartRight, h, bgPaint)
 
-            val yPositions = floatArrayOf(h * 0.15f, h * 0.5f, h * 0.85f)
+            val yPositions = floatArrayOf(h * 0.2f, h * 0.5f, h * 0.8f)
             val rssiLabels = arrayOf("120", "60", "0")
             val snrLabels = arrayOf("50", "25", "0")
 
@@ -491,15 +493,15 @@ class FloatView(
             }
 
             val prefix = if (isAir) "[AIR] " else "[GND] "
-            canvas.drawText(prefix, chartLeft + 15f, 26f, prefixTextPaint)
+            canvas.drawText(prefix, chartLeft + 15f, 22f, prefixTextPaint)
             val startX = chartLeft + 15f + prefixTextPaint.measureText(prefix)
 
             val r1Text = "R1: ${rssi1List.lastOrNull()?.toInt() ?: 0}  "
-            canvas.drawText(r1Text, startX, 26f, paintTextRssi1)
+            canvas.drawText(r1Text, startX, 22f, paintTextRssi1)
             val r2Text = "R2: ${rssi2List.lastOrNull()?.toInt() ?: 0}  "
-            canvas.drawText(r2Text, startX + paintTextRssi1.measureText(r1Text), 26f, paintTextRssi2)
+            canvas.drawText(r2Text, startX + paintTextRssi1.measureText(r1Text), 22f, paintTextRssi2)
             val snrText = "SNR: ${snrList.lastOrNull()?.toInt() ?: 0}"
-            canvas.drawText(snrText, startX + paintTextRssi1.measureText(r1Text) + paintTextRssi2.measureText(r2Text), 26f, paintTextSnr)
+            canvas.drawText(snrText, startX + paintTextRssi1.measureText(r1Text) + paintTextRssi2.measureText(r2Text), 22f, paintTextSnr)
 
             drawNormalCurve(canvas, rssi1List, rssiMin, rssiMax, chartLeft, chartWidth, h, paintRssi1)
             drawNormalCurve(canvas, rssi2List, rssiMin, rssiMax, chartLeft, chartWidth, h, paintRssi2)
@@ -516,6 +518,108 @@ class FloatView(
                 val valStart = list[i].coerceIn(minVal, maxVal)
                 val valEnd = list[i + 1].coerceIn(minVal, maxVal)
                 canvas.drawLine(startX, h * (1f - (valStart - minVal) / range), endX, h * (1f - (valEnd - minVal) / range), paint)
+            }
+        }
+    }
+
+    // 新增核心组件：专门负责解析与动态绘制多路底噪（Noise Floor）的波形图组件
+    private class NoiseFloorChartView(context: Context, private val isAir: Boolean) : View(context) {
+        private val maxDataPoints = 100
+        private val yAxisWidth = 85f
+        
+        // 历史数据队列：内部存储的是多个频点的数组。支持动态增减频点
+        private val historyList = LinkedList<FloatArray>()
+        
+        private val axisTextPaint = Paint().apply { color = Color.parseColor("#95A5A6"); textSize = 13f; isAntiAlias = true }
+        private val headerTextPaint = Paint().apply { color = Color.parseColor("#E67E22"); textSize = 14f; isFakeBoldText = true; isAntiAlias = true }
+        private val gridPaint = Paint().apply { color = Color.argb(30, 255, 255, 255); strokeWidth = 1f }
+        private val bgPaint = Paint().apply { color = Color.argb(20, 230, 126, 34) } // 橙色透明背景以示区别
+
+        // 多路频点底噪画笔颜色池（六路色彩）
+        private val curveColors = intArrayOf(
+            Color.parseColor("#E74C3C"), // 红
+            Color.parseColor("#F1C40F"), // 黄
+            Color.parseColor("#3498DB"), // 蓝
+            Color.parseColor("#9B59B6"), // 紫
+            Color.parseColor("#1ABC9C"), // 青
+            Color.parseColor("#E67E22")  // 橙
+        )
+        private val curvePaints = Array(curveColors.size) { i ->
+            Paint().apply { color = curveColors[i]; strokeWidth = 2f; style = Paint.Style.STROKE; isAntiAlias = true }
+        }
+
+        private val noiseMin = 40f
+        private val noiseMax = 140f // 适配底噪的范围，例如 70~100 处于图表中央
+
+        fun addNoiseData(rawCsv: String) {
+            try {
+                val parts = rawCsv.split(",")
+                val floatArray = FloatArray(parts.size)
+                for (i in parts.indices) {
+                    floatArray[i] = parts[i].trim().toFloatOrNull() ?: 0f
+                }
+                historyList.addLast(floatArray)
+                if (historyList.size > maxDataPoints) historyList.removeFirst()
+                postInvalidate()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+
+        override fun onDraw(canvas: Canvas) {
+            super.onDraw(canvas)
+            val w = width.toFloat()
+            val h = height.toFloat()
+            if (w <= 0 || h <= 0) return
+
+            val chartLeft = yAxisWidth
+            val chartRight = w
+            val chartWidth = chartRight - chartLeft
+            canvas.drawRect(chartLeft, 0f, chartRight, h, bgPaint)
+
+            // 绘制底噪网格与 Y 轴刻度
+            val yPositions = floatArrayOf(h * 0.2f, h * 0.5f, h * 0.8f)
+            val labels = arrayOf("140", "90", "40")
+            for (i in yPositions.indices) {
+                val y = yPositions[i]
+                canvas.drawLine(chartLeft, y, chartRight, y, gridPaint)
+                canvas.drawText(labels[i], 20f, y + 5f, axisTextPaint)
+            }
+
+            // 绘制头部标签
+            val title = if (isAir) "[AIR NOISE]" else "[GND NOISE]"
+            canvas.drawText(title, chartLeft + 15f, 22f, headerTextPaint)
+
+            if (historyList.isEmpty()) return
+            
+            // 获取当前最新一帧数据所包含的实际频点通道数
+            val currentChannels = historyList.last.size
+            val stepX = chartWidth / (maxDataPoints - 1)
+            val range = noiseMax - noiseMin
+
+            // 循环为每一个底噪通道独立绘制历史走势曲线
+            for (ch in 0 until currentChannels) {
+                val paint = curvePaints[ch % curvePaints.size]
+                
+                for (i in 0 until historyList.size - 1) {
+                    val startArray = historyList[i]
+                    val endArray = historyList[i + 1]
+                    
+                    // 防止数据源格式突然改变导致数组越界异常
+                    if (ch >= startArray.size || ch >= endArray.size) continue
+                    
+                    val startX = chartLeft + (i * stepX)
+                    val endX = chartLeft + ((i + 1) * stepX)
+                    
+                    val valStart = startArray[ch].coerceIn(noiseMin, noiseMax)
+                    val valEnd = endArray[ch].coerceIn(noiseMin, noiseMax)
+                    
+                    canvas.drawLine(
+                        startX, h * (1f - (valStart - noiseMin) / range),
+                        endX, h * (1f - (valEnd - noiseMin) / range),
+                        paint
+                    )
+                }
             }
         }
     }
