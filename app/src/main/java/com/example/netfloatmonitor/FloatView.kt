@@ -1,6 +1,5 @@
 package com.example.netfloatmonitor
 
-import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
@@ -10,7 +9,6 @@ import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
-import android.view.animation.DecelerateInterpolator
 import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.LinearLayout
@@ -36,11 +34,9 @@ class FloatView(
     private var lastExpandedWidth = 1350
     private var lastExpandedHeight = 520
     
-    // 收纳看板物理尺寸（适配信号栏+三参数文本）
+    // 收纳看板物理尺寸
     private val collapsedWidth = 220
     private val collapsedHeight = 130
-    // 隐藏半角后，留在屏幕内的可点区域宽度
-    private val visibleEdgeWidth = 85 
 
     private var startWidth = 0
     private var startHeight = 0
@@ -130,7 +126,7 @@ class FloatView(
             if (isExpanded) performToggle()
         }
 
-        // 恢复原始最纯粹的拖动实现：全屏自由拖动，不做物理死边界卡死
+        // 纯粹的自由拖动逻辑：绝不锁定边界，不干扰UI刷新线程
         setOnTouchListener(object : OnTouchListener {
             private var isDragging = false
 
@@ -141,7 +137,6 @@ class FloatView(
                         downY = event.rawY
                         startWidth = width
                         startHeight = height
-                        // 处于展开态时，右下角120px区域支持拉伸大小
                         resize = isExpanded && (event.x > (width - 120)) && (event.y > (height - 120))
                         isDragging = false
                     }
@@ -162,54 +157,28 @@ class FloatView(
                             lastExpandedWidth = newWidth
                             lastExpandedHeight = newHeight
                         } else {
-                            // 【彻底恢复原始手感】：直接根据手指偏移增量更新坐标，绝不强制卡死边界
+                            // 自由移动逻辑：完全不加任何吸附与限制限制
                             params.x += dx.toInt()
                             params.y += dy.toInt()
-                            
-                            downX = event.rawX
-                            downY = event.rawY
                         }
+                        
+                        // 核心修正：无论哪种模式，更新当前锚点坐标，防止计算级联放大导致卡死
+                        downX = event.rawX
+                        downY = event.rawY
+                        
                         windowManager.updateViewLayout(this@FloatView, params)
                     }
                     MotionEvent.ACTION_UP -> {
                         if (!isExpanded && !isDragging) {
-                            // 收纳态下点击：直接恢复展开
+                            // 收纳态下且没发生拖动时被点击，才触发展开
                             performToggle()
-                        } else if (!isExpanded && isDragging) {
-                            // 收纳态拖动结束：顺滑停留在最后释放的地方，支持靠边自动隐藏半边
-                            animateToEdgeAndHideHalf()
                         }
+                        // 移除所有的吸附和自动贴边动画，停在松手位置
                     }
                 }
                 return true
             }
         })
-    }
-
-    private fun getScreenWidth(): Int = context.resources.displayMetrics.widthPixels
-
-    // 收纳时顺滑贴近最靠近的那一侧边缘
-    private fun animateToEdgeAndHideHalf() {
-        val screenWidth = getScreenWidth()
-        
-        // 判定离哪边近就吸附哪边
-        val targetX = if (params.x + collapsedWidth / 2 < screenWidth / 2) {
-            -(collapsedWidth - visibleEdgeWidth)
-        } else {
-            screenWidth - visibleEdgeWidth
-        }
-
-        ValueAnimator.ofInt(params.x, targetX).apply {
-            duration = 300
-            interpolator = DecelerateInterpolator()
-            addUpdateListener { animation ->
-                params.x = animation.animatedValue as Int
-                if (isAttachedToWindow) {
-                    windowManager.updateViewLayout(this@FloatView, params)
-                }
-            }
-            start()
-        }
     }
 
     private fun performToggle() {
@@ -227,8 +196,8 @@ class FloatView(
             
             params.width = collapsedWidth
             params.height = collapsedHeight
+            // 切换状态时不改变原本的 x, y，防止位置乱跳
             windowManager.updateViewLayout(this@FloatView, params)
-            animateToEdgeAndHideHalf()
         } else {
             isExpanded = true
             collapsedPanel.visibility = View.GONE
@@ -242,13 +211,6 @@ class FloatView(
             
             params.width = lastExpandedWidth
             params.height = lastExpandedHeight
-            
-            // 展开时稍微保证不要完全消失在视线外
-            val screenWidth = getScreenWidth()
-            if (params.x < 0) params.x = 10
-            if (params.x + lastExpandedWidth > screenWidth) {
-                params.x = screenWidth - lastExpandedWidth - 10
-            }
             windowManager.updateViewLayout(this@FloatView, params)
         }
     }
@@ -357,7 +319,7 @@ class FloatView(
     }
 
     /**
-     * 已调优：精简小巧版信号格图标 + 底部特意放大加粗的详细参数文本
+     * 小巧版信号格图标 + 底部特意放大加粗的详细参数文本
      */
     private class SignalIconView(context: Context, private val label: String) : View(context) {
         private var r1 = 0f
@@ -373,8 +335,8 @@ class FloatView(
         }
         private val subTextPaint = Paint().apply {
             color = Color.parseColor("#BDC3C7")
-            textSize = 15f         // 底部字大一点
-            isFakeBoldText = true  // 文本加粗
+            textSize = 15f         
+            isFakeBoldText = true  
             isAntiAlias = true
             textAlign = Paint.Align.CENTER
         }
@@ -392,12 +354,10 @@ class FloatView(
             val h = height.toFloat()
             if (w <= 0 || h <= 0) return
 
-            // 1. 顶部标头
             textPaint.color = if (label == "AIR") Color.parseColor("#E67E22") else Color.parseColor("#3498DB")
             textPaint.isFakeBoldText = true
             canvas.drawText(label, w / 2f, 20f, textPaint)
 
-            // 2. 状态判定
             val primaryRssi = if (r1 > 0 && r2 > 0) Math.min(r1, r2) else Math.max(r1, r2)
             val (bars, barColor) = when {
                 primaryRssi == 0f -> 1 to Color.parseColor("#E74C3C")
@@ -407,7 +367,6 @@ class FloatView(
                 else -> 1 to Color.parseColor("#E74C3C")
             }
 
-            // 3. 绘制图标调小后的手机阶梯格
             val barCount = 4
             val barSpacing = 4f
             val totalSpacing = barSpacing * (barCount - 1)
@@ -430,7 +389,6 @@ class FloatView(
                 canvas.drawRect(x, top, x + barWidth, baseLineY, paint)
             }
 
-            // 4. 绘制放大加粗的底部字体
             val infoStr = "${r1.toInt()}/${r2.toInt()}/${snr.toInt()}"
             val finalInfo = if (primaryRssi == 0f) "DISCONN" else infoStr
             subTextPaint.color = barColor
