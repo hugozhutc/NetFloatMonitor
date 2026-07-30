@@ -1,4 +1,4 @@
-package com.network.monitor // 请根据你的项目实际 package 调整
+package com.example.netfloatmonitor // 已自动同步为你日志中的 package
 
 import android.animation.ValueAnimator
 import android.annotation.SuppressLint
@@ -19,7 +19,6 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
 import android.view.animation.DecelerateInterpolator
-import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -48,9 +47,9 @@ object ColorPool {
 }
 
 /**
- * 悬浮窗主控制面板
+ * 悬浮窗主控制面板 (已将类名修改为 FloatView 以匹配你的 FloatService)
  */
-class FloatMonitorWindow(private val context: Context) {
+class FloatView(private val context: Context) {
 
     private val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
     private val layoutParams = WindowManager.LayoutParams().apply {
@@ -271,7 +270,7 @@ class FloatMonitorWindow(private val context: Context) {
                         val tv = TextView(context).apply {
                             layoutParams = LinearLayout.LayoutParams(
                                 ViewGroup.LayoutParams.MATCH_PARENT,
-                                Double.NaN.toInt() // WRAP_CONTENT
+                                ViewGroup.LayoutParams.WRAP_CONTENT
                             )
                             text = displayText
                             setTextColor(Color.WHITE)
@@ -290,7 +289,6 @@ class FloatMonitorWindow(private val context: Context) {
      */
     @SuppressLint("ClickableViewAccessibility")
     private fun setupTouchEvents() {
-        // 双击与移动手势监听
         var lastTouchTime = 0L
         var initialX = 0
         var initialY = 0
@@ -321,7 +319,6 @@ class FloatMonitorWindow(private val context: Context) {
                 }
                 MotionEvent.ACTION_UP -> {
                     if (!isDragging && (System.currentTimeMillis() - lastTouchTime < 300)) {
-                        // 触发双击折叠/展开动画
                         performToggle()
                     }
                     true
@@ -330,7 +327,6 @@ class FloatMonitorWindow(private val context: Context) {
             }
         }
 
-        // 右下角拉伸缩放手柄逻辑
         var startW = 0
         var startH = 0
         resizeHandle.setOnTouchListener { _, event ->
@@ -349,7 +345,6 @@ class FloatMonitorWindow(private val context: Context) {
                     val targetW = max(600, startW + dw)
                     val targetH = max(300, startH + dh)
 
-                    // 动态分配两侧的伸缩权重
                     leftScrollView.layoutParams.width = (targetW * 0.4f).toInt()
                     leftScrollView.layoutParams.height = targetH - 40
                     
@@ -365,9 +360,6 @@ class FloatMonitorWindow(private val context: Context) {
         }
     }
 
-    /**
-     * 折叠与展开动效
-     */
     private fun performToggle() {
         isCollapsed = !isCollapsed
         val startWidth = rootLayout.width
@@ -399,8 +391,9 @@ open class BaseChartView @JvmOverloads constructor(
     context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
 ) : View(context, attrs, defStyleAttr) {
 
-    protected val gridPaint = Paint(Paint.ANTI_ALIAS_ALIAS_FLAG).apply {
-        color = Color.parseColor("#22FFFFFF") // 细微白网格线
+    // 修复：修正错别字并开启抗锯齿
+    protected val gridPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#22FFFFFF")
         strokeWidth = 1.5f
         style = Paint.Style.STROKE
     }
@@ -424,18 +417,14 @@ open class BaseChartView @JvmOverloads constructor(
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
         chartLeft = paddingLeft + 20f
-        chartTop = paddingTop + 45f // 为顶部标题和动态图理解析腾出安全空间
+        chartTop = paddingTop + 45f 
         chartRight = w - paddingRight - 20f
         chartBottom = h - paddingBottom - 20f
     }
 
-    /**
-     * 绘制标准背景网格与外边框 (加入抗锯齿与精准像素校准)
-     */
     protected fun drawBackgroundGrid(canvas: Canvas) {
         canvas.drawRect(chartLeft, chartTop, chartRight, chartBottom, borderPaint)
         
-        // 纵向网格线线数
         val cols = 6
         val widthStep = (chartRight - chartLeft) / cols
         for (i in 1 until cols) {
@@ -443,11 +432,9 @@ open class BaseChartView @JvmOverloads constructor(
             canvas.drawLine(x, chartTop, x, chartBottom, gridPaint)
         }
 
-        // 横向网格线线数
         val rows = 4
         val heightStep = (chartBottom - chartTop) / rows
         for (i in 1 until rows) {
-            // 向下取整像素对齐，防止高分屏上线条虚化
             val y = Math.floor((chartTop + i * heightStep).toDouble()).toFloat()
             canvas.drawLine(chartLeft, y, chartRight, y, gridPaint)
         }
@@ -455,7 +442,7 @@ open class BaseChartView @JvmOverloads constructor(
 }
 
 /**
- * 视图 1：通用信号强度历史走势波形图 (单线条)
+ * 视图 1：通用信号强度历史走势波形图
  */
 class WaveformView(context: Context) : BaseChartView(context) {
 
@@ -514,7 +501,7 @@ class WaveformView(context: Context) : BaseChartView(context) {
 }
 
 /**
- * 视图 2：多路无线底噪柱状图 (精准映射左侧色彩池，集成智能防重叠换行图例)
+ * 视图 2：多路无线底噪柱状图 (修复 Lambda 内 label 返回语法错误)
  */
 class NoiseFloorChartView(context: Context) : BaseChartView(context) {
 
@@ -526,7 +513,6 @@ class NoiseFloorChartView(context: Context) : BaseChartView(context) {
         style = Paint.Style.FILL
     }
 
-    // 缓存最新解析获得的两条主频段多路数据
     private var currentDataA = FloatArray(0)
     private var currentDataG = FloatArray(0)
 
@@ -546,11 +532,9 @@ class NoiseFloorChartView(context: Context) : BaseChartView(context) {
         val mainTitle = "[AIR NOISE FLOORS]"
         canvas.drawText(mainTitle, chartLeft + 10f, chartTop - 18f, textPaint)
 
-        // 动态计算主标题文字宽度，建立图例绘制的绝对左边界防御线
         val titleWidth = textPaint.measureText(mainTitle)
         val legendLeftBarrier = chartLeft + 10f + titleWidth + 30f
 
-        // 合并数据源进行柱状图渲染与动态彩色图例解算
         val totalBarsCount = currentDataA.size + currentDataG.size
         if (totalBarsCount == 0) return
 
@@ -564,60 +548,52 @@ class NoiseFloorChartView(context: Context) : BaseChartView(context) {
         val totalSpacing = barSpacing * (totalBarsCount + 1)
         val singleBarWidth = (chartWidth - totalSpacing) / totalBarsCount
 
-        // ----------------- 核心加固：智能防重叠、支持自动换行的图例绘制算法 -----------------
-        var currentLegendX = chartRight - 10f // 从右侧边界开始向左逆向排布
-        var currentLegendY = chartTop - 18f    // 初始 Y 轴高度与标题对齐
-        val legendRowHeight = 28f              // 换行后的行高增量
+        // ----------------- 修复后的标准图例控制排版逻辑 -----------------
+        var currentLegendX = chartRight - 10f
+        var currentLegendY = chartTop - 18f
+        val legendRowHeight = 28f
 
-        // 统一提取图例渲染 lambda 表达式
-        val drawLegendItem: (String, Int) -> Unit = { label, index ->
-            val indicatorColor = ColorPool.getColorForIndex(index)
-            legendIndicatorPaint.color = indicatorColor
+        // 将渲染逻辑重构为普通双层循环，规避 Kotlin 命名标签编译限制
+        val bandsLabels = arrayOf(currentDataA to "2.4G", currentDataG to "5.8G")
+        
+        outer@ for (pair in bandsLabels) {
+            val dataArray = pair.first
+            val prefix = pair.second
             
-            val itemTextWidth = textPaint.measureText(label)
-            val totalItemWidth = 20f + 6f + itemTextWidth // [彩色方块] + 间距 + 文本宽度
-            
-            // 边界检查：如果当前行向左排布会侵入左侧主标题的领地，执行自动换行
-            if (currentLegendX - totalItemWidth < legendLeftBarrier) {
-                currentLegendX = chartRight - 10f // X 坐标重置回右侧起点
-                currentLegendY += legendRowHeight // Y 坐标向下递增一行
+            for (i in dataArray.indices) {
+                val label = "$prefix-$i"
+                val indicatorColor = ColorPool.getColorForIndex(i)
+                legendIndicatorPaint.color = indicatorColor
                 
-                // 纵向极端越界保护：如果换行太多侵入了图表网格内部，则停止后续绘制，防止视觉灾难
-                if (currentLegendY > chartBottom) {
-                    return@drawLegendItem
+                val itemTextWidth = textPaint.measureText(label)
+                val totalItemWidth = 20f + 6f + itemTextWidth
+                
+                if (currentLegendX - totalItemWidth < legendLeftBarrier) {
+                    currentLegendX = chartRight - 10f
+                    currentLegendY += legendRowHeight
+                    
+                    if (currentLegendY > chartBottom) {
+                        break@outer // 超出视口，完全终止图例绘制
+                    }
                 }
+
+                currentLegendX -= totalItemWidth
+                val rectF = RectF(currentLegendX, currentLegendY - 16f, currentLegendX + 18f, currentLegendY + 2f)
+                canvas.drawRect(rectF, legendIndicatorPaint)
+                canvas.drawText(label, currentLegendX + 24f, currentLegendY, textPaint)
+                
+                currentLegendX -= 14f
             }
-
-            // 执行图例色块与文本的绘制
-            currentLegendX -= totalItemWidth
-            val rectF = RectF(currentLegendX, currentLegendY - 16f, currentLegendX + 18f, currentLegendY + 2f)
-            canvas.drawRect(rectF, legendIndicatorPaint)
-            canvas.drawText(label, currentLegendX + 24f, currentLegendY, textPaint)
-            
-            // 留出图例项之间的横向小间距
-            currentLegendX -= 14f
         }
+        // -------------------------------------------------------------
 
-        // 依次轮询绘制 2.4G(a) 与 5.8G(g) 的动态彩色图例
-        for (i in currentDataA.indices) {
-            drawLegendItem("2.4G-$i", i)
-        }
-        for (i in currentDataG.indices) {
-            drawLegendItem("5.8G-$i", i)
-        }
-        // ---------------------------------------------------------------------------------
-
-        // 接下来进行下方柱状图柱体的渲染
         var barIndex = 0
-
-        // 绘制 2.4G 频段柱体
         for (i in currentDataA.indices) {
             val noiseVal = currentDataA[i]
             drawSingleBar(canvas, noiseVal, minVal, maxVal, valRange, chartHeight, barIndex, singleBarWidth, barSpacing, i)
             barIndex++
         }
 
-        // 绘制 5.8G 频段柱体
         for (i in currentDataG.indices) {
             val noiseVal = currentDataG[i]
             drawSingleBar(canvas, noiseVal, minVal, maxVal, valRange, chartHeight, barIndex, singleBarWidth, barSpacing, i)
@@ -625,9 +601,6 @@ class NoiseFloorChartView(context: Context) : BaseChartView(context) {
         }
     }
 
-    /**
-     * 精准绘制单个柱状图柱体，颜色与左侧面板及上方图例完美契合
-     */
     private fun drawSingleBar(
         canvas: Canvas, value: Float, minVal: Float, maxVal: Float, valRange: Float,
         chartHeight: Float, barIndex: Int, barWidth: Float, spacing: Float, poolIndex: Int
@@ -640,7 +613,6 @@ class NoiseFloorChartView(context: Context) : BaseChartView(context) {
         val top = chartBottom - (ratio * chartHeight)
         val bottom = chartBottom
 
-        // 从颜色池精准提取对应的颜色
         barPaint.color = ColorPool.getColorForIndex(poolIndex)
         canvas.drawRect(left, top, right, bottom, barPaint)
     }
