@@ -30,13 +30,13 @@ class FloatView(
     private val airChartView = WaveformView(context, isAir = true)
     private val gndChartView = WaveformView(context, isAir = false)
     
-    // 新增：天空与地面多频点底噪曲线图
+    // 天空与地面多频点底噪曲线图（内部集成了彩色图例）
     private val airNoiseChartView = NoiseFloorChartView(context, isAir = true)
     private val gndNoiseChartView = NoiseFloorChartView(context, isAir = false)
 
     private var isExpanded = true
     private var lastExpandedWidth = 1380
-    private var lastExpandedHeight = 650 // 适当增加高度以完美容纳4个曲线图
+    private var lastExpandedHeight = 650 
     
     private val collapsedWidth = 220
     private val collapsedHeight = 130
@@ -266,26 +266,59 @@ class FloatView(
                 var gndR2: Float? = null
                 var gndSnr: Float? = null
 
+                // 核心预设全局曲线颜色池，确保左侧文本和右侧 Chart 完美互通
+                val noiseColors = arrayOf("#E74C3C", "#F1C40F", "#3498DB", "#9B59B6", "#1ABC9C", "#E67E22")
+
                 val keys = obj.keys()
                 while (keys.hasNext()) {
                     val key = keys.next()
                     val valueStr = obj.optString(key, "")
 
-                    // 分流解析并添加文本
-                    if (key.endsWith("_a") || key.startsWith("air_") || key == "noiseFloor_a") {
+                    // 拦截底噪键，对其进行动态多路拆解与色彩精准绑定
+                    if (key == "noiseFloor_a" || key == "noiseFloor_g") {
+                        val isAir = key == "noiseFloor_a"
+                        val targetLayout = if (isAir) airLayout else gndLayout
+                        val targetMap = if (isAir) airTextViewMap else gndTextViewMap
+                        val chart = if (isAir) airNoiseChartView else gndNoiseChartView
+                        
+                        chart.addNoiseData(valueStr)
+                        
+                        val parts = valueStr.split(",")
+                        parts.forEachIndexed { index, partValue ->
+                            val subKey = "${key}_ch${index + 1}"
+                            val channelColor = Color.parseColor(noiseColors[index % noiseColors.size])
+                            val prefixLabel = if (isAir) "空中频点" else "地面频点"
+                            val displayText = "$prefixLabel${index + 1} : ${partValue.trim()}"
+                            
+                            val cachedTv = targetMap[subKey]
+                            if (cachedTv != null) {
+                                cachedTv.text = displayText
+                                cachedTv.setTextColor(channelColor)
+                            } else {
+                                val tv = TextView(context).apply {
+                                    text = displayText
+                                    textSize = 12f
+                                    setTextColor(channelColor)
+                                    setPadding(6, 4, 6, 4)
+                                }
+                                targetLayout.addView(tv)
+                                targetMap[subKey] = tv
+                            }
+                        }
+                        continue // 跳过通用添加处理，防止整串数据重复出现
+                    }
+
+                    // 常规遥测数据流分流解析
+                    if (key.endsWith("_a") || key.startsWith("air_")) {
                         updateOrAddTextWithColor(airLayout, airTextViewMap, key, valueStr)
                         if (key.contains("rssi1")) airR1 = valueStr.toFloatOrNull()
                         if (key.contains("rssi2")) airR2 = valueStr.toFloatOrNull()
                         if (key.contains("snr")) airSnr = valueStr.toFloatOrNull()
-                        // 馈送天空底噪数据给波形图
-                        if (key == "noiseFloor_a") airNoiseChartView.addNoiseData(valueStr)
-                    } else if (key.endsWith("_g") || key.startsWith("gnd_") || key == "noiseFloor_g") {
+                    } else if (key.endsWith("_g") || key.startsWith("gnd_")) {
                         updateOrAddTextWithColor(gndLayout, gndTextViewMap, key, valueStr)
                         if (key.contains("rssi1")) gndR1 = valueStr.toFloatOrNull()
                         if (key.contains("rssi2")) gndR2 = valueStr.toFloatOrNull()
                         if (key.contains("snr")) gndSnr = valueStr.toFloatOrNull()
-                        // 馈送地面底噪数据给波形图
-                        if (key == "noiseFloor_g") gndNoiseChartView.addNoiseData(valueStr)
                     } else {
                         updateOrAddTextWithColor(airLayout, airTextViewMap, key, valueStr)
                     }
@@ -325,7 +358,6 @@ class FloatView(
                     else -> Color.parseColor("#2ECC71")
                 }
             }
-            key.contains("noiseFloor", ignoreCase = true) -> Color.parseColor("#E67E22") // 底噪文字高亮显眼橙
             key.contains("failed", ignoreCase = true) -> {
                 val failedCount = value.toIntOrNull() ?: 0
                 if (failedCount > 0) Color.parseColor("#E74C3C") else Color.WHITE
@@ -522,34 +554,32 @@ class FloatView(
         }
     }
 
-    // 新增核心组件：专门负责解析与动态绘制多路底噪（Noise Floor）的波形图组件
     private class NoiseFloorChartView(context: Context, private val isAir: Boolean) : View(context) {
         private val maxDataPoints = 100
         private val yAxisWidth = 85f
         
-        // 历史数据队列：内部存储的是多个频点的数组。支持动态增减频点
         private val historyList = LinkedList<FloatArray>()
         
         private val axisTextPaint = Paint().apply { color = Color.parseColor("#95A5A6"); textSize = 13f; isAntiAlias = true }
         private val headerTextPaint = Paint().apply { color = Color.parseColor("#E67E22"); textSize = 14f; isFakeBoldText = true; isAntiAlias = true }
         private val gridPaint = Paint().apply { color = Color.argb(30, 255, 255, 255); strokeWidth = 1f }
-        private val bgPaint = Paint().apply { color = Color.argb(20, 230, 126, 34) } // 橙色透明背景以示区别
+        private val bgPaint = Paint().apply { color = Color.argb(20, 230, 126, 34) } 
 
-        // 多路频点底噪画笔颜色池（六路色彩）
+        // 核心色彩池定义，完全与全局解析逻辑对齐
         private val curveColors = intArrayOf(
-            Color.parseColor("#E74C3C"), // 红
-            Color.parseColor("#F1C40F"), // 黄
-            Color.parseColor("#3498DB"), // 蓝
-            Color.parseColor("#9B59B6"), // 紫
-            Color.parseColor("#1ABC9C"), // 青
-            Color.parseColor("#E67E22")  // 橙
+            Color.parseColor("#E74C3C"), // CH1 红
+            Color.parseColor("#F1C40F"), // CH2 黄
+            Color.parseColor("#3498DB"), // CH3 蓝
+            Color.parseColor("#9B59B6"), // CH4 紫
+            Color.parseColor("#1ABC9C"), // CH5 青
+            Color.parseColor("#E67E22")  // CH6 橙
         )
         private val curvePaints = Array(curveColors.size) { i ->
             Paint().apply { color = curveColors[i]; strokeWidth = 2f; style = Paint.Style.STROKE; isAntiAlias = true }
         }
 
         private val noiseMin = 40f
-        private val noiseMax = 140f // 适配底噪的范围，例如 70~100 处于图表中央
+        private val noiseMax = 140f
 
         fun addNoiseData(rawCsv: String) {
             try {
@@ -577,7 +607,7 @@ class FloatView(
             val chartWidth = chartRight - chartLeft
             canvas.drawRect(chartLeft, 0f, chartRight, h, bgPaint)
 
-            // 绘制底噪网格与 Y 轴刻度
+            // 1. 绘制底噪网格与 Y 轴刻度
             val yPositions = floatArrayOf(h * 0.2f, h * 0.5f, h * 0.8f)
             val labels = arrayOf("140", "90", "40")
             for (i in yPositions.indices) {
@@ -586,18 +616,17 @@ class FloatView(
                 canvas.drawText(labels[i], 20f, y + 5f, axisTextPaint)
             }
 
-            // 绘制头部标签
+            // 2. 绘制头部标题
             val title = if (isAir) "[AIR NOISE]" else "[GND NOISE]"
             canvas.drawText(title, chartLeft + 15f, 22f, headerTextPaint)
 
             if (historyList.isEmpty()) return
             
-            // 获取当前最新一帧数据所包含的实际频点通道数
             val currentChannels = historyList.last.size
             val stepX = chartWidth / (maxDataPoints - 1)
             val range = noiseMax - noiseMin
 
-            // 循环为每一个底噪通道独立绘制历史走势曲线
+            // 3. 绘制多路底噪核心曲线轨迹
             for (ch in 0 until currentChannels) {
                 val paint = curvePaints[ch % curvePaints.size]
                 
@@ -605,7 +634,6 @@ class FloatView(
                     val startArray = historyList[i]
                     val endArray = historyList[i + 1]
                     
-                    // 防止数据源格式突然改变导致数组越界异常
                     if (ch >= startArray.size || ch >= endArray.size) continue
                     
                     val startX = chartLeft + (i * stepX)
@@ -620,6 +648,31 @@ class FloatView(
                         paint
                     )
                 }
+            }
+
+            // 4. 新增：图表右上角彩色动态图例指示器（Legend）
+            val legendPaint = Paint().apply { isAntiAlias = true; style = Paint.Style.FILL }
+            val legendTextPaint = Paint().apply { color = Color.parseColor("#BDC3C7"); textSize = 11f; isAntiAlias = true }
+            
+            var legendRightX = w - 15f
+            val legendY = 22f // 与主标题处于同一水平线
+
+            for (ch in (currentChannels - 1) downTo 0) {
+                val chColor = curveColors[ch % curveColors.size]
+                val labelStr = "P${ch + 1}" // 对应频点(Point)通道号
+                
+                val textWidth = legendTextPaint.measureText(labelStr)
+                val itemWidth = textWidth + 14f
+                
+                // 绘制图例彩色指示小方块
+                legendPaint.color = chColor
+                canvas.drawRect(legendRightX - itemWidth, legendY - 8f, legendRightX - itemWidth + 8f, legendY, legendPaint)
+                
+                // 绘制指示通道文字
+                canvas.drawText(labelStr, legendRightX - itemWidth + 12f, legendY, legendTextPaint)
+                
+                // 指针动态向左移位，防止图例重叠
+                legendRightX -= (itemWidth + 14f)
             }
         }
     }
