@@ -26,13 +26,11 @@ class FloatView(
     private val airLayout = LinearLayout(context)
     private val gndLayout = LinearLayout(context)
     
-    // 右侧第三栏：垂直容器，用于上下堆叠放两个图表
     private val chartContainer = LinearLayout(context)
     private val airChartView = WaveformView(context, isAir = true)
     private val gndChartView = WaveformView(context, isAir = false)
 
     private var isExpanded = true
-    // 调整展开后的默认宽高，给予上下双图表和Y轴刻度更充裕的展示空间
     private var lastExpandedWidth = 1300
     private var lastExpandedHeight = 540
     private val collapsedSize = 160
@@ -47,6 +45,10 @@ class FloatView(
     private val contentFrame = FrameLayout(context)
     private val contentPanel = LinearLayout(context)
     
+    // 核心性能优化：静态缓存已存在的 Text 视图，规避 removeAllViews()
+    private val airTextViewMap = HashMap<String, TextView>()
+    private val gndTextViewMap = HashMap<String, TextView>()
+
     private val resizeIndicator = View(context).apply {
         val triangleBg = GradientDrawable().apply {
             setColor(Color.parseColor("#3498DB"))
@@ -69,44 +71,39 @@ class FloatView(
     }
 
     init {
-        this.setOrientation(LinearLayout.VERTICAL)
+        this.orientation = LinearLayout.VERTICAL
         this.setPadding(8, 6, 8, 8)
 
         val bg = GradientDrawable()
         bg.setColor(Color.argb(180, 0, 0, 0))
         bg.cornerRadius = 10f
-        this.setBackground(bg)
+        this.background = bg
 
-        topBar.setOrientation(LinearLayout.HORIZONTAL)
-        topBar.setGravity(Gravity.RIGHT or Gravity.CENTER_VERTICAL)
+        topBar.orientation = LinearLayout.HORIZONTAL
+        topBar.gravity = Gravity.RIGHT or Gravity.CENTER_VERTICAL
         topBar.setPadding(0, 0, 4, 4)
         
         val btnLp = LinearLayout.LayoutParams(45, 45)
         topBar.addView(toggleBtn, btnLp)
         addView(topBar)
 
-        contentPanel.setOrientation(LinearLayout.HORIZONTAL)
-        airLayout.setOrientation(LinearLayout.VERTICAL)
-        gndLayout.setOrientation(LinearLayout.VERTICAL)
+        contentPanel.orientation = LinearLayout.HORIZONTAL
+        airLayout.orientation = LinearLayout.VERTICAL
+        gndLayout.orientation = LinearLayout.VERTICAL
         
-        // 1. 左侧和中间的数据文本面板
         contentPanel.addView(createPanel("AIR", airLayout))
         contentPanel.addView(createPanel("GND", gndLayout))
         
-        // 2. 配置右侧第三栏容器（上下平分摆放两个折线图）
-        chartContainer.setOrientation(LinearLayout.VERTICAL)
+        chartContainer.orientation = LinearLayout.VERTICAL
         
-        // 天空端图表占用 0.5 权重，带 8dp 下边距分隔
         val airChartLp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f).apply {
             setMargins(0, 0, 0, 8)
         }
-        // 地面端图表占用 0.5 权重
         val gndChartLp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f)
         
         chartContainer.addView(airChartView, airChartLp)
         chartContainer.addView(gndChartView, gndChartLp)
         
-        // 将整个右侧第三栏加进主面板，分配 700dp 宽度给Y轴刻度和曲线留下充裕空间
         val chartContainerLp = LinearLayout.LayoutParams(700, LinearLayout.LayoutParams.MATCH_PARENT).apply {
             setMargins(12, 0, 4, 0)
         }
@@ -161,7 +158,6 @@ class FloatView(
                             if (params.y > maxAllowableY) {
                                 params.y = maxAllowableY
                             }
-
                             windowManager.updateViewLayout(this@FloatView, params)
                         }
                     }
@@ -191,7 +187,6 @@ class FloatView(
                         val location = IntArray(2)
                         this@FloatView.getLocationOnScreen(location)
                         val absoluteY = location[1]
-
                         val navBarHeight = getNavigationBarHeight()
                         val usableScreenHeight = getScreenHeight() - navBarHeight
 
@@ -205,7 +200,6 @@ class FloatView(
 
                             params.width = newWidth
                             params.height = newHeight
-                            
                             lastExpandedWidth = newWidth
                             lastExpandedHeight = newHeight
                         } else {
@@ -215,7 +209,6 @@ class FloatView(
                             if (targetY + height > usableScreenHeight) {
                                 targetY = usableScreenHeight - height
                             }
-                            
                             params.y = targetY
                             downX = event.rawX
                             downY = event.rawY
@@ -230,11 +223,7 @@ class FloatView(
 
     private fun getNavigationBarHeight(): Int {
         val resourceId = context.resources.getIdentifier("navigation_bar_height", "dimen", "android")
-        return if (resourceId > 0) {
-            context.resources.getDimensionPixelSize(resourceId)
-        } else {
-            0
-        }
+        return if (resourceId > 0) context.resources.getDimensionPixelSize(resourceId) else 0
     }
 
     private fun getScreenHeight(): Int {
@@ -243,30 +232,25 @@ class FloatView(
 
     private fun performToggle() {
         val panelBg = GradientDrawable()
-        
         if (isExpanded) {
             isExpanded = false
             contentFrame.visibility = View.GONE
             resizeIndicator.visibility = View.GONE
             
-            val collapsedLp = LinearLayout.LayoutParams(
+            toggleBtn.layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 
                 LinearLayout.LayoutParams.MATCH_PARENT
             )
-            toggleBtn.layoutParams = collapsedLp
-            
             toggleBtn.text = "Link"
             toggleBtn.textSize = 14f
-            val btnBg = GradientDrawable().apply {
+            toggleBtn.background = GradientDrawable().apply {
                 setColor(Color.parseColor("#1ABC9C"))
                 cornerRadius = 80f
             }
-            toggleBtn.background = btnBg
             
             panelBg.setColor(Color.TRANSPARENT)
-            this.setBackground(panelBg)
+            this.background = panelBg
             this.setPadding(0, 0, 0, 0)
-
             params.width = collapsedSize
             params.height = collapsedSize
         } else {
@@ -274,22 +258,18 @@ class FloatView(
             contentFrame.visibility = View.VISIBLE
             resizeIndicator.visibility = View.VISIBLE
             
-            val expandedLp = LinearLayout.LayoutParams(45, 45)
-            toggleBtn.layoutParams = expandedLp
-            
+            toggleBtn.layoutParams = LinearLayout.LayoutParams(45, 45)
             toggleBtn.text = "×"
             toggleBtn.textSize = 14f
-            val btnBg = GradientDrawable().apply {
+            toggleBtn.background = GradientDrawable().apply {
                 setColor(Color.parseColor("#C0392B"))
                 cornerRadius = 6f
             }
-            toggleBtn.background = btnBg
             
             panelBg.setColor(Color.argb(180, 0, 0, 0))
             panelBg.cornerRadius = 10f
-            this.setBackground(panelBg)
+            this.background = panelBg
             this.setPadding(8, 6, 8, 8)
-
             params.width = lastExpandedWidth
             params.height = lastExpandedHeight
         }
@@ -298,101 +278,77 @@ class FloatView(
 
     private fun createPanel(title: String, containerLayout: LinearLayout): View {
         val box = LinearLayout(context)
-        box.setOrientation(LinearLayout.VERTICAL)
+        box.orientation = LinearLayout.VERTICAL
 
-        val titleView = TextView(context)
-        titleView.text = title
-        titleView.textSize = 14f
-        titleView.setTextColor(Color.GREEN)
+        val titleView = TextView(context).apply {
+            text = title
+            textSize = 14f
+            setTextColor(Color.GREEN)
+        }
         box.addView(titleView)
 
         val scroll = ScrollView(context)
         scroll.addView(containerLayout)
-
-        val lp = LinearLayout.LayoutParams(300, LinearLayout.LayoutParams.MATCH_PARENT)
-        box.addView(scroll, lp)
-
+        box.addView(scroll, LinearLayout.LayoutParams(300, LinearLayout.LayoutParams.MATCH_PARENT))
         return box
     }
 
-    fun updateJson(json: String) {
-        try {
-            if (json.isBlank()) return
-            val obj = JSONObject(json)
+    // 接收强类型消费，杜绝高频二次反序列化开销
+    fun updateData(status: LinkStatus) {
+        // 更新图表
+        val aR1 = status.airRssi1.toFloatOrNull()?.let { Math.abs(it) }
+        val aR2 = status.airRssi2.toFloatOrNull()?.let { Math.abs(it) }
+        val aSnr = status.airSnr.toFloatOrNull()?.let { Math.abs(it) }
+        airChartView.addData(aR1, aR2, aSnr)
 
-            airLayout.removeAllViews()
-            gndLayout.removeAllViews()
+        val gR1 = status.gndRssi1.toFloatOrNull()?.let { Math.abs(it) }
+        val gR2 = status.gndRssi2.toFloatOrNull()?.let { Math.abs(it) }
+        val gSnr = status.gndSnr.toFloatOrNull()?.let { Math.abs(it) }
+        gndChartView.addData(gR1, gR2, gSnr)
 
-            var airRssi1: Float? = null
-            var airRssi2: Float? = null
-            var airSnr: Float? = null
-            
-            var gndRssi1: Float? = null
-            var gndRssi2: Float? = null
-            var gndSnr: Float? = null
+        // 精准刷新左侧文本列，规避销毁
+        updateOrAddText(airLayout, airTextViewMap, "airRssi1", status.airRssi1)
+        updateOrAddText(airLayout, airTextViewMap, "airRssi2", status.airRssi2)
+        updateOrAddText(airLayout, airTextViewMap, "airSnr", status.airSnr)
+        updateOrAddText(airLayout, airTextViewMap, "airPass", status.airPass)
+        updateOrAddText(airLayout, airTextViewMap, "airFailed", status.airFailed)
+        updateOrAddText(airLayout, airTextViewMap, "airAnt", status.airAnt)
+        updateOrAddText(airLayout, airTextViewMap, "airNoise", status.airNoise.joinToString(","))
 
-            obj.keys().forEach { key ->
-                val valueStr = obj.get(key).toString()
-                val lowerKey = key.lowercase()
-                val numValue = valueStr.toFloatOrNull()?.let { Math.abs(it) }
+        // 精准刷新中间文本列
+        updateOrAddText(gndLayout, gndTextViewMap, "gndRssi1", status.gndRssi1)
+        updateOrAddText(gndLayout, gndTextViewMap, "gndRssi2", status.gndRssi2)
+        updateOrAddText(gndLayout, gndTextViewMap, "gndSnr", status.gndSnr)
+        updateOrAddText(gndLayout, gndTextViewMap, "gndPass", status.gndPass)
+        updateOrAddText(gndLayout, gndTextViewMap, "gndFailed", status.gndFailed)
+        updateOrAddText(gndLayout, gndTextViewMap, "gndAnt", status.gndAnt)
+        updateOrAddText(gndLayout, gndTextViewMap, "gndNoise", status.gndNoise.joinToString(","))
 
-                if (numValue != null) {
-                    when {
-                        lowerKey.endsWith("_a") -> {
-                            when {
-                                lowerKey.contains("rssi1") -> airRssi1 = numValue
-                                lowerKey.contains("rssi2") -> airRssi2 = numValue
-                                lowerKey.contains("rssi") && airRssi1 == null -> airRssi1 = numValue
-                                lowerKey.contains("snr") -> airSnr = numValue
-                            }
-                        }
-                        lowerKey.endsWith("_g") -> {
-                            when {
-                                lowerKey.contains("rssi1") -> gndRssi1 = numValue
-                                lowerKey.contains("rssi2") -> gndRssi2 = numValue
-                                lowerKey.contains("rssi") && gndRssi1 == null -> gndRssi1 = numValue
-                                lowerKey.contains("snr") -> gndSnr = numValue
-                            }
-                        }
-                        lowerKey.contains("air_rssi1") -> airRssi1 = numValue
-                        lowerKey.contains("air_rssi2") -> airRssi2 = numValue
-                        lowerKey.contains("air_snr") -> airSnr = numValue
-                        lowerKey.contains("gnd_rssi1") -> gndRssi1 = numValue
-                        lowerKey.contains("gnd_rssi2") -> gndRssi2 = numValue
-                        lowerKey.contains("gnd_snr") -> gndSnr = numValue
-                    }
-                }
+        // 公共属性动态追加在Air栏下部作为公共面板显示
+        updateOrAddText(airLayout, airTextViewMap, "freq", status.freq)
+        updateOrAddText(airLayout, airTextViewMap, "mcs", status.mcs)
+        updateOrAddText(airLayout, airTextViewMap, "power", status.power)
+        updateOrAddText(airLayout, airTextViewMap, "distance", status.distance)
+        updateOrAddText(airLayout, airTextViewMap, "txRate", status.txRate)
+        updateOrAddText(airLayout, airTextViewMap, "rxRate", status.rxRate)
+    }
 
-                when {
-                    key.endsWith("_g") -> addItem(gndLayout, key, valueStr)
-                    key.endsWith("_a") -> addItem(airLayout, key, valueStr)
-                    else -> addItem(airLayout, key, valueStr)
-                }
+    private fun updateOrAddText(layout: LinearLayout, map: HashMap<String, TextView>, key: String, value: String) {
+        val cachedTv = map[key]
+        if (cachedTv != null) {
+            cachedTv.text = "$key : $value"
+        } else {
+            val tv = TextView(context).apply {
+                text = "$key : $value"
+                textSize = 12f
+                setTextColor(Color.WHITE)
+                setPadding(4, 3, 4, 3)
             }
-
-            airChartView.addData(airRssi1, airRssi2, airSnr)
-            gndChartView.addData(gndRssi1, gndRssi2, gndSnr)
-
-        } catch (e: Exception) {
-            airLayout.removeAllViews()
-            gndLayout.removeAllViews()
-            addItem(airLayout, "JSON_ERROR", e.message ?: "Unknown Error")
+            layout.addView(tv)
+            map[key] = tv
         }
     }
 
-    private fun addItem(layout: LinearLayout, key: String, value: String) {
-        val tv = TextView(context)
-        tv.text = "$key : $value"
-        tv.textSize = 12f
-        tv.setTextColor(Color.WHITE)
-        tv.setPadding(4, 3, 4, 3)
-        layout.addView(tv)
-    }
-
-    /**
-     * 内部波形图绘制组件
-     * 适配：天空与地面颜色一致、实时看版文字颜色与折线对齐
-     */
     private class WaveformView(context: Context, private val isAir: Boolean) : View(context) {
         private val maxDataPoints = 100
         private val yAxisWidth = 85f 
@@ -401,7 +357,6 @@ class FloatView(
         private val rssi2List = LinkedList<Float>()
         private val snrList = LinkedList<Float>()
 
-        // 基础灰色画笔：用于轴线和前缀标识文字
         private val axisTextPaint = Paint().apply {
             color = Color.parseColor("#BDC3C7")
             textSize = 16f
@@ -414,12 +369,10 @@ class FloatView(
             isAntiAlias = true
         }
 
-        // 统一提取三大独立色彩配置
-        private val colorRssi1 = Color.parseColor("#2980B9") // 经典深蓝
-        private val colorRssi2 = Color.parseColor("#3498DB") // 经典淡蓝
-        private val colorSnr   = Color.parseColor("#2ECC71") // 经典嫩绿
+        private val colorRssi1 = Color.parseColor("#2980B9")
+        private val colorRssi2 = Color.parseColor("#3498DB")
+        private val colorSnr   = Color.parseColor("#2ECC71")
 
-        // 核心折线图画笔配置 (AIR 与 GND 保持一致)
         private val paintRssi1 = Paint().apply {
             color = colorRssi1
             strokeWidth = 4f
@@ -441,7 +394,6 @@ class FloatView(
             isAntiAlias = true
         }
 
-        // 看板各个数据值独立对应的色彩画笔
         private val paintTextRssi1 = Paint().apply {
             color = colorRssi1
             textSize = 18f
@@ -496,10 +448,8 @@ class FloatView(
             val chartRight = w
             val chartWidth = chartRight - chartLeft
 
-            // 1. 绘制网格背景框
             canvas.drawRect(chartLeft, 0f, chartRight, h, bgPaint)
 
-            // 2. 绘制网格横参考线与刻度
             val yPositions = floatArrayOf(h * 0.15f, h * 0.5f, h * 0.85f)
             val rssiLabels = arrayOf("120", "60", "0")
             val snrLabels = arrayOf("50", "25", "0")
@@ -511,11 +461,9 @@ class FloatView(
                 canvas.drawText(labelText, 5f, y + 6f, axisTextPaint)
             }
 
-            // 3. 顶部实时数字看板输出 (多段渲染以精确控制各文本块颜色)
             val prefix = if (isAir) "[AIR] " else "[GND] "
             canvas.drawText(prefix, chartLeft + 15f, 25f, prefixTextPaint)
             
-            // 计算前缀所占宽度，动态向右追加高亮颜色数值文本
             val prefixWidth = prefixTextPaint.measureText(prefix)
             val startX = chartLeft + 15f + prefixWidth
 
@@ -530,10 +478,9 @@ class FloatView(
             val snrText = "SNR: ${snrList.lastOrNull()?.toInt()}"
             canvas.drawText(snrText, startX + r1Width + r2Width, 25f, paintTextSnr)
 
-            // 4. 正向绘制三条波形曲线 (0在最底部)
             drawNormalCurve(canvas, rssi1List, rssiMin, rssiMax, chartLeft, chartWidth, h, paintRssi1)
             drawNormalCurve(canvas, rssi2List, rssiMin, rssiMax, chartLeft, chartWidth, h, paintRssi2)
-            drawNormalCurve(canvas, snrList, snrMin, snrMax, chartLeft, chartWidth, h, paintSnr)
+            drawNormalCurve(canvas, snrList, minVal = snrMin, maxVal = snrMax, leftOffset = chartLeft, cWidth = chartWidth, h = h, paint = paintSnr)
         }
 
         private fun drawNormalCurve(canvas: Canvas, list: List<Float>, minVal: Float, maxVal: Float, leftOffset: Float, cWidth: Float, h: Float, paint: Paint) {
@@ -544,13 +491,10 @@ class FloatView(
             for (i in 0 until list.size - 1) {
                 val startX = leftOffset + (i * stepX)
                 val endX = leftOffset + ((i + 1) * stepX)
-
                 val valStart = list[i].coerceIn(minVal, maxVal)
                 val valEnd = list[i + 1].coerceIn(minVal, maxVal)
-
                 val startY = h * (1f - (valStart - minVal) / range)
                 val endY = h * (1f - (valEnd - minVal) / range)
-
                 canvas.drawLine(startX, startY, endX, endY, paint)
             }
         }
