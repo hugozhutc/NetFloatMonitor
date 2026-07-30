@@ -36,7 +36,7 @@ class FloatView(
     private var lastExpandedWidth = 1350
     private var lastExpandedHeight = 520
     
-    // 收纳看板物理尺寸（因为要放下信号图标加多行文字，稍微加高加宽以防文字重叠）
+    // 收纳看板物理尺寸（适配信号栏+三参数文本）
     private val collapsedWidth = 220
     private val collapsedHeight = 130
     // 隐藏半角后，留在屏幕内的可点区域宽度
@@ -52,7 +52,7 @@ class FloatView(
     private val contentFrame = FrameLayout(context)
     private val contentPanel = LinearLayout(context)
     
-    // 【新组件】收纳态专属的双路信号栏看板
+    // 收纳态专属：左右并排的双路信号栏看板
     private val collapsedPanel = LinearLayout(context)
     private val airSignalIconView = SignalIconView(context, "AIR")
     private val gndSignalIconView = SignalIconView(context, "GND")
@@ -88,7 +88,7 @@ class FloatView(
         bg.cornerRadius = 14f
         this.background = bg
 
-        // 组装收纳态小看板：左边放AIR图标和数据，右边放GND图标和数据
+        // 组装收纳态小看板布局
         collapsedPanel.orientation = LinearLayout.HORIZONTAL
         collapsedPanel.gravity = Gravity.CENTER
         collapsedPanel.visibility = View.GONE
@@ -130,7 +130,7 @@ class FloatView(
             if (isExpanded) performToggle()
         }
 
-        // 手势总闸
+        // 手势响应总闸（完美适配原生横屏遥控器，安全过滤导航栏拦截）
         setOnTouchListener(object : OnTouchListener {
             private var isDragging = false
 
@@ -147,12 +147,10 @@ class FloatView(
                     MotionEvent.ACTION_MOVE -> {
                         val dx = event.rawX - downX
                         val dy = event.rawY - downY
-                        if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
+                        
+                        if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
                             isDragging = true
                         }
-
-                        val navBarHeight = getNavigationBarHeight()
-                        val usableScreenHeight = getScreenHeight() - navBarHeight
 
                         if (isExpanded && resize) {
                             val newWidth = (startWidth + dx).toInt().coerceAtLeast(600)
@@ -163,11 +161,22 @@ class FloatView(
                             lastExpandedHeight = newHeight
                         } else {
                             params.x += dx.toInt()
-                            var targetY = params.y + dy.toInt()
+                            params.y += dy.toInt()
+
+                            val screenW = getScreenWidth()
+                            val screenH = getScreenHeight()
+                            val currentW = if (isExpanded) width else collapsedWidth
                             val currentH = if (isExpanded) height else collapsedHeight
-                            if (targetY + currentH > usableScreenHeight) targetY = usableScreenHeight - currentH
-                            if (targetY < 0) targetY = 0
-                            params.y = targetY
+
+                            // 仅安全防护绝对屏幕上下边界
+                            if (params.y < 0) params.y = 0
+                            if (params.y + currentH > screenH) params.y = screenH - currentH
+
+                            if (isExpanded) {
+                                if (params.x < 0) params.x = 0
+                                if (params.x + currentW > screenW) params.x = screenW - currentW
+                            }
+
                             downX = event.rawX
                             downY = event.rawY
                         }
@@ -186,22 +195,21 @@ class FloatView(
         })
     }
 
-    private fun getNavigationBarHeight(): Int {
-        val resourceId = context.resources.getIdentifier("navigation_bar_height", "dimen", "android")
-        return if (resourceId > 0) context.resources.getDimensionPixelSize(resourceId) else 0
-    }
     private fun getScreenWidth(): Int = context.resources.displayMetrics.widthPixels
     private fun getScreenHeight(): Int = context.resources.displayMetrics.heightPixels
 
+    // 横屏无阻碍边缘缩进半角吸附
     private fun animateToEdgeAndHideHalf() {
         val screenWidth = getScreenWidth()
+        val screenHeight = getScreenHeight()
+        
         val targetX = if (params.x + collapsedWidth / 2 < screenWidth / 2) {
             -(collapsedWidth - visibleEdgeWidth)
         } else {
             screenWidth - visibleEdgeWidth
         }
 
-        val maxAllowableY = getScreenHeight() - getNavigationBarHeight() - collapsedHeight
+        val maxAllowableY = screenHeight - collapsedHeight
         if (params.y > maxAllowableY) params.y = maxAllowableY
         if (params.y < 0) params.y = 0
 
@@ -305,7 +313,6 @@ class FloatView(
                 }
             }
 
-            // 【核心数据同步】推送给收纳态的自定义信号图标 View
             airSignalIconView.setSignalData(airR1 ?: 0f, airR2 ?: 0f, airSnr ?: 0f)
             gndSignalIconView.setSignalData(gndR1 ?: 0f, gndR2 ?: 0f, gndSnr ?: 0f)
 
@@ -363,7 +370,7 @@ class FloatView(
     }
 
     /**
-     * 【全新自定义组件】收纳态信号格图标 + 底部多参数面板
+     * 已微调：缩小了顶部的手机阶梯信号格，同时放大了底部的三参数详情文字并加粗
      */
     private class SignalIconView(context: Context, private val label: String) : View(context) {
         private var r1 = 0f
@@ -373,13 +380,14 @@ class FloatView(
         private val paint = Paint().apply { isAntiAlias = true }
         private val textPaint = Paint().apply {
             color = Color.WHITE
-            textSize = 15f
+            textSize = 14f
             isAntiAlias = true
             textAlign = Paint.Align.CENTER
         }
         private val subTextPaint = Paint().apply {
             color = Color.parseColor("#BDC3C7")
-            textSize = 13f
+            textSize = 15f  // 【优化点：字号由13f增大至15f】
+            isFakeBoldText = true // 【优化点：文字加粗提升可读性】
             isAntiAlias = true
             textAlign = Paint.Align.CENTER
         }
@@ -397,51 +405,49 @@ class FloatView(
             val h = height.toFloat()
             if (w <= 0 || h <= 0) return
 
-            // 1. 绘制顶部的标签 (AIR / GND)
+            // 1. 绘制顶部指示标签 (AIR / GND)
             textPaint.color = if (label == "AIR") Color.parseColor("#E67E22") else Color.parseColor("#3498DB")
             textPaint.isFakeBoldText = true
-            canvas.drawText(label, w / 2f, 22f, textPaint)
+            canvas.drawText(label, w / 2f, 20f, textPaint)
 
-            // 2. 正值逻辑判定信号条格数与颜色（取较好的那个RSSI做代表）
+            // 2. 判定信号级别
             val primaryRssi = if (r1 > 0 && r2 > 0) Math.min(r1, r2) else Math.max(r1, r2)
-            
             val (bars, barColor) = when {
-                primaryRssi == 0f -> 1 to Color.parseColor("#E74C3C") // 断连（红，仅1格）
-                primaryRssi < 60f -> 4 to Color.parseColor("#2ECC71") // 极好（绿，4格）
-                primaryRssi < 75f -> 3 to Color.parseColor("#F1C40F") // 中等（黄，3格）
-                primaryRssi < 90f -> 2 to Color.parseColor("#E67E22") // 偏弱（橙，2格）
-                else -> 1 to Color.parseColor("#E74C3C")              // 极差（红，1格）
+                primaryRssi == 0f -> 1 to Color.parseColor("#E74C3C")
+                primaryRssi < 60f -> 4 to Color.parseColor("#2ECC71")
+                primaryRssi < 75f -> 3 to Color.parseColor("#F1C40F")
+                primaryRssi < 90f -> 2 to Color.parseColor("#E67E22")
+                else -> 1 to Color.parseColor("#E74C3C")
             }
 
-            // 3. 绘制手机信号条图标
+            // 3. 绘制【缩小紧凑版】手机阶梯信号条
             val barCount = 4
-            val barSpacing = 5f
+            val barSpacing = 4f  // 略微缩小格间距
             val totalSpacing = barSpacing * (barCount - 1)
-            val barWidth = 7f
+            val barWidth = 6f    // 降低单格宽度（由7f调小至6f）
             val startX = (w - (barWidth * barCount + totalSpacing)) / 2f
-            val baseLineY = h - 50f // 给底部留出空隙写参数文字
+            val baseLineY = h - 45f // 重新平衡底线坐标，给大字体留位置
 
             for (i in 0 until barCount) {
                 val x = startX + i * (barWidth + barSpacing)
-                val barHeight = 10f + i * 8f // 递增高度
+                val barHeight = 8f + i * 5f // 【优化点：降低阶梯递增高度，更加小巧】
                 val top = baseLineY - barHeight
                 
                 if (i < bars) {
                     paint.color = barColor
                     paint.style = Paint.Style.FILL
                 } else {
-                    paint.color = Color.argb(60, 255, 255, 255) // 未达到的格子半透明暗显
+                    paint.color = Color.argb(55, 255, 255, 255)
                     paint.style = Paint.Style.FILL
                 }
                 canvas.drawRect(x, top, x + barWidth, baseLineY, paint)
             }
 
-            // 4. 绘制底部详细参数三合一文字 (格式: R1/R2/SNR)
+            // 4. 绘制【放大加粗版】底部详细参数
             val infoStr = "${r1.toInt()}/${r2.toInt()}/${snr.toInt()}"
-            // 如果数据全为0，直接显示断连
             val finalInfo = if (primaryRssi == 0f) "DISCONN" else infoStr
             subTextPaint.color = barColor
-            canvas.drawText(finalInfo, w / 2f, h - 14f, subTextPaint)
+            canvas.drawText(finalInfo, w / 2f, h - 15f, subTextPaint)
         }
     }
 
@@ -457,7 +463,12 @@ class FloatView(
         private val snrList = LinkedList<Float>()
 
         private val axisTextPaint = Paint().apply { color = Color.parseColor("#95A5A6"); textSize = 15f; isAntiAlias = true }
-        private val prefixTextPaint = Paint().apply { color = Color.parseColor("#ECF0F1"); textSize = 17f; isFakeBoldText = true; isAntiAlias = true }
+        private val prefixTextPaint = Paint().apply { 
+            color = Color.parseColor("#ECF0F1")
+            textSize = 17f
+            isFakeBoldText = true
+            isAntiAlias = true 
+        }
 
         private val colorRssi1 = Color.parseColor("#2980B9")
         private val colorRssi2 = Color.parseColor("#3498DB")
