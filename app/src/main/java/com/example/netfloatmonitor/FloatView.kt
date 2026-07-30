@@ -313,7 +313,7 @@ class FloatView(
         val titleView = TextView(context).apply {
             text = title
             textSize = 12f
-            paint.isBoldText = true
+            typeface = android.graphics.Typeface.DEFAULT_BOLD //  正确加粗方式
             setTextColor(Color.parseColor("#E67E22"))
             setPadding(4, 2, 4, 6)
         }
@@ -440,7 +440,7 @@ class FloatView(
         private val prefixTextPaint = Paint().apply {
             color = Color.parseColor("#ECF0F1")
             textSize = 17f
-            paint.isBoldText = true
+            isFakeBoldText = true //  正确写法：使用 Paint 的伪粗体属性
             isAntiAlias = true
         }
 
