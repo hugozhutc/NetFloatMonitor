@@ -41,12 +41,16 @@ class FloatView(
     private var startWidth = 0
     private var startHeight = 0
     
-    // 核心修正：downX/Y 用于记录 ACTION_DOWN 初始点；lastX/Y 用于记录上一帧位置以计算移动增量
+    // 坐标核心修正：downX/Y 用于记录 ACTION_DOWN 初始基准点；lastX/Y 用于计算移动增量
     private var downX = 0f
     private var downY = 0f
     private var lastX = 0f
     private var lastY = 0f
     private var resize = false
+
+    // 高频跨进程 Window 更新锁：防止高频手势将 UI 线程与通信通道顶死导致数据无法刷新
+    @Volatile
+    private var isUpdatingLayout = false
 
     private val topBar = LinearLayout(context)
     private val contentFrame = FrameLayout(context)
@@ -130,7 +134,7 @@ class FloatView(
             if (isExpanded) performToggle()
         }
 
-        // 纯粹的自由拖动与平滑缩放逻辑：拒绝干扰UI刷新线程，全屏位置不设限，无任何吸附
+        // 纯粹的自由拖动与平滑缩放逻辑
         setOnTouchListener(object : OnTouchListener {
             private var isDragging = false
 
@@ -143,13 +147,16 @@ class FloatView(
                         lastY = event.rawY
                         startWidth = width
                         startHeight = height
-                        // 右下角 120 像素区域触发拉伸
+                        // 右下角宽容区域触发拉伸
                         resize = isExpanded && (event.x > (width - 120)) && (event.y > (height - 120))
                         isDragging = false
                     }
                     MotionEvent.ACTION_MOVE -> {
+                        // 如果上一帧的 Window 刷新还在阻塞排队，直接跳过此帧，给数据刷新腾出通道
+                        if (isUpdatingLayout) return true
+
                         if (isExpanded && resize) {
-                            // 【模式 A：缩放窗口】基于最初的按下点计算总位移，防止反复重置导致缩水
+                            // 【模式 A：缩放窗口】永远基于最初按下点计算总位移，彻底杜绝瞬间变小或画面抖动
                             val totalDx = event.rawX - downX
                             val totalDy = event.rawY - downY
                             
@@ -161,7 +168,7 @@ class FloatView(
                             lastExpandedWidth = newWidth
                             lastExpandedHeight = newHeight
                         } else {
-                            // 【模式 B：自由拖动】基于上一帧的位置计算步进增量，并实时平移
+                            // 【模式 B：自由拖动】基于上一帧的位置计算步进增量
                             val dx = event.rawX - lastX
                             val dy = event.rawY - lastY
                             
@@ -173,19 +180,27 @@ class FloatView(
                             params.y += dy.toInt()
                         }
                         
-                        // 始终更新 lastX/Y 用于计算下一帧的移动增量
                         lastX = event.rawX
                         lastY = event.rawY
                         
-                        // 安全刷新窗口布局
-                        windowManager.updateViewLayout(this@FloatView, params)
+                        // 采用队列锁机制，将更新异步投递给主线程，防止阻塞网络数据回调
+                        isUpdatingLayout = true
+                        post {
+                            try {
+                                if (parent != null) {
+                                    windowManager.updateViewLayout(this@FloatView, params)
+                                }
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            } finally {
+                                isUpdatingLayout = false
+                            }
+                        }
                     }
                     MotionEvent.ACTION_UP -> {
                         if (!isExpanded && !isDragging) {
-                            // 收纳态下被纯粹点击时，触发展开
                             performToggle()
                         }
-                        // 完全移除了所有的吸附操作，松手在哪就停在哪
                     }
                 }
                 return true
@@ -242,45 +257,49 @@ class FloatView(
         return box
     }
 
+    // 终极保证：不论外部在后台哪个子线程或数据轮询线程调用，内部强行切回 UI 线程渲染数据
     fun updateJsonDynamic(rawJson: String) {
-        try {
-            val obj = JSONObject(rawJson)
-            
-            var airR1: Float? = null
-            var airR2: Float? = null
-            var airSnr: Float? = null
-            var gndR1: Float? = null
-            var gndR2: Float? = null
-            var gndSnr: Float? = null
+        post {
+            try {
+                val obj = JSONObject(rawJson)
+                
+                var airR1: Float? = null
+                var airR2: Float? = null
+                var airSnr: Float? = null
+                var gndR1: Float? = null
+                var gndR2: Float? = null
+                var gndSnr: Float? = null
 
-            val keys = obj.keys()
-            while (keys.hasNext()) {
-                val key = keys.next()
-                val valueStr = obj.optString(key, "")
+                val keys = obj.keys()
+                while (keys.hasNext()) {
+                    val key = keys.next()
+                    val valueStr = obj.optString(key, "")
 
-                if (key.endsWith("_a") || key.startsWith("air_")) {
-                    updateOrAddTextWithColor(airLayout, airTextViewMap, key, valueStr)
-                    if (key.contains("rssi1")) airR1 = valueStr.toFloatOrNull()
-                    if (key.contains("rssi2")) airR2 = valueStr.toFloatOrNull()
-                    if (key.contains("snr")) airSnr = valueStr.toFloatOrNull()
-                } else if (key.endsWith("_g") || key.startsWith("gnd_")) {
-                    updateOrAddTextWithColor(gndLayout, gndTextViewMap, key, valueStr)
-                    if (key.contains("rssi1")) gndR1 = valueStr.toFloatOrNull()
-                    if (key.contains("rssi2")) gndR2 = valueStr.toFloatOrNull()
-                    if (key.contains("snr")) gndSnr = valueStr.toFloatOrNull()
-                } else {
-                    updateOrAddTextWithColor(airLayout, airTextViewMap, key, valueStr)
+                    if (key.endsWith("_a") || key.startsWith("air_")) {
+                        updateOrAddTextWithColor(airLayout, airTextViewMap, key, valueStr)
+                        if (key.contains("rssi1")) airR1 = valueStr.toFloatOrNull()
+                        if (key.contains("rssi2")) airR2 = valueStr.toFloatOrNull()
+                        if (key.contains("snr")) airSnr = valueStr.toFloatOrNull()
+                    } else if (key.endsWith("_g") || key.startsWith("gnd_")) {
+                        updateOrAddTextWithColor(gndLayout, gndTextViewMap, key, valueStr)
+                        if (key.contains("rssi1")) gndR1 = valueStr.toFloatOrNull()
+                        if (key.contains("rssi2")) gndR2 = valueStr.toFloatOrNull()
+                        if (key.contains("snr")) gndSnr = valueStr.toFloatOrNull()
+                    } else {
+                        updateOrAddTextWithColor(airLayout, airTextViewMap, key, valueStr)
+                    }
                 }
+
+                airSignalIconView.setSignalData(airR1 ?: 0f, airR2 ?: 0f, airSnr ?: 0f)
+                gndSignalIconView.setSignalData(gndR1 ?: 0f, gndR2 ?: 0f, gndSnr ?: 0f)
+
+                if (airR1 != null || airR2 != null || airSnr != null) airChartView.addData(airR1, airR2, airSnr)
+                if (gndR1 != null || gndR2 != null || gndSnr != null) gndChartView.addData(gndR1, gndR2, gndSnr)
+
+            } catch (e: Exception) {
+                android.util.Log.e("FloatViewError", "数据刷新渲染异常: ${e.message}")
+                e.printStackTrace()
             }
-
-            airSignalIconView.setSignalData(airR1 ?: 0f, airR2 ?: 0f, airSnr ?: 0f)
-            gndSignalIconView.setSignalData(gndR1 ?: 0f, gndR2 ?: 0f, gndSnr ?: 0f)
-
-            if (airR1 != null || airR2 != null || airSnr != null) airChartView.addData(airR1, airR2, airSnr)
-            if (gndR1 != null || gndR2 != null || gndSnr != null) gndChartView.addData(gndR1, gndR2, gndSnr)
-
-        } catch (e: Exception) {
-            e.printStackTrace()
         }
     }
 
