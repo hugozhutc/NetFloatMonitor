@@ -30,12 +30,12 @@ class FloatView(
     private val airChartView = WaveformView(context, isAir = true)
     private val gndChartView = WaveformView(context, isAir = false)
     
-    // 天空与地面多频点底噪曲线图（内部集成了彩色图例）
+    // 天空与地面多频点底噪曲线图
     private val airNoiseChartView = NoiseFloorChartView(context, isAir = true)
     private val gndNoiseChartView = NoiseFloorChartView(context, isAir = false)
 
     private var isExpanded = true
-    private var lastExpandedWidth = 1380
+    private var lastExpandedWidth = 1400
     private var lastExpandedHeight = 650 
     
     private val collapsedWidth = 220
@@ -113,10 +113,17 @@ class FloatView(
         airLayout.orientation = LinearLayout.VERTICAL
         gndLayout.orientation = LinearLayout.VERTICAL
         
-        contentPanel.addView(createPanel("AIR TELEMETRY", airLayout))
-        contentPanel.addView(createPanel("GND TELEMETRY", gndLayout))
+        // ================= 终极优化 1：自适应挂载文本面板 =================
+        // createPanel 内部已被重构为自动使用权重，天空端占整体的 1 份空间
+        val airTelemetryPanel = createPanel("AIR TELEMETRY", airLayout)
+        val airPanelLp = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f)
+        contentPanel.addView(airTelemetryPanel, airPanelLp)
         
-        // 组装 4 个波形曲线图
+        // 地面端占整体的 1 份空间
+        val gndTelemetryPanel = createPanel("GND TELEMETRY", gndLayout)
+        val gndPanelLp = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f)
+        contentPanel.addView(gndTelemetryPanel, gndPanelLp)
+        
         chartContainer.orientation = LinearLayout.VERTICAL
         val subChartLp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f).apply { setMargins(0, 0, 0, 6) }
         val lastChartLp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f)
@@ -126,7 +133,11 @@ class FloatView(
         chartContainer.addView(airNoiseChartView, subChartLp)
         chartContainer.addView(gndNoiseChartView, lastChartLp)
         
-        val chartContainerLp = LinearLayout.LayoutParams(750, LinearLayout.LayoutParams.MATCH_PARENT).apply { setMargins(16, 0, 4, 0) }
+        // ================= 终极优化 2：图表区使用动态权重 =================
+        // 抛弃 750 像素固定宽度。宽度设为 0，权重给 2.5f，意味着图表区的宽度永远是文本框的 2.5 倍，防止由于底噪文本换行顶开布局
+        val chartContainerLp = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 2.5f).apply { 
+            setMargins(16, 0, 4, 0) 
+        }
         contentPanel.addView(chartContainer, chartContainerLp)
         
         contentFrame.addView(contentPanel, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
@@ -248,9 +259,16 @@ class FloatView(
             setPadding(4, 2, 4, 6)
         }
         box.addView(titleView)
+        
+        // 找到文本更新区所处的 ScrollView
         val scroll = ScrollView(context).apply { setVerticalScrollBarEnabled(false) }
         scroll.addView(containerLayout)
-        box.addView(scroll, LinearLayout.LayoutParams(310, LinearLayout.LayoutParams.MATCH_PARENT))
+        
+        // ================= 终极优化 3：让文本框在 ScrollView 内部自适应并支持超出裁剪 =================
+        // 原本硬编码的 (310, MATCH_PARENT) 改为自适应
+        val scrollLp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.MATCH_PARENT)
+        box.addView(scroll, scrollLp)
+        
         return box
     }
 
@@ -266,7 +284,7 @@ class FloatView(
                 var gndR2: Float? = null
                 var gndSnr: Float? = null
 
-                // 核心预设全局曲线颜色池，确保左侧文本和右侧 Chart 完美互通
+                // 核心预设色彩池：红、黄、蓝、紫、青、橙
                 val noiseColors = arrayOf("#E74C3C", "#F1C40F", "#3498DB", "#9B59B6", "#1ABC9C", "#E67E22")
 
                 val keys = obj.keys()
@@ -274,7 +292,7 @@ class FloatView(
                     val key = keys.next()
                     val valueStr = obj.optString(key, "")
 
-                    // 拦截底噪键，对其进行动态多路拆解与色彩精准绑定
+                    // 底噪多路彩色拆解拦截
                     if (key == "noiseFloor_a" || key == "noiseFloor_g") {
                         val isAir = key == "noiseFloor_a"
                         val targetLayout = if (isAir) airLayout else gndLayout
@@ -299,20 +317,23 @@ class FloatView(
                                     text = displayText
                                     textSize = 12f
                                     setTextColor(channelColor)
+                                    // ================= 终极优化 4：禁止文本换行顶开布局高度 =================
+                                    setSingleLine(true) 
+                                    setEllipsize(android.text.TextUtils.TruncateAt.END) // 超出显示省略号
                                     setPadding(6, 4, 6, 4)
                                 }
                                 targetLayout.addView(tv)
                                 targetMap[subKey] = tv
                             }
                         }
-
-                        if (key == "noiseFloor_a") airNoiseChartView.postInvalidate()
-                        if (key == "noiseFloor_g") gndNoiseChartView.postInvalidate()
                         
-                        continue // 跳过通用添加处理，防止整串数据重复出现
+                        // 馈送给底噪波形图数据后，强制重新 invalidate 以立刻重绘曲线，无需等待其他常规遥测数据刷新
+                        chart.postInvalidate()
+                        
+                        continue 
                     }
 
-                    // 常规遥测数据流分流解析
+                    // 常规遥测文本数据
                     if (key.endsWith("_a") || key.startsWith("air_")) {
                         updateOrAddTextWithColor(airLayout, airTextViewMap, key, valueStr)
                         if (key.contains("rssi1")) airR1 = valueStr.toFloatOrNull()
@@ -379,6 +400,9 @@ class FloatView(
                 text = displayText
                 textSize = 12f
                 setTextColor(displayColor)
+                // 常规遥测数据也加上单行禁止换行，彻底杜绝所有文本垂直挤压整体高度
+                setSingleLine(true) 
+                setEllipsize(android.text.TextUtils.TruncateAt.END)
                 setPadding(6, 4, 6, 4)
             }
             layout.addView(tv)
@@ -569,14 +593,13 @@ class FloatView(
         private val gridPaint = Paint().apply { color = Color.argb(30, 255, 255, 255); strokeWidth = 1f }
         private val bgPaint = Paint().apply { color = Color.argb(20, 230, 126, 34) } 
 
-        // 核心色彩池定义，完全与全局解析逻辑对齐
         private val curveColors = intArrayOf(
-            Color.parseColor("#E74C3C"), // CH1 红
-            Color.parseColor("#F1C40F"), // CH2 黄
-            Color.parseColor("#3498DB"), // CH3 蓝
-            Color.parseColor("#9B59B6"), // CH4 紫
-            Color.parseColor("#1ABC9C"), // CH5 青
-            Color.parseColor("#E67E22")  // CH6 橙
+            Color.parseColor("#E74C3C"), // 红
+            Color.parseColor("#F1C40F"), // 黄
+            Color.parseColor("#3498DB"), // 蓝
+            Color.parseColor("#9B59B6"), // 紫
+            Color.parseColor("#1ABC9C"), // 青
+            Color.parseColor("#E67E22")  // 橙
         )
         private val curvePaints = Array(curveColors.size) { i ->
             Paint().apply { color = curveColors[i]; strokeWidth = 2f; style = Paint.Style.STROKE; isAntiAlias = true }
@@ -590,7 +613,7 @@ class FloatView(
                 val parts = rawCsv.split(",")
                 val floatArray = FloatArray(parts.size)
                 for (i in parts.indices) {
-                    floatArray[i] = parts[i].trim().toFloatOrNull() ?: 0f
+                    floatArray[i] = parts[Parti].trim().toFloatOrNull() ?: 0f
                 }
                 historyList.addLast(floatArray)
                 if (historyList.size > maxDataPoints) historyList.removeFirst()
@@ -611,16 +634,14 @@ class FloatView(
             val chartWidth = chartRight - chartLeft
             canvas.drawRect(chartLeft, 0f, chartRight, h, bgPaint)
 
-            // 1. 绘制底噪网格与 Y 轴刻度
             val yPositions = floatArrayOf(h * 0.2f, h * 0.5f, h * 0.8f)
             val labels = arrayOf("140", "90", "40")
             for (i in yPositions.indices) {
                 val y = yPositions[i]
                 canvas.drawLine(chartLeft, y, chartRight, y, gridPaint)
-                canvas.drawText(labels[i], 20f, y + 5f, axisTextPaint)
+                canvas.drawText(labels[parti], 20f, y + 5f, axisTextPaint)
             }
 
-            // 2. 绘制头部标题
             val title = if (isAir) "[AIR NOISE]" else "[GND NOISE]"
             canvas.drawText(title, chartLeft + 15f, 22f, headerTextPaint)
 
@@ -630,12 +651,11 @@ class FloatView(
             val stepX = chartWidth / (maxDataPoints - 1)
             val range = noiseMax - noiseMin
 
-            // 3. 绘制多路底噪核心曲线轨迹
             for (ch in 0 until currentChannels) {
                 val paint = curvePaints[ch % curvePaints.size]
                 
                 for (i in 0 until historyList.size - 1) {
-                    val startArray = historyList[i]
+                    val startArray = historyList[parti]
                     val endArray = historyList[i + 1]
                     
                     if (ch >= startArray.size || ch >= endArray.size) continue
@@ -654,28 +674,24 @@ class FloatView(
                 }
             }
 
-            // 4. 新增：图表右上角彩色动态图例指示器（Legend）
             val legendPaint = Paint().apply { isAntiAlias = true; style = Paint.Style.FILL }
             val legendTextPaint = Paint().apply { color = Color.parseColor("#BDC3C7"); textSize = 11f; isAntiAlias = true }
             
             var legendRightX = w - 15f
-            val legendY = 22f // 与主标题处于同一水平线
+            val legendY = 22f // 与标题对齐
 
             for (ch in (currentChannels - 1) downTo 0) {
                 val chColor = curveColors[ch % curveColors.size]
-                val labelStr = "P${ch + 1}" // 对应频点(Point)通道号
+                val labelStr = "CH${ch + 1}"
                 
                 val textWidth = legendTextPaint.measureText(labelStr)
                 val itemWidth = textWidth + 14f
                 
-                // 绘制图例彩色指示小方块
                 legendPaint.color = chColor
                 canvas.drawRect(legendRightX - itemWidth, legendY - 8f, legendRightX - itemWidth + 8f, legendY, legendPaint)
                 
-                // 绘制指示通道文字
                 canvas.drawText(labelStr, legendRightX - itemWidth + 12f, legendY, legendTextPaint)
                 
-                // 指针动态向左移位，防止图例重叠
                 legendRightX -= (itemWidth + 14f)
             }
         }
