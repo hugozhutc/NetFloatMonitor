@@ -280,7 +280,7 @@ class FloatView(
                         parts.forEachIndexed { index, partValue ->
                             val subKey = "${key}_ch${index + 1}"
                             val channelColor = Color.parseColor(noiseColors[index % noiseColors.size])
-                            val prefixLabel = if (isAir) "空中频点" else "地面频点"
+                            val prefixLabel = if (isAir) "Air_ch" else "Gnd_ch"
                             val displayText = "$prefixLabel${index + 1} : ${partValue.trim()}"
                             
                             val cachedTv = targetMap[subKey]
@@ -650,7 +650,7 @@ class FloatView(
 
             for (ch in (currentChannels - 1) downTo 0) {
                 val chColor = curveColors[ch % curveColors.size]
-                val labelStr = "P${ch + 1}"
+                val labelStr = "ch${ch + 1}"
                 
                 val textWidth = legendTextPaint.measureText(labelStr)
                 val itemWidth = textWidth + 14f
