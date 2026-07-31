@@ -27,7 +27,7 @@ class FloatView(
     private val airLayout = LinearLayout(context)
     private val gndLayout = LinearLayout(context)
     
-    // 拆分为两个独立的图表栏容器[cite: 1]
+    // 拆分为两个独立的图表栏容器
     private val waveformContainer = LinearLayout(context)
     private val noiseContainer = LinearLayout(context)
     
@@ -38,7 +38,7 @@ class FloatView(
     private val gndNoiseChartView = NoiseFloorChartView(context, isAir = false)
 
     private var isExpanded = true
-    private var lastExpandedWidth = 1760 // 扩展宽度至 1760 以容纳 4 栏[cite: 1]
+    private var lastExpandedWidth = 1760 // 扩展宽度至 1760 以容纳 4 栏
     private var lastExpandedHeight = 650 
     
     private val collapsedWidth = 220
@@ -113,27 +113,27 @@ class FloatView(
         airLayout.orientation = LinearLayout.VERTICAL
         gndLayout.orientation = LinearLayout.VERTICAL
         
-        // 第 1 栏与第 2 栏：数据文本[cite: 1]
+        // 第 1 栏与第 2 栏：数据文本
         contentPanel.addView(createPanel("AIR TELEMETRY", airLayout))
         contentPanel.addView(createPanel("GND TELEMETRY", gndLayout))
         
         val subChartLp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f).apply { setMargins(0, 0, 0, 6) }
         val lastChartLp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f)
         
-        // 第 3 栏：实时波形图（AIR + GND）[cite: 1]
+        // 第 3 栏：实时波形图（AIR + GND）
         waveformContainer.orientation = LinearLayout.VERTICAL
         waveformContainer.addView(airChartView, subChartLp)
         waveformContainer.addView(gndChartView, lastChartLp)
         
-        // 第 4 栏：底噪频谱图（AIR + GND）[cite: 1]
+        // 第 4 栏：底噪频谱图（AIR + GND）
         noiseContainer.orientation = LinearLayout.VERTICAL
         noiseContainer.addView(airNoiseChartView, subChartLp)
         noiseContainer.addView(gndNoiseChartView, lastChartLp)
         
-        // 设置图表栏的布局参数[cite: 1]
+        // 设置图表栏的布局参数
         val chartWidthLp = LinearLayout.LayoutParams(550, LinearLayout.LayoutParams.MATCH_PARENT).apply { setMargins(16, 0, 4, 0) }
-        contentPanel.addView(waveformContainer, chartWidthLp)[cite: 1]
-        contentPanel.addView(noiseContainer, chartWidthLp)   [cite: 1]
+        contentPanel.addView(waveformContainer, chartWidthLp)
+        contentPanel.addView(noiseContainer, chartWidthLp)   
         
         contentFrame.addView(contentPanel, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
         contentFrame.addView(resizeIndicator, FrameLayout.LayoutParams(18, 18).apply { gravity = Gravity.BOTTOM or Gravity.END; setMargins(0, 0, 2, 2) })
@@ -283,14 +283,14 @@ class FloatView(
                         val targetMap = if (isAir) airTextViewMap else gndTextViewMap
                         val chart = if (isAir) airNoiseChartView else gndNoiseChartView
                         
-                        chart.addNoiseData(valueStr)[cite: 1]
+                        chart.addNoiseData(valueStr)
                         
                         val parts = valueStr.split(",")
                         parts.forEachIndexed { index, partValue ->
                             val subKey = "${key}_ch${index + 1}"
                             val channelColor = Color.parseColor(noiseColors[index % noiseColors.size])
-                            val prefixLabel = if (isAir) "Air_ch" else "Gnd_ch"[cite: 1]
-                            val displayText = "$prefixLabel${index + 1} : ${partValue.trim()}"[cite: 1]
+                            val prefixLabel = if (isAir) "Air_ch" else "Gnd_ch"
+                            val displayText = "$prefixLabel${index + 1} : ${partValue.trim()}"
                             
                             val cachedTv = targetMap[subKey]
                             if (cachedTv != null) {
@@ -303,33 +303,33 @@ class FloatView(
                                     setTextColor(channelColor)
                                     setPadding(6, 4, 6, 4)
                                 }
-                                targetLayout.addView(tv)[cite: 1]
+                                targetLayout.addView(tv)
                                 targetMap[subKey] = tv
                             }
                         }
                         continue 
                     }
 
-                    if (key.endsWith("_a") || key.startsWith("air_")) {[cite: 1]
-                        updateOrAddTextWithColor(airLayout, airTextViewMap, key, valueStr)[cite: 1]
-                        if (key.contains("rssi1")) airR1 = valueStr.toFloatOrNull()[cite: 1]
-                        if (key.contains("rssi2")) airR2 = valueStr.toFloatOrNull()[cite: 1]
-                        if (key.contains("snr")) airSnr = valueStr.toFloatOrNull()[cite: 1]
-                    } else if (key.endsWith("_g") || key.startsWith("gnd_")) {[cite: 1]
-                        updateOrAddTextWithColor(gndLayout, gndTextViewMap, key, valueStr)[cite: 1]
-                        if (key.contains("rssi1")) gndR1 = valueStr.toFloatOrNull()[cite: 1]
-                        if (key.contains("rssi2")) gndR2 = valueStr.toFloatOrNull()[cite: 1]
-                        if (key.contains("snr")) gndSnr = valueStr.toFloatOrNull()[cite: 1]
+                    if (key.endsWith("_a") || key.startsWith("air_")) {
+                        updateOrAddTextWithColor(airLayout, airTextViewMap, key, valueStr)
+                        if (key.contains("rssi1")) airR1 = valueStr.toFloatOrNull()
+                        if (key.contains("rssi2")) airR2 = valueStr.toFloatOrNull()
+                        if (key.contains("snr")) airSnr = valueStr.toFloatOrNull()
+                    } else if (key.endsWith("_g") || key.startsWith("gnd_")) {
+                        updateOrAddTextWithColor(gndLayout, gndTextViewMap, key, valueStr)
+                        if (key.contains("rssi1")) gndR1 = valueStr.toFloatOrNull()
+                        if (key.contains("rssi2")) gndR2 = valueStr.toFloatOrNull()
+                        if (key.contains("snr")) gndSnr = valueStr.toFloatOrNull()
                     } else {
-                        updateOrAddTextWithColor(airLayout, airTextViewMap, key, valueStr)[cite: 1]
+                        updateOrAddTextWithColor(airLayout, airTextViewMap, key, valueStr)
                     }
                 }
 
-                airSignalIconView.setSignalData(airR1 ?: 0f, airR2 ?: 0f, airSnr ?: 0f)[cite: 1]
-                gndSignalIconView.setSignalData(gndR1 ?: 0f, gndR2 ?: 0f, gndSnr ?: 0f)[cite: 1]
+                airSignalIconView.setSignalData(airR1 ?: 0f, airR2 ?: 0f, airSnr ?: 0f)
+                gndSignalIconView.setSignalData(gndR1 ?: 0f, gndR2 ?: 0f, gndSnr ?: 0f)
 
-                if (airR1 != null || airR2 != null || airSnr != null) airChartView.addData(airR1, airR2, airSnr)[cite: 1]
-                if (gndR1 != null || gndR2 != null || gndSnr != null) gndChartView.addData(gndR1, gndR2, gndSnr)[cite: 1]
+                if (airR1 != null || airR2 != null || airSnr != null) airChartView.addData(airR1, airR2, airSnr)
+                if (gndR1 != null || gndR2 != null || gndSnr != null) gndChartView.addData(gndR1, gndR2, gndSnr)
 
             } catch (e: Exception) {
                 android.util.Log.e("FloatViewError", "数据刷新渲染异常: ${e.message}")
@@ -366,7 +366,7 @@ class FloatView(
             else -> Color.WHITE
         }
 
-        val displayText = "$key : $value"[cite: 1]
+        val displayText = "$key : $value"
         if (cachedTv != null) {
             cachedTv.text = displayText
             cachedTv.setTextColor(displayColor)
@@ -377,7 +377,7 @@ class FloatView(
                 setTextColor(displayColor)
                 setPadding(6, 4, 6, 4)
             }
-            layout.addView(tv)[cite: 1]
+            layout.addView(tv)
             map[key] = tv
         }
     }
@@ -403,10 +403,10 @@ class FloatView(
         }
 
         fun setSignalData(rssi1: Float, rssi2: Float, snrVal: Float) {
-            this.r1 = rssi1[cite: 1]
-            this.r2 = rssi2[cite: 1]
-            this.snr = snrVal[cite: 1]
-            postInvalidate()[cite: 1]
+            this.r1 = rssi1
+            this.r2 = rssi2
+            this.snr = snrVal
+            postInvalidate()
         }
 
         override fun onDraw(canvas: Canvas) {
@@ -415,17 +415,17 @@ class FloatView(
             val h = height.toFloat()
             if (w <= 0 || h <= 0) return
 
-            textPaint.color = if (label == "AIR") Color.parseColor("#E67E22") else Color.parseColor("#3498DB")[cite: 1]
+            textPaint.color = if (label == "AIR") Color.parseColor("#E67E22") else Color.parseColor("#3498DB")
             textPaint.isFakeBoldText = true
-            canvas.drawText(label, w / 2f, 20f, textPaint)[cite: 1]
+            canvas.drawText(label, w / 2f, 20f, textPaint)
 
-            val primaryRssi = if (r1 > 0 && r2 > 0) Math.min(r1, r2) else Math.max(r1, r2)[cite: 1]
+            val primaryRssi = if (r1 > 0 && r2 > 0) Math.min(r1, r2) else Math.max(r1, r2)
             val (bars, barColor) = when {
-                primaryRssi == 0f -> 1 to Color.parseColor("#E74C3C")[cite: 1]
-                primaryRssi < 60f -> 4 to Color.parseColor("#2ECC71")[cite: 1]
-                primaryRssi < 75f -> 3 to Color.parseColor("#F1C40F")[cite: 1]
-                primaryRssi < 90f -> 2 to Color.parseColor("#E67E22")[cite: 1]
-                else -> 1 to Color.parseColor("#E74C3C")[cite: 1]
+                primaryRssi == 0f -> 1 to Color.parseColor("#E74C3C")
+                primaryRssi < 60f -> 4 to Color.parseColor("#2ECC71")
+                primaryRssi < 75f -> 3 to Color.parseColor("#F1C40F")
+                primaryRssi < 90f -> 2 to Color.parseColor("#E67E22")
+                else -> 1 to Color.parseColor("#E74C3C")
             }
 
             val barCount = 4
@@ -447,13 +447,13 @@ class FloatView(
                     paint.color = Color.argb(55, 255, 255, 255)
                     paint.style = Paint.Style.FILL
                 }
-                canvas.drawRect(x, top, x + barWidth, baseLineY, paint)[cite: 1]
+                canvas.drawRect(x, top, x + barWidth, baseLineY, paint)
             }
 
-            val infoStr = "${r1.toInt()}/${r2.toInt()}/${snr.toInt()}"[cite: 1]
-            val finalInfo = if (primaryRssi == 0f) "DISCONN" else infoStr[cite: 1]
+            val infoStr = "${r1.toInt()}/${r2.toInt()}/${snr.toInt()}"
+            val finalInfo = if (primaryRssi == 0f) "DISCONN" else infoStr
             subTextPaint.color = barColor
-            canvas.drawText(finalInfo, w / 2f, h - 15f, subTextPaint)[cite: 1]
+            canvas.drawText(finalInfo, w / 2f, h - 15f, subTextPaint)
         }
     }
 
@@ -461,11 +461,11 @@ class FloatView(
         private val maxDataPoints = 100
         private val yAxisWidth = 85f 
 
-        private val rssi1List = CopyOnWriteArrayList<Float>()[cite: 1]
-        private val rssi2List = CopyOnWriteArrayList<Float>()[cite: 1]
-        private val snrList = CopyOnWriteArrayList<Float>()[cite: 1]
+        private val rssi1List = CopyOnWriteArrayList<Float>()
+        private val rssi2List = CopyOnWriteArrayList<Float>()
+        private val snrList = CopyOnWriteArrayList<Float>()
 
-        private val axisTextPaint = Paint().apply { color = Color.parseColor("#95A5A6"); textSize = 13f; isAntiAlias = true }[cite: 1]
+        private val axisTextPaint = Paint().apply { color = Color.parseColor("#95A5A6"); textSize = 13f; isAntiAlias = true }
         private val prefixTextPaint = Paint().apply { 
             color = Color.parseColor("#ECF0F1")
             textSize = 14f
@@ -477,16 +477,16 @@ class FloatView(
         private val colorRssi2 = Color.parseColor("#3498DB")
         private val colorSnr   = Color.parseColor("#2ECC71")
 
-        private val paintRssi1 = Paint().apply { color = colorRssi1; strokeWidth = 3f; style = Paint.Style.STROKE; isAntiAlias = true }[cite: 1]
-        private val paintRssi2 = Paint().apply { color = colorRssi2; strokeWidth = 2f; style = Paint.Style.STROKE; isAntiAlias = true }[cite: 1]
-        private val paintSnr   = Paint().apply { color = colorSnr; strokeWidth = 2.5f; style = Paint.Style.STROKE; isAntiAlias = true }[cite: 1]
+        private val paintRssi1 = Paint().apply { color = colorRssi1; strokeWidth = 3f; style = Paint.Style.STROKE; isAntiAlias = true }
+        private val paintRssi2 = Paint().apply { color = colorRssi2; strokeWidth = 2f; style = Paint.Style.STROKE; isAntiAlias = true }
+        private val paintSnr   = Paint().apply { color = colorSnr; strokeWidth = 2.5f; style = Paint.Style.STROKE; isAntiAlias = true }
 
-        private val paintTextRssi1 = Paint().apply { color = colorRssi1; textSize = 14f; isAntiAlias = true }[cite: 1]
-        private val paintTextRssi2 = Paint().apply { color = colorRssi2; textSize = 14f; isAntiAlias = true }[cite: 1]
-        private val paintTextSnr   = Paint().apply { color = colorSnr; textSize = 14f; isAntiAlias = true }[cite: 1]
+        private val paintTextRssi1 = Paint().apply { color = colorRssi1; textSize = 14f; isAntiAlias = true }
+        private val paintTextRssi2 = Paint().apply { color = colorRssi2; textSize = 14f; isAntiAlias = true }
+        private val paintTextSnr   = Paint().apply { color = colorSnr; textSize = 14f; isAntiAlias = true }
 
-        private val gridPaint = Paint().apply { color = Color.argb(30, 255, 255, 255); strokeWidth = 1f }[cite: 1]
-        private val bgPaint = Paint().apply { color = Color.argb(15, 255, 255, 255) }[cite: 1]
+        private val gridPaint = Paint().apply { color = Color.argb(30, 255, 255, 255); strokeWidth = 1f }
+        private val bgPaint = Paint().apply { color = Color.argb(15, 255, 255, 255) }
 
         private val rssiMin = 0f
         private val rssiMax = 120f
@@ -494,14 +494,14 @@ class FloatView(
         private val snrMax = 50f
 
         fun addData(r1: Float?, r2: Float?, snr: Float?) {
-            rssi1List.add(r1 ?: rssi1List.lastOrNull() ?: 0f)[cite: 1]
-            rssi2List.add(r2 ?: rssi2List.lastOrNull() ?: 0f)[cite: 1]
-            snrList.add(snr ?: snrList.lastOrNull() ?: 0f)[cite: 1]
+            rssi1List.add(r1 ?: rssi1List.lastOrNull() ?: 0f)
+            rssi2List.add(r2 ?: rssi2List.lastOrNull() ?: 0f)
+            snrList.add(snr ?: snrList.lastOrNull() ?: 0f)
             
-            if (rssi1List.size > maxDataPoints) rssi1List.removeAt(0)[cite: 1]
-            if (rssi2List.size > maxDataPoints) rssi2List.removeAt(0)[cite: 1]
-            if (snrList.size > maxDataPoints) snrList.removeAt(0)[cite: 1]
-            postInvalidate()[cite: 1]
+            if (rssi1List.size > maxDataPoints) rssi1List.removeAt(0)
+            if (rssi2List.size > maxDataPoints) rssi2List.removeAt(0)
+            if (snrList.size > maxDataPoints) snrList.removeAt(0)
+            postInvalidate()
         }
 
         override fun onDraw(canvas: Canvas) {
@@ -510,48 +510,48 @@ class FloatView(
             val h = height.toFloat()
             if (w <= 0 || h <= 0) return
 
-            val chartLeft = yAxisWidth[cite: 1]
+            val chartLeft = yAxisWidth
             val chartRight = w
             val chartWidth = chartRight - chartLeft
-            canvas.drawRect(chartLeft, 0f, chartRight, h, bgPaint)[cite: 1]
+            canvas.drawRect(chartLeft, 0f, chartRight, h, bgPaint)
 
-            val yPositions = floatArrayOf(h * 0.2f, h * 0.5f, h * 0.8f)[cite: 1]
-            val rssiLabels = arrayOf("120", "60", "0")[cite: 1]
-            val snrLabels = arrayOf("50", "25", "0")[cite: 1]
+            val yPositions = floatArrayOf(h * 0.2f, h * 0.5f, h * 0.8f)
+            val rssiLabels = arrayOf("120", "60", "0")
+            val snrLabels = arrayOf("50", "25", "0")
 
             for (i in yPositions.indices) {
                 val y = yPositions[i]
-                canvas.drawLine(chartLeft, y, chartRight, y, gridPaint)[cite: 1]
-                canvas.drawText("${rssiLabels[i]}(${snrLabels[i]})", 5f, y + 5f, axisTextPaint)[cite: 1]
+                canvas.drawLine(chartLeft, y, chartRight, y, gridPaint)
+                canvas.drawText("${rssiLabels[i]}(${snrLabels[i]})", 5f, y + 5f, axisTextPaint)
             }
 
-            val prefix = if (isAir) "[AIR] " else "[GND] "[cite: 1]
-            canvas.drawText(prefix, chartLeft + 15f, 22f, prefixTextPaint)[cite: 1]
-            val startX = chartLeft + 15f + prefixTextPaint.measureText(prefix)[cite: 1]
+            val prefix = if (isAir) "[AIR] " else "[GND] "
+            canvas.drawText(prefix, chartLeft + 15f, 22f, prefixTextPaint)
+            val startX = chartLeft + 15f + prefixTextPaint.measureText(prefix)
 
-            val r1Text = "R1: ${rssi1List.lastOrNull()?.toInt() ?: 0}  "[cite: 1]
-            canvas.drawText(r1Text, startX, 22f, paintTextRssi1)[cite: 1]
-            val r2Text = "R2: ${rssi2List.lastOrNull()?.toInt() ?: 0}  "[cite: 1]
-            canvas.drawText(r2Text, startX + paintTextRssi1.measureText(r1Text), 22f, paintTextRssi2)[cite: 1]
-            val snrText = "SNR: ${snrList.lastOrNull()?.toInt() ?: 0}"[cite: 1]
-            canvas.drawText(snrText, startX + paintTextRssi1.measureText(r1Text) + paintTextRssi2.measureText(r2Text), 22f, paintTextSnr)[cite: 1]
+            val r1Text = "R1: ${rssi1List.lastOrNull()?.toInt() ?: 0}  "
+            canvas.drawText(r1Text, startX, 22f, paintTextRssi1)
+            val r2Text = "R2: ${rssi2List.lastOrNull()?.toInt() ?: 0}  "
+            canvas.drawText(r2Text, startX + paintTextRssi1.measureText(r1Text), 22f, paintTextRssi2)
+            val snrText = "SNR: ${snrList.lastOrNull()?.toInt() ?: 0}"
+            canvas.drawText(snrText, startX + paintTextRssi1.measureText(r1Text) + paintTextRssi2.measureText(r2Text), 22f, paintTextSnr)
 
-            drawNormalCurve(canvas, rssi1List, rssiMin, rssiMax, chartLeft, chartWidth, h, paintRssi1)[cite: 1]
-            drawNormalCurve(canvas, rssi2List, rssiMin, rssiMax, chartLeft, chartWidth, h, paintRssi2)[cite: 1]
-            drawNormalCurve(canvas, snrList, minVal = snrMin, maxVal = snrMax, leftOffset = chartLeft, cWidth = chartWidth, h = h, paint = paintSnr)[cite: 1]
+            drawNormalCurve(canvas, rssi1List, rssiMin, rssiMax, chartLeft, chartWidth, h, paintRssi1)
+            drawNormalCurve(canvas, rssi2List, rssiMin, rssiMax, chartLeft, chartWidth, h, paintRssi2)
+            drawNormalCurve(canvas, snrList, minVal = snrMin, maxVal = snrMax, leftOffset = chartLeft, cWidth = chartWidth, h = h, paint = paintSnr)
         }
 
         private fun drawNormalCurve(canvas: Canvas, list: List<Float>, minVal: Float, maxVal: Float, leftOffset: Float, cWidth: Float, h: Float, paint: Paint) {
-            val size = list.size[cite: 1]
+            val size = list.size
             if (size < 2) return
-            val stepX = cWidth / (maxDataPoints - 1)[cite: 1]
+            val stepX = cWidth / (maxDataPoints - 1)
             val range = maxVal - minVal
             for (i in 0 until size - 1) {
-                val startX = leftOffset + (i * stepX)[cite: 1]
-                val endX = leftOffset + ((i + 1) * stepX)[cite: 1]
-                val valStart = list[i].coerceIn(minVal, maxVal)[cite: 1]
-                val valEnd = list[i + 1].coerceIn(minVal, maxVal)[cite: 1]
-                canvas.drawLine(startX, h * (1f - (valStart - minVal) / range), endX, h * (1f - (valEnd - minVal) / range), paint)[cite: 1]
+                val startX = leftOffset + (i * stepX)
+                val endX = leftOffset + ((i + 1) * stepX)
+                val valStart = list[i].coerceIn(minVal, maxVal)
+                val valEnd = list[i + 1].coerceIn(minVal, maxVal)
+                canvas.drawLine(startX, h * (1f - (valStart - minVal) / range), endX, h * (1f - (valEnd - minVal) / range), paint)
             }
         }
     }
@@ -560,12 +560,12 @@ class FloatView(
         private val maxDataPoints = 100
         private val yAxisWidth = 85f
         
-        private val historyList = CopyOnWriteArrayList<FloatArray>()[cite: 1]
+        private val historyList = CopyOnWriteArrayList<FloatArray>()
         
-        private val axisTextPaint = Paint().apply { color = Color.parseColor("#95A5A6"); textSize = 13f; isAntiAlias = true }[cite: 1]
-        private val headerTextPaint = Paint().apply { color = Color.parseColor("#E67E22"); textSize = 14f; isFakeBoldText = true; isAntiAlias = true }[cite: 1]
-        private val gridPaint = Paint().apply { color = Color.argb(30, 255, 255, 255); strokeWidth = 1f }[cite: 1]
-        private val bgPaint = Paint().apply { color = Color.argb(20, 230, 126, 34) }[cite: 1]
+        private val axisTextPaint = Paint().apply { color = Color.parseColor("#95A5A6"); textSize = 13f; isAntiAlias = true }
+        private val headerTextPaint = Paint().apply { color = Color.parseColor("#E67E22"); textSize = 14f; isFakeBoldText = true; isAntiAlias = true }
+        private val gridPaint = Paint().apply { color = Color.argb(30, 255, 255, 255); strokeWidth = 1f }
+        private val bgPaint = Paint().apply { color = Color.argb(20, 230, 126, 34) }
 
         private val curveColors = intArrayOf(
             Color.parseColor("#E74C3C"), 
@@ -576,7 +576,7 @@ class FloatView(
             Color.parseColor("#E67E22")  
         )
         private val curvePaints = Array(curveColors.size) { i ->
-            Paint().apply { color = curveColors[i]; strokeWidth = 2f; style = Paint.Style.STROKE; isAntiAlias = true }[cite: 1]
+            Paint().apply { color = curveColors[i]; strokeWidth = 2f; style = Paint.Style.STROKE; isAntiAlias = true }
         }
 
         private val noiseMin = 40f
@@ -589,9 +589,9 @@ class FloatView(
                 for (i in parts.indices) {
                     floatArray[i] = parts[i].trim().toFloatOrNull() ?: 0f
                 }
-                historyList.add(floatArray)[cite: 1]
-                if (historyList.size > maxDataPoints) historyList.removeAt(0)[cite: 1]
-                postInvalidate()[cite: 1]
+                historyList.add(floatArray)
+                if (historyList.size > maxDataPoints) historyList.removeAt(0)
+                postInvalidate()
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -603,49 +603,49 @@ class FloatView(
             val h = height.toFloat()
             if (w <= 0 || h <= 0) return
 
-            val chartLeft = yAxisWidth[cite: 1]
+            val chartLeft = yAxisWidth
             val chartRight = w
             val chartWidth = chartRight - chartLeft
-            canvas.drawRect(chartLeft, 0f, chartRight, h, bgPaint)[cite: 1]
+            canvas.drawRect(chartLeft, 0f, chartRight, h, bgPaint)
 
-            val yPositions = floatArrayOf(h * 0.2f, h * 0.5f, h * 0.8f)[cite: 1]
-            val labels = arrayOf("140", "90", "40")[cite: 1]
+            val yPositions = floatArrayOf(h * 0.2f, h * 0.5f, h * 0.8f)
+            val labels = arrayOf("140", "90", "40")
             for (i in yPositions.indices) {
                 val y = yPositions[i]
-                canvas.drawLine(chartLeft, y, chartRight, y, gridPaint)[cite: 1]
-                canvas.drawText(labels[i], 20f, y + 5f, axisTextPaint)[cite: 1]
+                canvas.drawLine(chartLeft, y, chartRight, y, gridPaint)
+                canvas.drawText(labels[i], 20f, y + 5f, axisTextPaint)
             }
 
-            val title = if (isAir) "[AIR NOISE]" else "[GND NOISE]"[cite: 1]
-            canvas.drawText(title, chartLeft + 15f, 22f, headerTextPaint)[cite: 1]
+            val title = if (isAir) "[AIR NOISE]" else "[GND NOISE]"
+            canvas.drawText(title, chartLeft + 15f, 22f, headerTextPaint)
 
-            val historySize = historyList.size[cite: 1]
-            if (historySize == 0) return[cite: 1]
+            val historySize = historyList.size
+            if (historySize == 0) return
             
-            val currentChannels = historyList[historySize - 1].size[cite: 1]
-            val stepX = chartWidth / (maxDataPoints - 1)[cite: 1]
+            val currentChannels = historyList[historySize - 1].size
+            val stepX = chartWidth / (maxDataPoints - 1)
             val range = noiseMax - noiseMin
 
             for (ch in 0 until currentChannels) {
-                val paint = curvePaints[ch % curvePaints.size][cite: 1]
+                val paint = curvePaints[ch % curvePaints.size]
                 
                 for (i in 0 until historySize - 1) {
-                    val startArray = historyList[i][cite: 1]
-                    val endArray = historyList[i + 1][cite: 1]
+                    val startArray = historyList[i]
+                    val endArray = historyList[i + 1]
                     
-                    if (ch >= startArray.size || ch >= endArray.size) continue[cite: 1]
+                    if (ch >= startArray.size || ch >= endArray.size) continue
                     
-                    val startX = chartLeft + (i * stepX)[cite: 1]
-                    val endX = chartLeft + ((i + 1) * stepX)[cite: 1]
+                    val startX = chartLeft + (i * stepX)
+                    val endX = chartLeft + ((i + 1) * stepX)
                     
-                    val valStart = startArray[ch].coerceIn(noiseMin, noiseMax)[cite: 1]
-                    val valEnd = endArray[ch].coerceIn(noiseMin, noiseMax)[cite: 1]
+                    val valStart = startArray[ch].coerceIn(noiseMin, noiseMax)
+                    val valEnd = endArray[ch].coerceIn(noiseMin, noiseMax)
                     
                     canvas.drawLine(
                         startX, h * (1f - (valStart - noiseMin) / range),
                         endX, h * (1f - (valEnd - noiseMin) / range),
                         paint
-                    )[cite: 1]
+                    )
                 }
             }
 
@@ -656,15 +656,15 @@ class FloatView(
             val legendY = 22f
 
             for (ch in (currentChannels - 1) downTo 0) {
-                val chColor = curveColors[ch % curveColors.size][cite: 1]
-                val labelStr = "ch${ch + 1}"[cite: 1]
+                val chColor = curveColors[ch % curveColors.size]
+                val labelStr = "ch${ch + 1}"
                 
                 val textWidth = legendTextPaint.measureText(labelStr)
                 val itemWidth = textWidth + 14f
                 
                 legendPaint.color = chColor
-                canvas.drawRect(legendRightX - itemWidth, legendY - 8f, legendRightX - itemWidth + 8f, legendY, legendPaint)[cite: 1]
-                canvas.drawText(labelStr, legendRightX - itemWidth + 12f, legendY, legendTextPaint)[cite: 1]
+                canvas.drawRect(legendRightX - itemWidth, legendY - 8f, legendRightX - itemWidth + 8f, legendY, legendPaint)
+                canvas.drawText(labelStr, legendRightX - itemWidth + 12f, legendY, legendTextPaint)
                 
                 legendRightX -= (itemWidth + 14f)
             }
