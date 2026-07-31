@@ -542,7 +542,7 @@ class FloatView(
             // 断连状态下，顶部实时数值文本统一变红报错
             if (isCurrentlyDisconnected) {
                 paintTextRssi1.color = colorDisconnect
-                paintTextTextRssi2.color = colorDisconnect
+                paintTextRssi2.color = colorDisconnect
                 paintTextSnr.color = colorDisconnect
             } else {
                 paintTextRssi1.color = colorRssi1
