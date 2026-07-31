@@ -177,7 +177,6 @@ class FloatView(
                         lastX = event.rawX
                         lastY = event.rawY
                         
-                        // 移除原有的危险 post 异步块，改为同步安全刷新，防止排队引起的闪烁与死锁
                         try {
                             windowManager.updateViewLayout(this@FloatView, params)
                         } catch (e: Exception) {
@@ -257,9 +256,12 @@ class FloatView(
                 var airR1: Float? = null
                 var airR2: Float? = null
                 var airSnr: Float? = null
+                var airLqi: Float? = null
+
                 var gndR1: Float? = null
                 var gndR2: Float? = null
                 var gndSnr: Float? = null
+                var gndLqi: Float? = null
 
                 val noiseColors = arrayOf("#E74C3C", "#F1C40F", "#3498DB", "#9B59B6", "#1ABC9C", "#E67E22")
 
@@ -267,6 +269,10 @@ class FloatView(
                 while (keys.hasNext()) {
                     val key = keys.next()
                     val valueStr = obj.optString(key, "")
+
+                    // 优先拦截并解析 LQI 参数
+                    if (key == "lqi_a") airLqi = valueStr.toFloatOrNull()
+                    if (key == "lqi_g") gndLqi = valueStr.toFloatOrNull()
 
                     if (key == "noiseFloor_a" || key == "noiseFloor_g") {
                         val isAir = key == "noiseFloor_a"
@@ -280,7 +286,7 @@ class FloatView(
                         parts.forEachIndexed { index, partValue ->
                             val subKey = "${key}_ch${index + 1}"
                             val channelColor = Color.parseColor(noiseColors[index % noiseColors.size])
-                            val prefixLabel = if (isAir) "Air_ch" else "Gnd_ch"
+                            val prefixLabel = if (isAir) "空中频点" else "地面频点"
                             val displayText = "$prefixLabel${index + 1} : ${partValue.trim()}"
                             
                             val cachedTv = targetMap[subKey]
@@ -316,11 +322,12 @@ class FloatView(
                     }
                 }
 
-                airSignalIconView.setSignalData(airR1 ?: 0f, airR2 ?: 0f, airSnr ?: 0f)
-                gndSignalIconView.setSignalData(gndR1 ?: 0f, gndR2 ?: 0f, gndSnr ?: 0f)
+                // 将新增的 LQI 链路状态协同传导至底层绘图 View
+                airSignalIconView.setSignalData(airR1 ?: 0f, airR2 ?: 0f, airSnr ?: 0f, airLqi)
+                gndSignalIconView.setSignalData(gndR1 ?: 0f, gndR2 ?: 0f, gndSnr ?: 0f, gndLqi)
 
-                if (airR1 != null || airR2 != null || airSnr != null) airChartView.addData(airR1, airR2, airSnr)
-                if (gndR1 != null || gndR2 != null || gndSnr != null) gndChartView.addData(gndR1, gndR2, gndSnr)
+                if (airR1 != null || airR2 != null || airSnr != null) airChartView.addData(airR1, airR2, airSnr, airLqi)
+                if (gndR1 != null || gndR2 != null || gndSnr != null) gndChartView.addData(gndR1, gndR2, gndSnr, gndLqi)
 
             } catch (e: Exception) {
                 android.util.Log.e("FloatViewError", "数据刷新渲染异常: ${e.message}")
@@ -377,6 +384,7 @@ class FloatView(
         private var r1 = 0f
         private var r2 = 0f
         private var snr = 0f
+        private var lqi: Float? = null
 
         private val paint = Paint().apply { isAntiAlias = true }
         private val textPaint = Paint().apply {
@@ -393,10 +401,11 @@ class FloatView(
             textAlign = Paint.Align.CENTER
         }
 
-        fun setSignalData(rssi1: Float, rssi2: Float, snrVal: Float) {
+        fun setSignalData(rssi1: Float, rssi2: Float, snrVal: Float, lqiVal: Float?) {
             this.r1 = rssi1
             this.r2 = rssi2
             this.snr = snrVal
+            this.lqi = lqiVal
             postInvalidate()
         }
 
@@ -410,9 +419,12 @@ class FloatView(
             textPaint.isFakeBoldText = true
             canvas.drawText(label, w / 2f, 20f, textPaint)
 
+            // 联动机制：若 LQI 为 0，直接判定为真正断开，无视缓存的 RSSI 强弱值
+            val isDisconnected = (lqi != null && lqi == 0f) || (r1 == 0f && r2 == 0f)
+
             val primaryRssi = if (r1 > 0 && r2 > 0) Math.min(r1, r2) else Math.max(r1, r2)
             val (bars, barColor) = when {
-                primaryRssi == 0f -> 1 to Color.parseColor("#E74C3C")
+                isDisconnected -> 1 to Color.parseColor("#E74C3C") // 断开时展示代表故障的红色
                 primaryRssi < 60f -> 4 to Color.parseColor("#2ECC71")
                 primaryRssi < 75f -> 3 to Color.parseColor("#F1C40F")
                 primaryRssi < 90f -> 2 to Color.parseColor("#E67E22")
@@ -442,7 +454,7 @@ class FloatView(
             }
 
             val infoStr = "${r1.toInt()}/${r2.toInt()}/${snr.toInt()}"
-            val finalInfo = if (primaryRssi == 0f) "DISCONN" else infoStr
+            val finalInfo = if (isDisconnected) "DISCONN" else infoStr
             subTextPaint.color = barColor
             canvas.drawText(finalInfo, w / 2f, h - 15f, subTextPaint)
         }
@@ -452,10 +464,10 @@ class FloatView(
         private val maxDataPoints = 100
         private val yAxisWidth = 85f 
 
-        // 引入并发安全的线程安全队列，杜绝高频网口/网口回调非主线程写数据导致的并发异常
         private val rssi1List = CopyOnWriteArrayList<Float>()
         private val rssi2List = CopyOnWriteArrayList<Float>()
         private val snrList = CopyOnWriteArrayList<Float>()
+        private val lqiList = CopyOnWriteArrayList<Float>()
 
         private val axisTextPaint = Paint().apply { color = Color.parseColor("#95A5A6"); textSize = 13f; isAntiAlias = true }
         private val prefixTextPaint = Paint().apply { 
@@ -468,6 +480,7 @@ class FloatView(
         private val colorRssi1 = Color.parseColor("#2980B9")
         private val colorRssi2 = Color.parseColor("#3498DB")
         private val colorSnr   = Color.parseColor("#2ECC71")
+        private val colorDisconnect = Color.parseColor("#E74C3C")
 
         private val paintRssi1 = Paint().apply { color = colorRssi1; strokeWidth = 3f; style = Paint.Style.STROKE; isAntiAlias = true }
         private val paintRssi2 = Paint().apply { color = colorRssi2; strokeWidth = 2f; style = Paint.Style.STROKE; isAntiAlias = true }
@@ -485,14 +498,16 @@ class FloatView(
         private val snrMin = 0f
         private val snrMax = 50f
 
-        fun addData(r1: Float?, r2: Float?, snr: Float?) {
+        fun addData(r1: Float?, r2: Float?, snr: Float?, lqiVal: Float?) {
             rssi1List.add(r1 ?: rssi1List.lastOrNull() ?: 0f)
             rssi2List.add(r2 ?: rssi2List.lastOrNull() ?: 0f)
             snrList.add(snr ?: snrList.lastOrNull() ?: 0f)
+            lqiList.add(lqiVal ?: lqiList.lastOrNull() ?: 100f)
             
             if (rssi1List.size > maxDataPoints) rssi1List.removeAt(0)
             if (rssi2List.size > maxDataPoints) rssi2List.removeAt(0)
             if (snrList.size > maxDataPoints) snrList.removeAt(0)
+            if (lqiList.size > maxDataPoints) lqiList.removeAt(0)
             postInvalidate()
         }
 
@@ -521,11 +536,25 @@ class FloatView(
             canvas.drawText(prefix, chartLeft + 15f, 22f, prefixTextPaint)
             val startX = chartLeft + 15f + prefixTextPaint.measureText(prefix)
 
-            val r1Text = "R1: ${rssi1List.lastOrNull()?.toInt() ?: 0}  "
+            // 监测最后一帧的链路状态
+            val isCurrentlyDisconnected = lqiList.lastOrNull() == 0f
+
+            // 断连状态下，顶部实时数值文本统一变红报错
+            if (isCurrentlyDisconnected) {
+                paintTextRssi1.color = colorDisconnect
+                paintTextTextRssi2.color = colorDisconnect
+                paintTextSnr.color = colorDisconnect
+            } else {
+                paintTextRssi1.color = colorRssi1
+                paintTextRssi2.color = colorRssi2
+                paintTextSnr.color = colorSnr
+            }
+
+            val r1Text = "R1: ${if(isCurrentlyDisconnected) "LOST" else rssi1List.lastOrNull()?.toInt() ?: 0}  "
             canvas.drawText(r1Text, startX, 22f, paintTextRssi1)
-            val r2Text = "R2: ${rssi2List.lastOrNull()?.toInt() ?: 0}  "
+            val r2Text = "R2: ${if(isCurrentlyDisconnected) "LOST" else rssi2List.lastOrNull()?.toInt() ?: 0}  "
             canvas.drawText(r2Text, startX + paintTextRssi1.measureText(r1Text), 22f, paintTextRssi2)
-            val snrText = "SNR: ${snrList.lastOrNull()?.toInt() ?: 0}"
+            val snrText = "SNR: ${if(isCurrentlyDisconnected) "LOST" else snrList.lastOrNull()?.toInt() ?: 0}"
             canvas.drawText(snrText, startX + paintTextRssi1.measureText(r1Text) + paintTextRssi2.measureText(r2Text), 22f, paintTextSnr)
 
             drawNormalCurve(canvas, rssi1List, rssiMin, rssiMax, chartLeft, chartWidth, h, paintRssi1)
@@ -541,8 +570,14 @@ class FloatView(
             for (i in 0 until size - 1) {
                 val startX = leftOffset + (i * stepX)
                 val endX = leftOffset + ((i + 1) * stepX)
-                val valStart = list[i].coerceIn(minVal, maxVal)
-                val valEnd = list[i + 1].coerceIn(minVal, maxVal)
+                
+                // 历史折线保护：如果在历史队列里某个时刻 LQI 降为了 0，该时段波形跌落触底
+                val isBroken = (i < lqiList.size && lqiList[i] == 0f)
+                val isNextBroken = (i + 1 < lqiList.size && lqiList[i + 1] == 0f)
+                
+                val valStart = if (isBroken) minVal else list[i].coerceIn(minVal, maxVal)
+                val valEnd = if (isNextBroken) minVal else list[i + 1].coerceIn(minVal, maxVal)
+                
                 canvas.drawLine(startX, h * (1f - (valStart - minVal) / range), endX, h * (1f - (valEnd - minVal) / range), paint)
             }
         }
@@ -552,7 +587,6 @@ class FloatView(
         private val maxDataPoints = 100
         private val yAxisWidth = 85f
         
-        // 使用 CopyOnWriteArrayList 防止非 UI 线程添加引发并发修改死锁
         private val historyList = CopyOnWriteArrayList<FloatArray>()
         
         private val axisTextPaint = Paint().apply { color = Color.parseColor("#95A5A6"); textSize = 13f; isAntiAlias = true }
@@ -650,7 +684,7 @@ class FloatView(
 
             for (ch in (currentChannels - 1) downTo 0) {
                 val chColor = curveColors[ch % curveColors.size]
-                val labelStr = "ch${ch + 1}"
+                val labelStr = "P${ch + 1}"
                 
                 val textWidth = legendTextPaint.measureText(labelStr)
                 val itemWidth = textWidth + 14f
