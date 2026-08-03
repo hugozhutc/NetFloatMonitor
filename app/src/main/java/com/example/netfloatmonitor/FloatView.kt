@@ -782,13 +782,13 @@ class FloatView(
             val h = height.toFloat()
             if (w <= 0 || h <= 0) return
         
-            val chartLeft = yAxisWidth[cite: 2]
+            val chartLeft = yAxisWidth
             val chartRight = w
             val chartWidth = chartRight - chartLeft
-            canvas.drawRect(chartLeft, 0f, chartRight, h, bgPaint)[cite: 2]
+            canvas.drawRect(chartLeft, 0f, chartRight, h, bgPaint)
         
             // 1. 获取底噪的总区间范围
-            val axisNoiseRange = noiseMax - noiseMin[cite: 2]
+            val axisNoiseRange = noiseMax - noiseMin
             
             // 2. 自定义你指定的底噪刻度标签
             val labels = arrayOf("120", "90", "60", "30")
@@ -806,18 +806,18 @@ class FloatView(
                 // 只有当计算出的坐标落在当前视图范围内时才绘制，防止越界
                 if (y in 0f..h) {
                     // 绘制横向网格线
-                    canvas.drawLine(chartLeft, y, chartRight, y, gridPaint)[cite: 2]
+                    canvas.drawLine(chartLeft, y, chartRight, y, gridPaint)
                     
                     // 边缘防裁剪处理（最底部的文字稍微往上提一点）
                     val textY = if (i == yPositions.lastIndex) y - 4f else y + 5f
                     
-                    // 绘制对应的底噪刻度数值[cite: 2]
-                    canvas.drawText(labels[i], 20f, textY, axisTextPaint)[cite: 2]
+                    // 绘制对应的底噪刻度数值
+                    canvas.drawText(labels[i], 20f, textY, axisTextPaint)
                 }
             }
         
-            val title = if (isAir) "[AIR] NOISE" else "[GND] NOISE"[cite: 2]
-            canvas.drawText(title, chartLeft + 15f, 22f, headerTextPaint)[cite: 2]
+            val title = if (isAir) "[AIR] NOISE" else "[GND] NOISE"
+            canvas.drawText(title, chartLeft + 15f, 22f, headerTextPaint)
         
             val historySize = historyList.size
             if (historySize == 0) return
@@ -825,7 +825,7 @@ class FloatView(
             val currentChannels = historyList[historySize - 1].size
             val stepX = chartWidth / (maxDataPoints - 1)
             
-            val range = noiseMax - noiseMin[cite: 2]
+            val range = noiseMax - noiseMin
         
             // 后续的底噪曲线折线与图例绘制逻辑保持原样...
             for (ch in 0 until currentChannels) {
