@@ -28,7 +28,7 @@ class FloatView(
     // ==========================================
     // 尺寸常量定义 (恢复经典 4 列平铺像素比例)
     // ==========================================
-    private val TEXT_COL_WIDTH = 360      // 单个文本数据列宽度
+    private val TEXT_COL_WIDTH = 220      // 单个文本数据列宽度
     private val CHART_COL_WIDTH = 480     // 单个图表曲线列宽度
     
     private val collapsedWidth = 220
@@ -96,7 +96,7 @@ class FloatView(
 
     // 新增：单独控制【实时波形图】的独立开关
     private val waveformToggleBtn = Button(context).apply {
-        text = "波形图 📈"
+        text = "Link Curve"
         textSize = 11f
         setTextColor(Color.WHITE)
         setGravity(Gravity.CENTER)
@@ -109,7 +109,7 @@ class FloatView(
 
     // 新增：单独控制【底噪频谱图】的独立开关
     private val noiseToggleBtn = Button(context).apply {
-        text = "底噪图 📊"
+        text = "Noise Floor"
         textSize = 11f
         setTextColor(Color.WHITE)
         setGravity(Gravity.CENTER)
@@ -195,7 +195,7 @@ class FloatView(
         waveformToggleBtn.setOnClickListener {
             isWaveformExpanded = !isWaveformExpanded
             waveformCol.visibility = if (isWaveformExpanded) View.VISIBLE else View.GONE
-            waveformToggleBtn.text = if (isWaveformExpanded) "波形图 📈" else "隐波形 📈"
+            waveformToggleBtn.text = if (isWaveformExpanded) "Link Curve" else "隐波形 📈"
             waveformToggleBtn.background = GradientDrawable().apply {
                 setColor(Color.parseColor(if (isWaveformExpanded) "#2980B9" else "#7F8C8D"))
                 cornerRadius = 6f
@@ -206,7 +206,7 @@ class FloatView(
         noiseToggleBtn.setOnClickListener {
             isNoiseExpanded = !isNoiseExpanded
             noiseCol.visibility = if (isNoiseExpanded) View.VISIBLE else View.GONE
-            noiseToggleBtn.text = if (isNoiseExpanded) "底噪图 📊" else "隐底噪 📊"
+            noiseToggleBtn.text = if (isNoiseExpanded) "Noise Floor" else "隐底噪 📊"
             noiseToggleBtn.background = GradientDrawable().apply {
                 setColor(Color.parseColor(if (isNoiseExpanded) "#27AE60" else "#7F8C8D"))
                 cornerRadius = 6f
