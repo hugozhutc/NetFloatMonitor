@@ -49,7 +49,7 @@ class FloatView(
     private var resize = false
 
     // =========================================================================
-    // 核心新增：用于支持 failed 字段动态变红、无闪烁保持、5秒自动恢复原色的状态追踪变量
+    // 用于支持 failed 字段动态变红、无闪烁保持、5秒自动恢复原色的状态追踪变量
     // =========================================================================
     private val lastValues = HashMap<String, String>()                    // 记录上一次的数值快照
     private val redTimerRunnables = HashMap<String, Runnable>()           // 存放每个 key 专属的定时恢复任务
@@ -372,7 +372,7 @@ class FloatView(
     }
 
     // =========================================================================
-    // 数据动态刷新与高保真核心渲染逻辑 (100% 完整保留原有精密数据处理)
+    // 数据动态刷新与高保真核心渲染逻辑
     // =========================================================================
     fun updateJsonDynamic(rawJson: String) {
         if (!isAttachedToWindow) return
@@ -407,7 +407,7 @@ class FloatView(
                             val prefixLabel = if (isAir) "Air_ch" else "Gnd_ch"
                             val displayText = "$prefixLabel${index + 1} : ${partValue.trim()}"
                             
-                            // 🟢 移除了左侧文本通道颜色标注，全部降为 10.5f 紧凑号并显示为纯白
+                            // 移除了左侧文本通道颜色标注，全部降为 10.5f 紧凑号并显示为纯白
                             val cachedTv = targetMap[subKey]
                             if (cachedTv != null) {
                                 cachedTv.text = displayText
@@ -481,26 +481,26 @@ class FloatView(
         }
 
         // =========================================================================
-        // 🟢 核心新增：针对 failed 字段的“数值出错变化触发变红，静止5秒恢复”机制
+        // 针对 failed 字段的“数值出错变化触发变红，静止5秒恢复”安全隔离机制
         // =========================================================================
         if (key.contains("failed", ignoreCase = true)) {
             val oldValue = lastValues[key]
             lastValues[key] = value // 实时更新历史快照
 
             if (oldValue != null && oldValue != value) {
-                // 如果当前已有定时器在跑，先掐断，重新为这个 key 计时5秒
-                mainHandler.removeCallbacks(redTimerRunnables[key])
+                // 🟢 修复核心：采用安全调用符 ?.let 规避可空类型传入平台 Java 方法的编译挂起问题
+                redTimerRunnables[key]?.let { mainHandler.removeCallbacks(it) }
                 
                 val resetRunnable = Runnable {
                     map[key]?.setTextColor(Color.WHITE) // 倒计时结束恢复纯白
                     redTimerRunnables.remove(key)
                 }
                 redTimerRunnables[key] = resetRunnable
-                mainHandler.postDelayed(resetRunnable, 5000) // 5000ms = 5秒
+                mainHandler.postDelayed(resetRunnable, 5000) // 5秒倒计时
                 
-                displayColor = Color.parseColor("#E74C3C") // 当前帧触发警报红
+                displayColor = Color.parseColor("#E74C3C") // 触发警报红
             } else {
-                // 若数值跟上一帧完全一样，校验是否处于5秒冻结冷却状态中，如果是，强行保持红色拦截被冲刷
+                // 若数值不变，校验是否处于倒计时冻结状态中，保持高亮红色隔离
                 displayColor = if (redTimerRunnables.containsKey(key)) {
                     Color.parseColor("#E74C3C")
                 } else {
@@ -516,7 +516,7 @@ class FloatView(
         } else {
             val tv = TextView(context).apply {
                 text = displayText
-                textSize = 10.5f // 🟢 统一调小字号至 10.5f，完美契合 220 宽度防止换行
+                textSize = 10.5f // 统一收紧字号至 10.5f
                 setTextColor(displayColor)
                 setPadding(6, 4, 6, 4)
             }
