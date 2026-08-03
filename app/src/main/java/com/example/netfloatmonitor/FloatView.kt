@@ -25,17 +25,20 @@ class FloatView(
     private val params: WindowManager.LayoutParams
 ) : LinearLayout(context) {
 
-    // 核心尺寸常量定义 (适配 7 寸屏屏显比例)
-    private val LEFT_PANEL_WIDTH = 330   // 左侧常驻文本面板宽度
-    private val RIGHT_CHARTS_WIDTH = 550 // 右侧图表抽屉宽度
+    // ==========================================
+    // 尺寸常量定义 (恢复经典 4 列平铺像素比例)
+    // ==========================================
+    private val TEXT_COL_WIDTH = 360      // 单个文本数据列宽度
+    private val CHART_COL_WIDTH = 480     // 单个图表曲线列宽度
     
     private val collapsedWidth = 220
     private val collapsedHeight = 130
-
-    // 状态控制
-    private var isExpanded = true
-    private var lastExpandedWidth = LEFT_PANEL_WIDTH + RIGHT_CHARTS_WIDTH // 动态计算的总展开宽度 (~880px)
     private var lastExpandedHeight = 650 
+
+    // 核心状态控制：完全独立区分开两张图表的收纳与展开
+    private var isExpanded = true             // 整体悬浮窗是否展开 (false 为右下角小图标状态)
+    private var isWaveformExpanded = true     // 实时波形曲线图列是否展开
+    private var isNoiseExpanded = true        // 底噪频谱曲线图列是否展开
 
     private var startWidth = 0
     private var startHeight = 0
@@ -48,19 +51,15 @@ class FloatView(
     // UI 容器组件
     private val topBar = LinearLayout(context)
     private val contentFrame = FrameLayout(context)
-    private val contentPanel = LinearLayout(context) // 主内容水平容器
+    private val contentPanel = LinearLayout(context) // 主内容水平平铺容器
     
-    // 方案一核心：左侧文本控制塔与右侧图表双层抽屉
-    private val leftTextPanel = LinearLayout(context)
-    private val rightChartsPanel = LinearLayout(context)
+    // 独立解耦的图表列容器
+    private val waveformCol = LinearLayout(context)
+    private val noiseCol = LinearLayout(context)
 
     // 数据列表容器
     private val airLayout = LinearLayout(context)
     private val gndLayout = LinearLayout(context)
-    
-    // 图表子容器
-    private val waveformContainer = LinearLayout(context)
-    private val noiseContainer = LinearLayout(context)
     
     // 自定义 View 实例
     private val airChartView = WaveformView(context, isAir = true)
@@ -68,7 +67,7 @@ class FloatView(
     private val airNoiseChartView = NoiseFloorChartView(context, isAir = true)
     private val gndNoiseChartView = NoiseFloorChartView(context, isAir = false)
 
-    // 折叠紧凑状态面板
+    // 迷你折叠面板组件
     private val collapsedPanel = LinearLayout(context)
     private val airSignalIconView = SignalIconView(context, "AIR")
     private val gndSignalIconView = SignalIconView(context, "GND")
@@ -76,7 +75,6 @@ class FloatView(
     private val airTextViewMap = HashMap<String, TextView>()
     private val gndTextViewMap = HashMap<String, TextView>()
 
-    // 辅助控制按钮与指示器
     private val resizeIndicator = View(context).apply {
         background = GradientDrawable().apply {
             setColor(Color.parseColor("#3498DB"))
@@ -84,6 +82,7 @@ class FloatView(
         }
     }
 
+    // 顶部全局最小化至图标按钮
     private val toggleBtn = Button(context).apply {
         text = "×"
         textSize = 14f
@@ -91,6 +90,32 @@ class FloatView(
         setGravity(Gravity.CENTER)
         background = GradientDrawable().apply {
             setColor(Color.parseColor("#C0392B"))
+            cornerRadius = 6f
+        }
+    }
+
+    // 新增：单独控制【实时波形图】的独立开关
+    private val waveformToggleBtn = Button(context).apply {
+        text = "波形图 📈"
+        textSize = 11f
+        setTextColor(Color.WHITE)
+        setGravity(Gravity.CENTER)
+        setPadding(10, 0, 10, 0)
+        background = GradientDrawable().apply {
+            setColor(Color.parseColor("#2980B9"))
+            cornerRadius = 6f
+        }
+    }
+
+    // 新增：单独控制【底噪频谱图】的独立开关
+    private val noiseToggleBtn = Button(context).apply {
+        text = "底噪图 📊"
+        textSize = 11f
+        setTextColor(Color.WHITE)
+        setGravity(Gravity.CENTER)
+        setPadding(10, 0, 10, 0)
+        background = GradientDrawable().apply {
+            setColor(Color.parseColor("#27AE60"))
             cornerRadius = 6f
         }
     }
@@ -105,7 +130,7 @@ class FloatView(
         }
         this.background = bg
 
-        // 1. 初始化迷你折叠面板
+        // 1. 初始化右下角迷你模式状态面板
         collapsedPanel.orientation = LinearLayout.HORIZONTAL
         collapsedPanel.gravity = Gravity.CENTER
         collapsedPanel.visibility = View.GONE
@@ -114,56 +139,47 @@ class FloatView(
         collapsedPanel.addView(gndSignalIconView, iconLp)
         addView(collapsedPanel)
 
-        // 2. 初始化顶部控制状态栏
+        // 2. 初始化顶部控制状态栏 (加入双图表独立控制开关)
         topBar.orientation = LinearLayout.HORIZONTAL
         topBar.gravity = Gravity.END or Gravity.CENTER_VERTICAL
         topBar.setPadding(0, 0, 4, 6)
+        
+        val btnLp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, 48).apply { rightMargin = 12 }
+        topBar.addView(waveformToggleBtn, btnLp)
+        topBar.addView(noiseToggleBtn, btnLp)
         topBar.addView(toggleBtn, LinearLayout.LayoutParams(48, 48))
         addView(topBar)
 
-        // 3. 构建主内容区 (左右分栏架构)
+        // 3. 构建主内容区 (经典的横向平铺串联架构)
         contentPanel.orientation = LinearLayout.HORIZONTAL
         airLayout.orientation = LinearLayout.VERTICAL
         gndLayout.orientation = LinearLayout.VERTICAL
         
-        // ================= 方案一：左侧数据面板重构（上下排布） =================
-        leftTextPanel.orientation = LinearLayout.VERTICAL
-        val textLp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f)
-        leftTextPanel.addView(createPanel("AIR TELEMETRY", airLayout), textLp)
-        leftTextPanel.addView(createPanel("GND TELEMETRY", gndLayout), textLp)
+        // 第 1 列：空中数传文本面板
+        contentPanel.addView(createPanel("AIR TELEMETRY", airLayout), LinearLayout.LayoutParams(TEXT_COL_WIDTH, LinearLayout.LayoutParams.MATCH_PARENT))
         
-        // 将重组后的左侧面板加入主布局
-        val leftPanelLp = LinearLayout.LayoutParams(LEFT_PANEL_WIDTH, LinearLayout.LayoutParams.MATCH_PARENT)
-        contentPanel.addView(leftTextPanel, leftPanelLp)
+        // 第 2 列：地面数传文本面板
+        val gndTextLp = LinearLayout.LayoutParams(TEXT_COL_WIDTH, LinearLayout.LayoutParams.MATCH_PARENT).apply { leftMargin = 12 }
+        contentPanel.addView(createPanel("GND TELEMETRY", gndLayout), gndTextLp)
 
-        // ================= 方案一：右侧图表面板重构（上下分层） =================
-        rightChartsPanel.orientation = LinearLayout.VERTICAL
-        
-        val subChartLp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f).apply { setMargins(0, 0, 0, 6) }
+        val subChartLp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f).apply { bottomMargin = 6 }
         val lastChartLp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f)
+
+        // 第 3 列：实时波形网格图层 (完全拆分为独立列容器)
+        waveformCol.orientation = LinearLayout.VERTICAL
+        waveformCol.addView(airChartView, subChartLp)
+        waveformCol.addView(gndChartView, lastChartLp)
+        val waveColLp = LinearLayout.LayoutParams(CHART_COL_WIDTH, LinearLayout.LayoutParams.MATCH_PARENT).apply { leftMargin = 16 }
+        contentPanel.addView(waveformCol, waveColLp)
+
+        // 第 4 列：底噪频谱网格图层 (完全拆分为独立列容器)
+        noiseCol.orientation = LinearLayout.VERTICAL
+        noiseCol.addView(airNoiseChartView, subChartLp)
+        noiseCol.addView(gndNoiseChartView, lastChartLp)
+        val noiseColLp = LinearLayout.LayoutParams(CHART_COL_WIDTH, LinearLayout.LayoutParams.MATCH_PARENT).apply { leftMargin = 16 }
+        contentPanel.addView(noiseCol, noiseColLp)
         
-        // 第 3 栏功能下沉：实时波形网格图层
-        waveformContainer.orientation = LinearLayout.VERTICAL
-        waveformContainer.addView(airChartView, subChartLp)
-        waveformContainer.addView(gndChartView, lastChartLp)
-        
-        // 第 4 栏功能下沉：底噪频谱网格图层
-        noiseContainer.orientation = LinearLayout.VERTICAL
-        noiseContainer.addView(airNoiseChartView, subChartLp)
-        noiseContainer.addView(gndNoiseChartView, lastChartLp)
-        
-        // 将波形图层与频谱图层在右侧面板内纵向均分堆叠
-        val verticalChartLp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f)
-        rightChartsPanel.addView(waveformContainer, verticalChartLp)
-        rightChartsPanel.addView(noiseContainer, verticalChartLp)
-        
-        // 将整合完毕的右侧图表抽屉挂载到主面板上，赋予独立间距
-        val rightDrawerLp = LinearLayout.LayoutParams(RIGHT_CHARTS_WIDTH, LinearLayout.LayoutParams.MATCH_PARENT).apply { 
-            setMargins(16, 0, 4, 0) 
-        }
-        contentPanel.addView(rightChartsPanel, rightDrawerLp)   
-        
-        // 4. 组装最外层容器与边界缩放指示器
+        // 4. 组装外层容器与边缘边界拉伸片
         contentFrame.addView(contentPanel, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
         contentFrame.addView(resizeIndicator, FrameLayout.LayoutParams(18, 18).apply { 
             gravity = Gravity.BOTTOM or Gravity.END
@@ -171,12 +187,64 @@ class FloatView(
         })
         addView(contentFrame, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.MATCH_PARENT))
 
-        // 5. 事件监听绑定
+        // 动态计算并应用初始窗口总宽度
+        updateWindowLayoutWidth()
+        params.height = lastExpandedHeight
+
+        // 5. 事件监听绑定与独立状态切换
+        waveformToggleBtn.setOnClickListener {
+            isWaveformExpanded = !isWaveformExpanded
+            waveformCol.visibility = if (isWaveformExpanded) View.VISIBLE else View.GONE
+            waveformToggleBtn.text = if (isWaveformExpanded) "波形图 📈" else "隐波形 📈"
+            waveformToggleBtn.background = GradientDrawable().apply {
+                setColor(Color.parseColor(if (isWaveformExpanded) "#2980B9" else "#7F8C8D"))
+                cornerRadius = 6f
+            }
+            updateWindowLayoutWidth()
+        }
+
+        noiseToggleBtn.setOnClickListener {
+            isNoiseExpanded = !isNoiseExpanded
+            noiseCol.visibility = if (isNoiseExpanded) View.VISIBLE else View.GONE
+            noiseToggleBtn.text = if (isNoiseExpanded) "底噪图 📊" else "隐底噪 📊"
+            noiseToggleBtn.background = GradientDrawable().apply {
+                setColor(Color.parseColor(if (isNoiseExpanded) "#27AE60" else "#7F8C8D"))
+                cornerRadius = 6f
+            }
+            updateWindowLayoutWidth()
+        }
+
         toggleBtn.setOnClickListener {
-            if (isExpanded) performToggle()
+            if (isExpanded) performGlobalToggle()
         }
 
         setupTouchInteraction()
+    }
+
+    /**
+     * 根据当前波形图、底噪图的独立展开状态，动态计算并更新悬浮窗的最佳物理宽度
+     */
+    private fun updateWindowLayoutWidth() {
+        if (!isAttachedToWindow || !isExpanded) return
+        
+        // 基础两列文本宽度 + 必要的内外边距兜底
+        var dynamicWidth = TEXT_COL_WIDTH * 2 + 50
+        
+        // 独立加上波形图列宽与间距
+        if (isWaveformExpanded) {
+            dynamicWidth += CHART_COL_WIDTH + 16
+        }
+        // 独立加上底噪图列宽与间距
+        if (isNoiseExpanded) {
+            dynamicWidth += CHART_COL_WIDTH + 16
+        }
+        
+        params.width = dynamicWidth
+        try {
+            windowManager.updateViewLayout(this, params)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     private fun setupTouchInteraction() {
@@ -202,12 +270,11 @@ class FloatView(
                             val totalDx = event.rawX - downX
                             val totalDy = event.rawY - downY
                             
-                            val newWidth = (startWidth + totalDx).toInt().coerceAtLeast(450)
-                            val newHeight = (startHeight + totalDy).toInt().coerceAtLeast(350)
+                            val newWidth = (startWidth + totalDx).toInt().coerceAtLeast(350)
+                            val newHeight = (startHeight + totalDy).toInt().coerceAtLeast(250)
                             
                             params.width = newWidth
                             params.height = newHeight
-                            lastExpandedWidth = newWidth
                             lastExpandedHeight = newHeight
                         } else {
                             val dx = event.rawX - lastX
@@ -232,7 +299,7 @@ class FloatView(
                     }
                     MotionEvent.ACTION_UP -> {
                         if (!isExpanded && !isDragging) {
-                            performToggle()
+                            performGlobalToggle()
                         }
                     }
                 }
@@ -241,7 +308,10 @@ class FloatView(
         })
     }
 
-    private fun performToggle() {
+    /**
+     * 全局最小化至极简状态面板切换逻辑 (对应右上角关闭按钮)
+     */
+    private fun performGlobalToggle() {
         if (!isAttachedToWindow) return
         val panelBg = GradientDrawable()
         if (isExpanded) {
@@ -268,7 +338,8 @@ class FloatView(
             this.background = panelBg
             this.setPadding(12, 8, 12, 12)
             
-            params.width = lastExpandedWidth
+            // 恢复展开时，通过独立联动计算器给出当前精准宽度
+            updateWindowLayoutWidth()
             params.height = lastExpandedHeight
         }
         try {
@@ -294,6 +365,9 @@ class FloatView(
         return box
     }
 
+    // =========================================================================
+    // 数据动态刷新与高保真核心渲染逻辑 (100% 完整保留原有精密数据处理)
+    // =========================================================================
     fun updateJsonDynamic(rawJson: String) {
         if (!isAttachedToWindow) return
         post {
@@ -369,7 +443,7 @@ class FloatView(
                 if (gndR1 != null || gndR2 != null || gndSnr != null) gndChartView.addData(gndR1, gndR2, gndSnr)
 
             } catch (e: Exception) {
-                android.util.Log.e("FloatViewError", "数据刷新渲染异常: ${e.message}")
+                android.util.Log.e("FloatViewError", "数据处理渲染异常: ${e.message}")
             }
         }
     }
@@ -420,7 +494,7 @@ class FloatView(
     }
 
     // ==========================================
-    // 内部私有子 View 组件 (逻辑严格维持原状)
+    // 内部私有自定义测量 View 绘制实现
     // ==========================================
 
     private class SignalIconView(context: Context, private val label: String) : View(context) {
