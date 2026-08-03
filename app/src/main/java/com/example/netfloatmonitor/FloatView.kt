@@ -411,12 +411,12 @@ class FloatView(
                             val cachedTv = targetMap[subKey]
                             if (cachedTv != null) {
                                 cachedTv.text = displayText
-                                cachedTv.setTextColor(Color.WHITE)
+                                cachedTv.setTextColor(channelColor)
                             } else {
                                 val tv = TextView(context).apply {
                                     text = displayText
                                     textSize = 10.5f
-                                    setTextColor(Color.WHITE)
+                                    setTextColor(channelColor)
                                     setPadding(6, 4, 6, 4)
                                 }
                                 targetLayout.addView(tv)
