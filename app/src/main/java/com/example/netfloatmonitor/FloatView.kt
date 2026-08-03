@@ -668,39 +668,46 @@ class FloatView(
             val w = width.toFloat()
             val h = height.toFloat()
             if (w <= 0 || h <= 0) return
-
-            val chartLeft = yAxisWidth
+        
+            val chartLeft = yAxisWidth //
             val chartRight = w
             val chartWidth = chartRight - chartLeft
-            canvas.drawRect(chartLeft, 0f, chartRight, h, bgPaint)
-
-            // 1. 定义屏幕绝对位置比例 
-            val yPositions = floatArrayOf(h * 0.2f, h * 0.5f, h * 0.8f)
+            canvas.drawRect(chartLeft, 0f, chartRight, h, bgPaint) //
+        
+            // 1. 获取 RSSI 的总区间范围
+            val axisRssiRange = rssiMax - rssiMin //[cite: 2]
             
-            // 2. 🟢 修正：更改变量名为 axisRssiRange 和 axisSnrRange 规避冲突
-            val axisRssiRange = rssiMax - rssiMin
-            val axisSnrRange = snrMax - snrMin
-            
-            val rssiLabels = arrayOf(
-                (rssiMax - axisRssiRange * 0.2f).toInt().toString(),
-                (rssiMax - axisRssiRange * 0.5f).toInt().toString(),
-                (rssiMax - axisRssiRange * 0.8f).toInt().toString()
+            // 2. 自定义你想显示的 RSSI 刻度，并按比例匹配整齐的 SNR 刻度
+            val rssiLabels = arrayOf("110", "60", "20", "0")
+            val snrLabels  = arrayOf("45", "25", "8", "0") // 根据 120:50 的物理比例换算的近似整数
+        
+            // 3. 【核心修改】反向计算这 4 个刻度值在画布上对应的 Y 轴绝对坐标
+            val yPositions = floatArrayOf(
+                h * (1f - (110f - rssiMin) / axisRssiRange), // 对应刻度 110 的高度
+                h * (1f - (60f - rssiMin) / axisRssiRange),  // 对应刻度 60 的高度
+                h * (1f - (20f - rssiMin) / axisRssiRange),  // 对应刻度 20 的高度
+                h * (1f - (0f - rssiMin) / axisRssiRange)    // 对应刻度 0 的高度（即画布最底部）
             )
-            val snrLabels = arrayOf(
-                (snrMax - axisSnrRange * 0.2f).toInt().toString(),
-                (snrMax - axisSnrRange * 0.5f).toInt().toString(),
-                (snrMax - axisSnrRange * 0.8f).toInt().toString()
-            )
-
-            // 3. 画网格线和动态文本
+        
+            // 4. 遍历绘制 4 条背景网格线与坐标轴文字
             for (i in yPositions.indices) {
                 val y = yPositions[i]
-                canvas.drawLine(chartLeft, y, chartRight, y, gridPaint)
-                canvas.drawText("${rssiLabels[i]}(${snrLabels[i]})", 5f, y + 5f, axisTextPaint)
+                // 绘制横向网格线[cite: 2]
+                canvas.drawLine(chartLeft, y, chartRight, y, gridPaint) //[cite: 2]
+                
+                // 边界防御：最底部的刻度 "0(0)" 如果还往下加 5f 会掉出画布，所以往上提一点
+                val textY = if (i == yPositions.lastIndex) y - 6f else y + 5f
+                
+                // 绘制复合刻度文字[cite: 2]
+                canvas.drawText("${rssiLabels[i]}(${snrLabels[i]})", 5f, textY, axisTextPaint) //[cite: 2]
             }
-
-            val prefix = if (isAir) "[AIR] " else "[GND] "
-            canvas.drawText(prefix, chartLeft + 15f, 22f, prefixTextPaint)
+        
+            // =========================================================================
+            // 后续的头部文字 R1/R2/SNR 以及折线绘制逻辑保持不变即可...
+            // =========================================================================
+            val prefix = if (isAir) "[AIR] " else "[GND] " //[cite: 2]
+            canvas.drawText(prefix, chartLeft + 15f, 22f, prefixTextPaint) //[cite: 2]
+            // ... 后面原有的代码保持不动[cite: 2]
             val startX = chartLeft + 15f + prefixTextPaint.measureText(prefix)
 
             val r1Text = "R1: ${rssi1List.lastOrNull()?.toInt() ?: 0}  "
