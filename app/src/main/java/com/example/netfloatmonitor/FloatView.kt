@@ -9,6 +9,7 @@ import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.Button
 import android.widget.FrameLayout
@@ -24,39 +25,50 @@ class FloatView(
     private val params: WindowManager.LayoutParams
 ) : LinearLayout(context) {
 
-    private val airLayout = LinearLayout(context)
-    private val gndLayout = LinearLayout(context)
-    
-    // 拆分为两个独立的图表栏容器
-    private val waveformContainer = LinearLayout(context)
-    private val noiseContainer = LinearLayout(context)
-    
-    private val airChartView = WaveformView(context, isAir = true)
-    private val gndChartView = WaveformView(context, isAir = false)
-    
-    private val airNoiseChartView = NoiseFloorChartView(context, isAir = true)
-    private val gndNoiseChartView = NoiseFloorChartView(context, isAir = false)
-
-    private var isExpanded = true
-    private var lastExpandedWidth = 1760 // 扩展宽度至 1760 以容纳 4 栏
-    private var lastExpandedHeight = 650 
+    // 核心尺寸常量定义 (适配 7 寸屏屏显比例)
+    private val LEFT_PANEL_WIDTH = 330   // 左侧常驻文本面板宽度
+    private val RIGHT_CHARTS_WIDTH = 550 // 右侧图表抽屉宽度
     
     private val collapsedWidth = 220
     private val collapsedHeight = 130
 
+    // 状态控制
+    private var isExpanded = true
+    private var lastExpandedWidth = LEFT_PANEL_WIDTH + RIGHT_CHARTS_WIDTH // 动态计算的总展开宽度 (~880px)
+    private var lastExpandedHeight = 650 
+
     private var startWidth = 0
     private var startHeight = 0
-    
     private var downX = 0f
     private var downY = 0f
     private var lastX = 0f
     private var lastY = 0f
     private var resize = false
 
+    // UI 容器组件
     private val topBar = LinearLayout(context)
     private val contentFrame = FrameLayout(context)
-    private val contentPanel = LinearLayout(context)
+    private val contentPanel = LinearLayout(context) // 主内容水平容器
     
+    // 方案一核心：左侧文本控制塔与右侧图表双层抽屉
+    private val leftTextPanel = LinearLayout(context)
+    private val rightChartsPanel = LinearLayout(context)
+
+    // 数据列表容器
+    private val airLayout = LinearLayout(context)
+    private val gndLayout = LinearLayout(context)
+    
+    // 图表子容器
+    private val waveformContainer = LinearLayout(context)
+    private val noiseContainer = LinearLayout(context)
+    
+    // 自定义 View 实例
+    private val airChartView = WaveformView(context, isAir = true)
+    private val gndChartView = WaveformView(context, isAir = false)
+    private val airNoiseChartView = NoiseFloorChartView(context, isAir = true)
+    private val gndNoiseChartView = NoiseFloorChartView(context, isAir = false)
+
+    // 折叠紧凑状态面板
     private val collapsedPanel = LinearLayout(context)
     private val airSignalIconView = SignalIconView(context, "AIR")
     private val gndSignalIconView = SignalIconView(context, "GND")
@@ -64,12 +76,12 @@ class FloatView(
     private val airTextViewMap = HashMap<String, TextView>()
     private val gndTextViewMap = HashMap<String, TextView>()
 
+    // 辅助控制按钮与指示器
     private val resizeIndicator = View(context).apply {
         background = GradientDrawable().apply {
             setColor(Color.parseColor("#3498DB"))
             cornerRadius = 4f
         }
-        visibility = View.VISIBLE
     }
 
     private val toggleBtn = Button(context).apply {
@@ -87,62 +99,87 @@ class FloatView(
         this.orientation = LinearLayout.VERTICAL
         this.setPadding(12, 8, 12, 12)
 
-        val bg = GradientDrawable()
-        bg.setColor(Color.argb(205, 15, 15, 15))
-        bg.cornerRadius = 14f
+        val bg = GradientDrawable().apply {
+            setColor(Color.argb(205, 15, 15, 15))
+            cornerRadius = 14f
+        }
         this.background = bg
 
+        // 1. 初始化迷你折叠面板
         collapsedPanel.orientation = LinearLayout.HORIZONTAL
         collapsedPanel.gravity = Gravity.CENTER
         collapsedPanel.visibility = View.GONE
-        
         val iconLp = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f)
         collapsedPanel.addView(airSignalIconView, iconLp)
         collapsedPanel.addView(gndSignalIconView, iconLp)
         addView(collapsedPanel)
 
+        // 2. 初始化顶部控制状态栏
         topBar.orientation = LinearLayout.HORIZONTAL
         topBar.gravity = Gravity.END or Gravity.CENTER_VERTICAL
         topBar.setPadding(0, 0, 4, 6)
-        
-        val btnLp = LinearLayout.LayoutParams(48, 48)
-        topBar.addView(toggleBtn, btnLp)
+        topBar.addView(toggleBtn, LinearLayout.LayoutParams(48, 48))
         addView(topBar)
 
+        // 3. 构建主内容区 (左右分栏架构)
         contentPanel.orientation = LinearLayout.HORIZONTAL
         airLayout.orientation = LinearLayout.VERTICAL
         gndLayout.orientation = LinearLayout.VERTICAL
         
-        // 第 1 栏与第 2 栏：数据文本
-        contentPanel.addView(createPanel("AIR TELEMETRY", airLayout))
-        contentPanel.addView(createPanel("GND TELEMETRY", gndLayout))
+        // ================= 方案一：左侧数据面板重构（上下排布） =================
+        leftTextPanel.orientation = LinearLayout.VERTICAL
+        val textLp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f)
+        leftTextPanel.addView(createPanel("AIR TELEMETRY", airLayout), textLp)
+        leftTextPanel.addView(createPanel("GND TELEMETRY", gndLayout), textLp)
+        
+        // 将重组后的左侧面板加入主布局
+        val leftPanelLp = LinearLayout.LayoutParams(LEFT_PANEL_WIDTH, LinearLayout.LayoutParams.MATCH_PARENT)
+        contentPanel.addView(leftTextPanel, leftPanelLp)
+
+        // ================= 方案一：右侧图表面板重构（上下分层） =================
+        rightChartsPanel.orientation = LinearLayout.VERTICAL
         
         val subChartLp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f).apply { setMargins(0, 0, 0, 6) }
         val lastChartLp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f)
         
-        // 第 3 栏：实时波形图（AIR + GND）
+        // 第 3 栏功能下沉：实时波形网格图层
         waveformContainer.orientation = LinearLayout.VERTICAL
         waveformContainer.addView(airChartView, subChartLp)
         waveformContainer.addView(gndChartView, lastChartLp)
         
-        // 第 4 栏：底噪频谱图（AIR + GND）
+        // 第 4 栏功能下沉：底噪频谱网格图层
         noiseContainer.orientation = LinearLayout.VERTICAL
         noiseContainer.addView(airNoiseChartView, subChartLp)
         noiseContainer.addView(gndNoiseChartView, lastChartLp)
         
-        // 设置图表栏的布局参数
-        val chartWidthLp = LinearLayout.LayoutParams(550, LinearLayout.LayoutParams.MATCH_PARENT).apply { setMargins(16, 0, 4, 0) }
-        contentPanel.addView(waveformContainer, chartWidthLp)
-        contentPanel.addView(noiseContainer, chartWidthLp)   
+        // 将波形图层与频谱图层在右侧面板内纵向均分堆叠
+        val verticalChartLp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f)
+        rightChartsPanel.addView(waveformContainer, verticalChartLp)
+        rightChartsPanel.addView(noiseContainer, verticalChartLp)
         
+        // 将整合完毕的右侧图表抽屉挂载到主面板上，赋予独立间距
+        val rightDrawerLp = LinearLayout.LayoutParams(RIGHT_CHARTS_WIDTH, LinearLayout.LayoutParams.MATCH_PARENT).apply { 
+            setMargins(16, 0, 4, 0) 
+        }
+        contentPanel.addView(rightChartsPanel, rightDrawerLp)   
+        
+        // 4. 组装最外层容器与边界缩放指示器
         contentFrame.addView(contentPanel, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
-        contentFrame.addView(resizeIndicator, FrameLayout.LayoutParams(18, 18).apply { gravity = Gravity.BOTTOM or Gravity.END; setMargins(0, 0, 2, 2) })
+        contentFrame.addView(resizeIndicator, FrameLayout.LayoutParams(18, 18).apply { 
+            gravity = Gravity.BOTTOM or Gravity.END
+            setMargins(0, 0, 2, 2) 
+        })
         addView(contentFrame, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.MATCH_PARENT))
 
+        // 5. 事件监听绑定
         toggleBtn.setOnClickListener {
             if (isExpanded) performToggle()
         }
 
+        setupTouchInteraction()
+    }
+
+    private fun setupTouchInteraction() {
         setOnTouchListener(object : OnTouchListener {
             private var isDragging = false
 
@@ -165,7 +202,7 @@ class FloatView(
                             val totalDx = event.rawX - downX
                             val totalDy = event.rawY - downY
                             
-                            val newWidth = (startWidth + totalDx).toInt().coerceAtLeast(650)
+                            val newWidth = (startWidth + totalDx).toInt().coerceAtLeast(450)
                             val newHeight = (startHeight + totalDy).toInt().coerceAtLeast(350)
                             
                             params.width = newWidth
@@ -253,7 +290,7 @@ class FloatView(
         box.addView(titleView)
         val scroll = ScrollView(context).apply { isVerticalScrollBarEnabled = false }
         scroll.addView(containerLayout)
-        box.addView(scroll, LinearLayout.LayoutParams(310, LinearLayout.LayoutParams.MATCH_PARENT))
+        box.addView(scroll, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
         return box
     }
 
@@ -381,6 +418,10 @@ class FloatView(
             map[key] = tv
         }
     }
+
+    // ==========================================
+    // 内部私有子 View 组件 (逻辑严格维持原状)
+    // ==========================================
 
     private class SignalIconView(context: Context, private val label: String) : View(context) {
         private var r1 = 0f
