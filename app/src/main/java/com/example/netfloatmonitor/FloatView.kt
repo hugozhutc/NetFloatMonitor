@@ -195,7 +195,7 @@ class FloatView(
         waveformToggleBtn.setOnClickListener {
             isWaveformExpanded = !isWaveformExpanded
             waveformCol.visibility = if (isWaveformExpanded) View.VISIBLE else View.GONE
-            waveformToggleBtn.text = if (isWaveformExpanded) "Link Curve" else "隐波形 📈"
+            waveformToggleBtn.text = if (isWaveformExpanded) "Link Curve" else "Link Curve"
             waveformToggleBtn.background = GradientDrawable().apply {
                 setColor(Color.parseColor(if (isWaveformExpanded) "#2980B9" else "#7F8C8D"))
                 cornerRadius = 6f
@@ -206,7 +206,7 @@ class FloatView(
         noiseToggleBtn.setOnClickListener {
             isNoiseExpanded = !isNoiseExpanded
             noiseCol.visibility = if (isNoiseExpanded) View.VISIBLE else View.GONE
-            noiseToggleBtn.text = if (isNoiseExpanded) "Noise Floor" else "隐底噪 📊"
+            noiseToggleBtn.text = if (isNoiseExpanded) "Noise Floor" else "Noise Floor"
             noiseToggleBtn.background = GradientDrawable().apply {
                 setColor(Color.parseColor(if (isNoiseExpanded) "#27AE60" else "#7F8C8D"))
                 cornerRadius = 6f
@@ -406,12 +406,12 @@ class FloatView(
                             val cachedTv = targetMap[subKey]
                             if (cachedTv != null) {
                                 cachedTv.text = displayText
-                                cachedTv.setTextColor(channelColor)
+                                cachedTv.setTextColor(Color.WHITE)
                             } else {
                                 val tv = TextView(context).apply {
                                     text = displayText
                                     textSize = 12f
-                                    setTextColor(channelColor)
+                                    setTextColor(Color.WHITE)
                                     setPadding(6, 4, 6, 4)
                                 }
                                 targetLayout.addView(tv)
