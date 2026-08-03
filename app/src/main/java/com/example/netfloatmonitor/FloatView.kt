@@ -648,9 +648,9 @@ class FloatView(
         private val bgPaint = Paint().apply { color = Color.argb(15, 255, 255, 255) }
 
         private val rssiMin = 0f
-        private val rssiMax = 120f
+        private val rssiMax = 110f
         private val snrMin = 0f
-        private val snrMax = 50f
+        private val snrMax = 40f
 
         fun addData(r1: Float?, r2: Float?, snr: Float?) {
             rssi1List.add(r1 ?: rssi1List.lastOrNull() ?: 0f)
@@ -675,8 +675,8 @@ class FloatView(
             canvas.drawRect(chartLeft, 0f, chartRight, h, bgPaint)
 
             val yPositions = floatArrayOf(h * 0.2f, h * 0.5f, h * 0.8f)
-            val rssiLabels = arrayOf("120", "60", "0")
-            val snrLabels = arrayOf("50", "25", "0")
+            val rssiLabels = arrayOf("110", "50", "0")
+            val snrLabels = arrayOf("40", "20", "0")
 
             for (i in yPositions.indices) {
                 val y = yPositions[i]
@@ -734,8 +734,8 @@ class FloatView(
             Paint().apply { color = curveColors[i]; strokeWidth = 2f; style = Paint.Style.STROKE; isAntiAlias = true }
         }
 
-        private val noiseMin = 40f
-        private val noiseMax = 140f
+        private val noiseMin = 20f
+        private val noiseMax = 110f
 
         fun addNoiseData(rawCsv: String) {
             try {
@@ -764,7 +764,7 @@ class FloatView(
             canvas.drawRect(chartLeft, 0f, chartRight, h, bgPaint)
 
             val yPositions = floatArrayOf(h * 0.2f, h * 0.5f, h * 0.8f)
-            val labels = arrayOf("140", "90", "40")
+            val labels = arrayOf("110", "90", "20")
             for (i in yPositions.indices) {
                 val y = yPositions[i]
                 canvas.drawLine(chartLeft, y, chartRight, y, gridPaint)
