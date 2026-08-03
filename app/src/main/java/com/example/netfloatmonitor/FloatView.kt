@@ -781,40 +781,53 @@ class FloatView(
             val w = width.toFloat()
             val h = height.toFloat()
             if (w <= 0 || h <= 0) return
-
-            val chartLeft = yAxisWidth
+        
+            val chartLeft = yAxisWidth[cite: 2]
             val chartRight = w
             val chartWidth = chartRight - chartLeft
-            canvas.drawRect(chartLeft, 0f, chartRight, h, bgPaint)
-
-            val yPositions = floatArrayOf(h * 0.2f, h * 0.5f, h * 0.8f)
+            canvas.drawRect(chartLeft, 0f, chartRight, h, bgPaint)[cite: 2]
+        
+            // 1. 获取底噪的总区间范围
+            val axisNoiseRange = noiseMax - noiseMin[cite: 2]
             
-            // 2. 🟢 修正：更改变量名为 axisNoiseRange 规避命名空间冲突
-            val axisNoiseRange = noiseMax - noiseMin
-            val labels = arrayOf(
-                (noiseMax - axisNoiseRange * 0.2f).toInt().toString(), 
-                (noiseMax - axisNoiseRange * 0.5f).toInt().toString(), 
-                (noiseMax - axisNoiseRange * 0.8f).toInt().toString()  
-            )
-
+            // 2. 自定义你指定的底噪刻度标签
+            val labels = arrayOf("120", "90", "60", "30")
+            val labelValues = floatArrayOf(120f, 90f, 60f, 30f)
+        
+            // 3. 【核心修改】反向计算这 4 个指定刻度值在底噪画布上对应的 Y 轴绝对坐标
+            val yPositions = FloatArray(labelValues.size) { i ->
+                h * (1f - (labelValues[i] - noiseMin) / axisNoiseRange)
+            }
+        
+            // 4. 遍历绘制 4 条背景网格线与坐标轴文字
             for (i in yPositions.indices) {
                 val y = yPositions[i]
-                canvas.drawLine(chartLeft, y, chartRight, y, gridPaint)
-                canvas.drawText(labels[i], 20f, y + 5f, axisTextPaint)
+                
+                // 只有当计算出的坐标落在当前视图范围内时才绘制，防止越界
+                if (y in 0f..h) {
+                    // 绘制横向网格线
+                    canvas.drawLine(chartLeft, y, chartRight, y, gridPaint)[cite: 2]
+                    
+                    // 边缘防裁剪处理（最底部的文字稍微往上提一点）
+                    val textY = if (i == yPositions.lastIndex) y - 4f else y + 5f
+                    
+                    // 绘制对应的底噪刻度数值[cite: 2]
+                    canvas.drawText(labels[i], 20f, textY, axisTextPaint)[cite: 2]
+                }
             }
-
-            val title = if (isAir) "[AIR] NOISE" else "[GND] NOISE"
-            canvas.drawText(title, chartLeft + 15f, 22f, headerTextPaint)
-
+        
+            val title = if (isAir) "[AIR] NOISE" else "[GND] NOISE"[cite: 2]
+            canvas.drawText(title, chartLeft + 15f, 22f, headerTextPaint)[cite: 2]
+        
             val historySize = historyList.size
             if (historySize == 0) return
             
             val currentChannels = historyList[historySize - 1].size
             val stepX = chartWidth / (maxDataPoints - 1)
             
-            // 下方原有的绘制范围变量（range）保持不变，不再与上面冲突
-            val range = noiseMax - noiseMin
-
+            val range = noiseMax - noiseMin[cite: 2]
+        
+            // 后续的底噪曲线折线与图例绘制逻辑保持原样...
             for (ch in 0 until currentChannels) {
                 val paint = curvePaints[ch % curvePaints.size]
                 
@@ -837,13 +850,14 @@ class FloatView(
                     )
                 }
             }
-
+        
+            // 图例绘制部分...
             val legendPaint = Paint().apply { isAntiAlias = true; style = Paint.Style.FILL }
             val legendTextPaint = Paint().apply { color = Color.parseColor("#BDC3C7"); textSize = 11f; isAntiAlias = true }
             
             var legendRightX = w - 15f
             val legendY = 22f
-
+        
             for (ch in (currentChannels - 1) downTo 0) {
                 val chColor = curveColors[ch % curveColors.size]
                 val labelStr = "ch${ch + 1}"
