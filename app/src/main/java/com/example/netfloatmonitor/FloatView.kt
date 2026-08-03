@@ -26,7 +26,7 @@ class FloatView(
 ) : LinearLayout(context) {
 
     // ==========================================
-    // 尺寸常量定义 (恢复经典 4 列平铺像素比例)
+    // 尺寸常量定义 (天空地面双栏已同步收窄为 220)
     // ==========================================
     private val TEXT_COL_WIDTH = 220      // 单个文本数据列宽度
     private val CHART_COL_WIDTH = 480     // 单个图表曲线列宽度
@@ -47,6 +47,13 @@ class FloatView(
     private var lastX = 0f
     private var lastY = 0f
     private var resize = false
+
+    // =========================================================================
+    // 核心新增：用于支持 failed 字段动态变红、无闪烁保持、5秒自动恢复原色的状态追踪变量
+    // =========================================================================
+    private val lastValues = HashMap<String, String>()                    // 记录上一次的数值快照
+    private val redTimerRunnables = HashMap<String, Runnable>()           // 存放每个 key 专属的定时恢复任务
+    private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper()) // 主线程路由驱动
 
     // UI 容器组件
     private val topBar = LinearLayout(context)
@@ -94,7 +101,7 @@ class FloatView(
         }
     }
 
-    // 新增：单独控制【实时波形图】的独立开关
+    // 单独控制【实时波形图】的独立开关
     private val waveformToggleBtn = Button(context).apply {
         text = "Link Curve"
         textSize = 11f
@@ -107,7 +114,7 @@ class FloatView(
         }
     }
 
-    // 新增：单独控制【底噪频谱图】的独立开关
+    // 单独控制【底噪频谱图】的独立开关
     private val noiseToggleBtn = Button(context).apply {
         text = "Noise Floor"
         textSize = 11f
@@ -195,7 +202,7 @@ class FloatView(
         waveformToggleBtn.setOnClickListener {
             isWaveformExpanded = !isWaveformExpanded
             waveformCol.visibility = if (isWaveformExpanded) View.VISIBLE else View.GONE
-            waveformToggleBtn.text = if (isWaveformExpanded) "Link Curve" else "Link Curve"
+            waveformToggleBtn.text = "Link Curve"
             waveformToggleBtn.background = GradientDrawable().apply {
                 setColor(Color.parseColor(if (isWaveformExpanded) "#2980B9" else "#7F8C8D"))
                 cornerRadius = 6f
@@ -206,7 +213,7 @@ class FloatView(
         noiseToggleBtn.setOnClickListener {
             isNoiseExpanded = !isNoiseExpanded
             noiseCol.visibility = if (isNoiseExpanded) View.VISIBLE else View.GONE
-            noiseToggleBtn.text = if (isNoiseExpanded) "Noise Floor" else "Noise Floor"
+            noiseToggleBtn.text = "Noise Floor"
             noiseToggleBtn.background = GradientDrawable().apply {
                 setColor(Color.parseColor(if (isNoiseExpanded) "#27AE60" else "#7F8C8D"))
                 cornerRadius = 6f
@@ -338,7 +345,6 @@ class FloatView(
             this.background = panelBg
             this.setPadding(12, 8, 12, 12)
             
-            // 恢复展开时，通过独立联动计算器给出当前精准宽度
             updateWindowLayoutWidth()
             params.height = lastExpandedHeight
         }
@@ -381,13 +387,12 @@ class FloatView(
                 var gndR2: Float? = null
                 var gndSnr: Float? = null
 
-                val noiseColors = arrayOf("#E74C3C", "#F1C40F", "#3498DB", "#9B59B6", "#1ABC9C", "#E67E22")
-
                 val keys = obj.keys()
                 while (keys.hasNext()) {
                     val key = keys.next()
                     val valueStr = obj.optString(key, "")
 
+                    // 噪声文本解析分支
                     if (key == "noiseFloor_a" || key == "noiseFloor_g") {
                         val isAir = key == "noiseFloor_a"
                         val targetLayout = if (isAir) airLayout else gndLayout
@@ -399,19 +404,19 @@ class FloatView(
                         val parts = valueStr.split(",")
                         parts.forEachIndexed { index, partValue ->
                             val subKey = "${key}_ch${index + 1}"
-                            val channelColor = Color.parseColor(noiseColors[index % noiseColors.size])
                             val prefixLabel = if (isAir) "Air_ch" else "Gnd_ch"
                             val displayText = "$prefixLabel${index + 1} : ${partValue.trim()}"
                             
+                            // 🟢 移除了左侧文本通道颜色标注，全部降为 10.5f 紧凑号并显示为纯白
                             val cachedTv = targetMap[subKey]
                             if (cachedTv != null) {
                                 cachedTv.text = displayText
-                                cachedTv.setTextColor(channelColor)
+                                cachedTv.setTextColor(Color.WHITE)
                             } else {
                                 val tv = TextView(context).apply {
                                     text = displayText
-                                    textSize = 12f
-                                    setTextColor(channelColor)
+                                    textSize = 10.5f
+                                    setTextColor(Color.WHITE)
                                     setPadding(6, 4, 6, 4)
                                 }
                                 targetLayout.addView(tv)
@@ -450,7 +455,9 @@ class FloatView(
 
     private fun updateOrAddTextWithColor(layout: LinearLayout, map: HashMap<String, TextView>, key: String, value: String) {
         val cachedTv = map[key]
-        val displayColor = when {
+        
+        // 基础业务动态颜色判定
+        var displayColor = when {
             key.contains("rssi", ignoreCase = true) -> {
                 val rssiVal = value.toFloatOrNull() ?: 0f
                 when {
@@ -469,12 +476,37 @@ class FloatView(
                     else -> Color.parseColor("#2ECC71")
                 }
             }
-            key.contains("failed", ignoreCase = true) -> {
-                val failedCount = value.toIntOrNull() ?: 0
-                if (failedCount > 0) Color.parseColor("#E74C3C") else Color.WHITE
-            }
             key.contains("pass", ignoreCase = true) -> Color.parseColor("#3498DB")
             else -> Color.WHITE
+        }
+
+        // =========================================================================
+        // 🟢 核心新增：针对 failed 字段的“数值出错变化触发变红，静止5秒恢复”机制
+        // =========================================================================
+        if (key.contains("failed", ignoreCase = true)) {
+            val oldValue = lastValues[key]
+            lastValues[key] = value // 实时更新历史快照
+
+            if (oldValue != null && oldValue != value) {
+                // 如果当前已有定时器在跑，先掐断，重新为这个 key 计时5秒
+                mainHandler.removeCallbacks(redTimerRunnables[key])
+                
+                val resetRunnable = Runnable {
+                    map[key]?.setTextColor(Color.WHITE) // 倒计时结束恢复纯白
+                    redTimerRunnables.remove(key)
+                }
+                redTimerRunnables[key] = resetRunnable
+                mainHandler.postDelayed(resetRunnable, 5000) // 5000ms = 5秒
+                
+                displayColor = Color.parseColor("#E74C3C") // 当前帧触发警报红
+            } else {
+                // 若数值跟上一帧完全一样，校验是否处于5秒冻结冷却状态中，如果是，强行保持红色拦截被冲刷
+                displayColor = if (redTimerRunnables.containsKey(key)) {
+                    Color.parseColor("#E74C3C")
+                } else {
+                    Color.WHITE
+                }
+            }
         }
 
         val displayText = "$key : $value"
@@ -484,7 +516,7 @@ class FloatView(
         } else {
             val tv = TextView(context).apply {
                 text = displayText
-                textSize = 12f
+                textSize = 10.5f // 🟢 统一调小字号至 10.5f，完美契合 220 宽度防止换行
                 setTextColor(displayColor)
                 setPadding(6, 4, 6, 4)
             }
