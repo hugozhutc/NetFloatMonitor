@@ -55,6 +55,16 @@ class FloatView(
     private val redTimerRunnables = HashMap<String, Runnable>()           // 存放每个 key 专属的定时恢复任务
     private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper()) // 主线程路由驱动
 
+    // 统一底噪曲线颜色调色板（供文本与频谱图表共享匹配）
+    private val noiseCurveColors = intArrayOf(
+        Color.parseColor("#E74C3C"), // ch1: 红
+        Color.parseColor("#F1C40F"), // ch2: 黄
+        Color.parseColor("#3498DB"), // ch3: 蓝
+        Color.parseColor("#9B59B6"), // ch4: 紫
+        Color.parseColor("#1ABC9C"), // ch5: 青
+        Color.parseColor("#E67E22")  // ch6: 橙
+    )
+
     // UI 容器组件
     private val topBar = LinearLayout(context)
     private val contentFrame = FrameLayout(context)
@@ -71,8 +81,8 @@ class FloatView(
     // 自定义 View 实例
     private val airChartView = WaveformView(context, isAir = true)
     private val gndChartView = WaveformView(context, isAir = false)
-    private val airNoiseChartView = NoiseFloorChartView(context, isAir = true)
-    private val gndNoiseChartView = NoiseFloorChartView(context, isAir = false)
+    private val airNoiseChartView = NoiseFloorChartView(context, isAir = true, noiseCurveColors)
+    private val gndNoiseChartView = NoiseFloorChartView(context, isAir = false, noiseCurveColors)
 
     // 迷你折叠面板组件
     private val collapsedPanel = LinearLayout(context)
@@ -407,16 +417,18 @@ class FloatView(
                             val prefixLabel = if (isAir) "Air_ch" else "Gnd_ch"
                             val displayText = "$prefixLabel${index + 1} : ${partValue.trim()}"
                             
-                            // 移除了左侧文本通道颜色标注，全部降为 10.5f 紧凑号并显示为纯白
+                            // 🟢 恢复核心：使文本颜色动态循环匹配调色板中对应的曲线色，同时维持 10.5f 紧凑大小
+                            val chColor = noiseCurveColors[index % noiseCurveColors.size]
+                            
                             val cachedTv = targetMap[subKey]
                             if (cachedTv != null) {
                                 cachedTv.text = displayText
-                                cachedTv.setTextColor(Color.WHITE)
+                                cachedTv.setTextColor(chColor)
                             } else {
                                 val tv = TextView(context).apply {
                                     text = displayText
                                     textSize = 10.5f
-                                    setTextColor(Color.WHITE)
+                                    setTextColor(chColor)
                                     setPadding(6, 4, 6, 4)
                                 }
                                 targetLayout.addView(tv)
@@ -488,7 +500,7 @@ class FloatView(
             lastValues[key] = value // 实时更新历史快照
 
             if (oldValue != null && oldValue != value) {
-                // 🟢 修复核心：采用安全调用符 ?.let 规避可空类型传入平台 Java 方法的编译挂起问题
+                // 采用安全调用符 ?.let 规避可空类型传入平台 Java 方法的编译问题
                 redTimerRunnables[key]?.let { mainHandler.removeCallbacks(it) }
                 
                 val resetRunnable = Runnable {
@@ -703,7 +715,11 @@ class FloatView(
         }
     }
 
-    private class NoiseFloorChartView(context: Context, private val isAir: Boolean) : View(context) {
+    private class NoiseFloorChartView(
+        context: Context, 
+        private val isAir: Boolean,
+        private val curveColors: IntArray
+    ) : View(context) {
         private val maxDataPoints = 100
         private val yAxisWidth = 85f
         
@@ -714,14 +730,6 @@ class FloatView(
         private val gridPaint = Paint().apply { color = Color.argb(30, 255, 255, 255); strokeWidth = 1f }
         private val bgPaint = Paint().apply { color = Color.argb(20, 230, 126, 34) }
 
-        private val curveColors = intArrayOf(
-            Color.parseColor("#E74C3C"), 
-            Color.parseColor("#F1C40F"), 
-            Color.parseColor("#3498DB"), 
-            Color.parseColor("#9B59B6"), 
-            Color.parseColor("#1ABC9C"), 
-            Color.parseColor("#E67E22")  
-        )
         private val curvePaints = Array(curveColors.size) { i ->
             Paint().apply { color = curveColors[i]; strokeWidth = 2f; style = Paint.Style.STROKE; isAntiAlias = true }
         }
