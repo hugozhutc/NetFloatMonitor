@@ -648,9 +648,9 @@ class FloatView(
         private val bgPaint = Paint().apply { color = Color.argb(15, 255, 255, 255) }
 
         private val rssiMin = 0f
-        private val rssiMax = 110f
+        private val rssiMax = 120f
         private val snrMin = 0f
-        private val snrMax = 40f
+        private val snrMax = 50f
 
         fun addData(r1: Float?, r2: Float?, snr: Float?) {
             rssi1List.add(r1 ?: rssi1List.lastOrNull() ?: 0f)
@@ -674,10 +674,25 @@ class FloatView(
             val chartWidth = chartRight - chartLeft
             canvas.drawRect(chartLeft, 0f, chartRight, h, bgPaint)
 
+            // 1. 定义屏幕绝对位置比例 
             val yPositions = floatArrayOf(h * 0.2f, h * 0.5f, h * 0.8f)
-            val rssiLabels = arrayOf("110", "50", "0")
-            val snrLabels = arrayOf("40", "20", "0")
+            
+            // 2. 🟢 修正：更改变量名为 axisRssiRange 和 axisSnrRange 规避冲突
+            val axisRssiRange = rssiMax - rssiMin
+            val axisSnrRange = snrMax - snrMin
+            
+            val rssiLabels = arrayOf(
+                (rssiMax - axisRssiRange * 0.2f).toInt().toString(),
+                (rssiMax - axisRssiRange * 0.5f).toInt().toString(),
+                (rssiMax - axisRssiRange * 0.8f).toInt().toString()
+            )
+            val snrLabels = arrayOf(
+                (snrMax - axisSnrRange * 0.2f).toInt().toString(),
+                (snrMax - axisSnrRange * 0.5f).toInt().toString(),
+                (snrMax - axisSnrRange * 0.8f).toInt().toString()
+            )
 
+            // 3. 画网格线和动态文本
             for (i in yPositions.indices) {
                 val y = yPositions[i]
                 canvas.drawLine(chartLeft, y, chartRight, y, gridPaint)
@@ -695,6 +710,8 @@ class FloatView(
             val snrText = "SNR: ${snrList.lastOrNull()?.toInt() ?: 0}"
             canvas.drawText(snrText, startX + paintTextRssi1.measureText(r1Text) + paintTextRssi2.measureText(r2Text), 22f, paintTextSnr)
 
+            // 下方的 range 依然保持原样，不会再与上方冲突了
+            val range = rssiMax - rssiMin
             drawNormalCurve(canvas, rssi1List, rssiMin, rssiMax, chartLeft, chartWidth, h, paintRssi1)
             drawNormalCurve(canvas, rssi2List, rssiMin, rssiMax, chartLeft, chartWidth, h, paintRssi2)
             drawNormalCurve(canvas, snrList, minVal = snrMin, maxVal = snrMax, leftOffset = chartLeft, cWidth = chartWidth, h = h, paint = paintSnr)
@@ -704,13 +721,13 @@ class FloatView(
             val size = list.size
             if (size < 2) return
             val stepX = cWidth / (maxDataPoints - 1)
-            val range = maxVal - minVal
+            val curRange = maxVal - minVal
             for (i in 0 until size - 1) {
                 val startX = leftOffset + (i * stepX)
                 val endX = leftOffset + ((i + 1) * stepX)
                 val valStart = list[i].coerceIn(minVal, maxVal)
                 val valEnd = list[i + 1].coerceIn(minVal, maxVal)
-                canvas.drawLine(startX, h * (1f - (valStart - minVal) / range), endX, h * (1f - (valEnd - minVal) / range), paint)
+                canvas.drawLine(startX, h * (1f - (valStart - minVal) / curRange), endX, h * (1f - (valEnd - minVal) / curRange), paint)
             }
         }
     }
@@ -734,8 +751,8 @@ class FloatView(
             Paint().apply { color = curveColors[i]; strokeWidth = 2f; style = Paint.Style.STROKE; isAntiAlias = true }
         }
 
-        private val noiseMin = 20f
-        private val noiseMax = 110f
+        private val noiseMin = 40f
+        private val noiseMax = 140f
 
         fun addNoiseData(rawCsv: String) {
             try {
@@ -764,19 +781,22 @@ class FloatView(
             canvas.drawRect(chartLeft, 0f, chartRight, h, bgPaint)
 
             val yPositions = floatArrayOf(h * 0.2f, h * 0.5f, h * 0.8f)
-            val range = noiseMax - noiseMin
+            
+            // 2. 🟢 修正：更改变量名为 axisNoiseRange 规避命名空间冲突
+            val axisNoiseRange = noiseMax - noiseMin
             val labels = arrayOf(
-                (noiseMax - range * 0.2f).toInt().toString(), // 20% 高度处对应的数值
-                (noiseMax - range * 0.5f).toInt().toString(), // 50% 高度处对应的数值
-                (noiseMax - range * 0.8f).toInt().toString()  // 80% 高度处对应的数值
+                (noiseMax - axisNoiseRange * 0.2f).toInt().toString(), 
+                (noiseMax - axisNoiseRange * 0.5f).toInt().toString(), 
+                (noiseMax - axisNoiseRange * 0.8f).toInt().toString()  
             )
+
             for (i in yPositions.indices) {
                 val y = yPositions[i]
                 canvas.drawLine(chartLeft, y, chartRight, y, gridPaint)
                 canvas.drawText(labels[i], 20f, y + 5f, axisTextPaint)
             }
 
-            val title = if (isAir) "[AIR NOISE]" else "[GND NOISE]"
+            val title = if (isAir) "[AIR] NOISE" else "[GND] NOISE"
             canvas.drawText(title, chartLeft + 15f, 22f, headerTextPaint)
 
             val historySize = historyList.size
@@ -784,6 +804,8 @@ class FloatView(
             
             val currentChannels = historyList[historySize - 1].size
             val stepX = chartWidth / (maxDataPoints - 1)
+            
+            // 下方原有的绘制范围变量（range）保持不变，不再与上面冲突
             val range = noiseMax - noiseMin
 
             for (ch in 0 until currentChannels) {
