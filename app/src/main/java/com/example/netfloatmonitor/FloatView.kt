@@ -764,7 +764,12 @@ class FloatView(
             canvas.drawRect(chartLeft, 0f, chartRight, h, bgPaint)
 
             val yPositions = floatArrayOf(h * 0.2f, h * 0.5f, h * 0.8f)
-            val labels = arrayOf("110", "90", "20")
+            val range = noiseMax - noiseMin
+            val labels = arrayOf(
+                (noiseMax - range * 0.2f).toInt().toString(), // 20% 高度处对应的数值
+                (noiseMax - range * 0.5f).toInt().toString(), // 50% 高度处对应的数值
+                (noiseMax - range * 0.8f).toInt().toString()  // 80% 高度处对应的数值
+            )
             for (i in yPositions.indices) {
                 val y = yPositions[i]
                 canvas.drawLine(chartLeft, y, chartRight, y, gridPaint)
