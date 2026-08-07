@@ -101,23 +101,62 @@ class LogManager(private val context: Context) {
             val jsonObject = JSONObject(jsonData)
             val file = File(logDir, name)
 
-            if (csvHeaders.isEmpty()) {
-                csvHeaders.add("Timestamp")
-                val keys = jsonObject.keys()
+            // 用于当前行实际填入的数据映射
+            val rowValuesMap = mutableMapOf<String, String>()
+            rowValuesMap["Timestamp"] = getTime()
+
+            // 1. 递归或平铺解析 JSON 中的普通字段与数组字段（如底噪 channels）
+            fun flattenJson(prefix: String, obj: JSONObject) {
+                val keys = obj.keys()
                 while (keys.hasNext()) {
-                    csvHeaders.add(keys.next())
+                    val key = keys.next()
+                    val fullKey = if (prefix.isEmpty()) key else "$prefix.$key"
+                    val value = obj.opt(key)
+
+                    when (value) {
+                        is JSONObject -> {
+                            flattenJson(fullKey, value)
+                        }
+                        is org.json.JSONArray -> {
+                            // 如果是数组（例如底噪列表），将其展开为 ch1, ch2, ch3...
+                            for (i in 0 until value.length()) {
+                                val itemKey = "${fullKey}_ch${i + 1}"
+                                val itemVal = value.optString(i, "")
+                                rowValuesMap[itemKey] = itemVal
+                                if (!csvHeaders.contains(itemKey)) {
+                                    csvHeaders.add(itemKey)
+                                }
+                            }
+                        }
+                        else -> {
+                            val strVal = value?.toString() ?: ""
+                            val cleanVal = if (strVal.contains(",")) "\"$strVal\"" else strVal
+                            rowValuesMap[fullKey] = cleanVal
+                            if (!csvHeaders.contains(fullKey)) {
+                                csvHeaders.add(fullKey)
+                            }
+                        }
+                    }
                 }
+            }
+
+            // 执行解析
+            flattenJson("", jsonObject)
+
+            // 2. 如果是第一次写入，初始化 CSV 表头 (保证 Timestamp 永远在第一列)
+            if (csvHeaders.isEmpty() || !csvHeaders.contains("Timestamp")) {
+                csvHeaders.remove("Timestamp")
+                csvHeaders.add(0, "Timestamp")
+                
                 val headerLine = csvHeaders.joinToString(separator = ",") + "\n"
                 file.appendText(headerLine)
             }
 
+            // 3. 严格按照表头顺序组装整行数据
             val rowData = ArrayList<String>(csvHeaders.size)
-            rowData.add(getTime())
-
-            for (i in 1 until csvHeaders.size) {
-                val key = csvHeaders[i]
-                val value = jsonObject.optString(key, "")
-                val cleanValue = if (value.contains(",")) "\"$value\"" else value
+            for (header in csvHeaders) {
+                val rawVal = rowValuesMap[header] ?: ""
+                val cleanValue = if (rawVal.contains(",")) "\"$rawVal\"" else rawVal
                 rowData.add(cleanValue)
             }
 
