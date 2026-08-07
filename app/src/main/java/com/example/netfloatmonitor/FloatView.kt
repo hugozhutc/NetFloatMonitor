@@ -674,22 +674,23 @@ class FloatView(
             val chartWidth = chartRight - chartLeft
             canvas.drawRect(chartLeft, 0f, chartRight, h, bgPaint) //
         
-            // 1. 获取 RSSI 的总区间范围
-            val axisRssiRange = rssiMax - rssiMin //[cite: 2]
+            // 1. 获取总区间范围
+            val axisRssiRange = rssiMax - rssiMin
             
-            // 2. 自定义你想显示的 RSSI 刻度，并按比例匹配整齐的 SNR 刻度
+            // 2. 自定义你想显示的刻度数值和对应的文本
+            val labelValues = floatArrayOf(110f, 90f, 70f, 50f, 30f, 0f)
             val rssiLabels = arrayOf("110", "90", "70", "50", "30", "0")
-            val snrLabels  = arrayOf("35", "20", "15", "10", "5", "0") // 根据 120:50 的物理比例换算的近似整数
+            val snrLabels  = arrayOf("45", "35", "25", "15", "8", "0")
         
-            // 3. 【核心修改】反向计算这 4 个刻度值在画布上对应的 Y 轴绝对坐标
+            // 3. 动态计算所有刻度对应的 Y 轴绝对坐标
             val yPositions = FloatArray(labelValues.size) { i ->
                 h * (1f - (labelValues[i] - rssiMin) / axisRssiRange)
             }
         
-            // 4. 遍历绘制 4 条背景网格线与坐标轴文字
+            // 4. 循环遍历绘制所有网格线与文字
             for (i in yPositions.indices) {
                 val y = yPositions[i]
-        
+                
                 // 确保坐标在视图内再绘制
                 if (y in 0f..h) {
                     // 绘制横向网格线
@@ -788,25 +789,25 @@ class FloatView(
             val chartWidth = chartRight - chartLeft
             canvas.drawRect(chartLeft, 0f, chartRight, h, bgPaint)
         
-            // 1. 获取底噪的总区间范围
+            // 1. 获取底噪总区间范围
             val axisNoiseRange = noiseMax - noiseMin
             
-            // 2. 自定义你指定的底噪刻度标签
-            val labels = arrayOf("110", "105", "90", "75", "60", "45", "30")
-            val labelValues = floatArrayOf(110f, 105f, 90f, 75f, 60f, 45f, 30f)
+            // 2. 自定义底噪的多个刻度标签和数值
+            val noiseLabels = arrayOf("120", "105", "90", "75", "60", "45", "30")
+            val noiseValues = floatArrayOf(120f, 105f, 90f, 75f, 60f, 45f, 30f)
         
-            // 3. 【核心修改】反向计算这 4 个指定刻度值在底噪画布上对应的 Y 轴绝对坐标
-            val yPositions = FloatArray(labelValues.size) { i ->
-                h * (1f - (labelValues[i] - noiseMin) / axisNoiseRange)
+            // 3. 动态计算底噪刻度的 Y 坐标
+            val yPositions = FloatArray(noiseValues.size) { i ->
+                h * (1f - (noiseValues[i] - noiseMin) / axisNoiseRange)
             }
         
-            // 4. 遍历绘制 4 条背景网格线与坐标轴文字
+            // 4. 循环绘制右侧网格线与文字
             for (i in yPositions.indices) {
                 val y = yPositions[i]
                 if (y in 0f..h) {
                     canvas.drawLine(chartLeft, y, chartRight, y, gridPaint)
                     val textY = if (i == yPositions.lastIndex) y - 4f else y + 5f
-                    canvas.drawText(labels[i], 20f, textY, axisTextPaint)
+                    canvas.drawText(noiseLabels[i], 20f, textY, axisTextPaint)
                 }
             }
         
