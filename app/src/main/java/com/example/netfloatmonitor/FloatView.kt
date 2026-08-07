@@ -173,11 +173,11 @@ class FloatView(
         gndLayout.orientation = LinearLayout.VERTICAL
         
         // 第 1 列：空中数传文本面板
-        contentPanel.addView(createPanel("AIR TELEMETRY", airLayout), LinearLayout.LayoutParams(TEXT_COL_WIDTH, LinearLayout.LayoutParams.MATCH_PARENT))
+        contentPanel.addView(createPanel("AIR", airLayout), LinearLayout.LayoutParams(TEXT_COL_WIDTH, LinearLayout.LayoutParams.MATCH_PARENT))
         
         // 第 2 列：地面数传文本面板
         val gndTextLp = LinearLayout.LayoutParams(TEXT_COL_WIDTH, LinearLayout.LayoutParams.MATCH_PARENT).apply { leftMargin = 12 }
-        contentPanel.addView(createPanel("GND TELEMETRY", gndLayout), gndTextLp)
+        contentPanel.addView(createPanel("GND", gndLayout), gndTextLp)
 
         val subChartLp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f).apply { bottomMargin = 6 }
         val lastChartLp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f)
@@ -678,28 +678,29 @@ class FloatView(
             val axisRssiRange = rssiMax - rssiMin //[cite: 2]
             
             // 2. 自定义你想显示的 RSSI 刻度，并按比例匹配整齐的 SNR 刻度
-            val rssiLabels = arrayOf("110", "60", "20", "0")
-            val snrLabels  = arrayOf("45", "25", "8", "0") // 根据 120:50 的物理比例换算的近似整数
+            val rssiLabels = arrayOf("110", "90", "70", "50", "30", "0")
+            val snrLabels  = arrayOf("35", "20", "15", "10", "5", "0") // 根据 120:50 的物理比例换算的近似整数
         
             // 3. 【核心修改】反向计算这 4 个刻度值在画布上对应的 Y 轴绝对坐标
-            val yPositions = floatArrayOf(
-                h * (1f - (110f - rssiMin) / axisRssiRange), // 对应刻度 110 的高度
-                h * (1f - (60f - rssiMin) / axisRssiRange),  // 对应刻度 60 的高度
-                h * (1f - (20f - rssiMin) / axisRssiRange),  // 对应刻度 20 的高度
-                h * (1f - (0f - rssiMin) / axisRssiRange)    // 对应刻度 0 的高度（即画布最底部）
-            )
+            val yPositions = FloatArray(labelValues.size) { i ->
+                h * (1f - (labelValues[i] - rssiMin) / axisRssiRange)
+            }
         
             // 4. 遍历绘制 4 条背景网格线与坐标轴文字
             for (i in yPositions.indices) {
                 val y = yPositions[i]
-                // 绘制横向网格线[cite: 2]
-                canvas.drawLine(chartLeft, y, chartRight, y, gridPaint) //[cite: 2]
-                
-                // 边界防御：最底部的刻度 "0(0)" 如果还往下加 5f 会掉出画布，所以往上提一点
-                val textY = if (i == yPositions.lastIndex) y - 6f else y + 5f
-                
-                // 绘制复合刻度文字[cite: 2]
-                canvas.drawText("${rssiLabels[i]}(${snrLabels[i]})", 5f, textY, axisTextPaint) //[cite: 2]
+        
+                // 确保坐标在视图内再绘制
+                if (y in 0f..h) {
+                    // 绘制横向网格线
+                    canvas.drawLine(chartLeft, y, chartRight, y, gridPaint)
+                    
+                    // 边缘防裁剪处理（最底部的文字稍微往上提）
+                    val textY = if (i == yPositions.lastIndex) y - 6f else y + 5f
+                    
+                    // 绘制复合刻度文字
+                    canvas.drawText("${rssiLabels[i]}(${snrLabels[i]})", 5f, textY, axisTextPaint)
+                }
             }
         
             // =========================================================================
@@ -791,8 +792,8 @@ class FloatView(
             val axisNoiseRange = noiseMax - noiseMin
             
             // 2. 自定义你指定的底噪刻度标签
-            val labels = arrayOf("120", "90", "60", "30")
-            val labelValues = floatArrayOf(120f, 90f, 60f, 30f)
+            val labels = arrayOf("110", "105", "90", "75", "60", "45", "30")
+            val labelValues = floatArrayOf(110f, 105f, 90f, 75f, 60f, 45f, 30f)
         
             // 3. 【核心修改】反向计算这 4 个指定刻度值在底噪画布上对应的 Y 轴绝对坐标
             val yPositions = FloatArray(labelValues.size) { i ->
@@ -802,16 +803,9 @@ class FloatView(
             // 4. 遍历绘制 4 条背景网格线与坐标轴文字
             for (i in yPositions.indices) {
                 val y = yPositions[i]
-                
-                // 只有当计算出的坐标落在当前视图范围内时才绘制，防止越界
                 if (y in 0f..h) {
-                    // 绘制横向网格线
                     canvas.drawLine(chartLeft, y, chartRight, y, gridPaint)
-                    
-                    // 边缘防裁剪处理（最底部的文字稍微往上提一点）
                     val textY = if (i == yPositions.lastIndex) y - 4f else y + 5f
-                    
-                    // 绘制对应的底噪刻度数值
                     canvas.drawText(labels[i], 20f, textY, axisTextPaint)
                 }
             }
