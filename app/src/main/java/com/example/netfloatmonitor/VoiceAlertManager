@@ -1,0 +1,172 @@
+package com.example.netfloatmonitor
+
+import android.content.Context
+import android.speech.tts.TextToSpeech
+import android.util.Log
+import java.util.Locale
+
+class VoiceAlertManager(
+    context: Context
+) : TextToSpeech.OnInitListener {
+
+    private val appContext = context.applicationContext
+
+    private var tts: TextToSpeech? = null
+    private var initialized = false
+
+    private val cooldownMs = 30_000L
+
+    private val lastAlertTime = mutableMapOf<String, Long>()
+
+    // 当前链路是否处于断开状态
+    private var linkDisconnected = false
+
+    init {
+        tts = TextToSpeech(appContext, this)
+    }
+
+    override fun onInit(status: Int) {
+
+        if (status == TextToSpeech.SUCCESS) {
+
+            val result = tts?.setLanguage(Locale.CHINA)
+
+            initialized =
+                result != TextToSpeech.LANG_MISSING_DATA &&
+                result != TextToSpeech.LANG_NOT_SUPPORTED
+
+            if (initialized) {
+
+                tts?.setSpeechRate(1.0f)
+                tts?.setPitch(1.0f)
+
+                Log.d(
+                    "VoiceAlert",
+                    "TTS 初始化成功"
+                )
+
+            } else {
+
+                Log.e(
+                    "VoiceAlert",
+                    "中文语音不支持"
+                )
+            }
+
+        } else {
+
+            Log.e(
+                "VoiceAlert",
+                "TTS 初始化失败"
+            )
+        }
+    }
+
+    /**
+     * 播报普通告警
+     */
+    fun speakAlert(
+        key: String,
+        text: String
+    ) {
+
+        if (!initialized) return
+
+        val now = System.currentTimeMillis()
+
+        val lastTime =
+            lastAlertTime[key] ?: 0L
+
+        if (now - lastTime < cooldownMs) {
+            return
+        }
+
+        lastAlertTime[key] = now
+
+        tts?.speak(
+            text,
+            TextToSpeech.QUEUE_ADD,
+            null,
+            "alert_$key"
+        )
+    }
+
+    /**
+     * 链路断开
+     *
+     * 只播报一次，避免3秒一次重复播报。
+     */
+    fun onLinkDisconnected() {
+
+        if (linkDisconnected) {
+            return
+        }
+
+        linkDisconnected = true
+
+        if (!initialized) return
+
+        tts?.speak(
+            "警告，链路已断开",
+            TextToSpeech.QUEUE_ADD,
+            null,
+            "link_disconnected"
+        )
+    }
+
+    /**
+     * 链路恢复
+     *
+     * 只有之前确实处于断开状态，
+     * 恢复以后才播报。
+     */
+    fun onLinkRecovered() {
+
+        if (!linkDisconnected) {
+            return
+        }
+
+        linkDisconnected = false
+
+        if (!initialized) return
+
+        tts?.speak(
+            "链路已恢复",
+            TextToSpeech.QUEUE_ADD,
+            null,
+            "link_recovered"
+        )
+    }
+
+    /**
+     * 清除告警状态
+     */
+    fun reset() {
+
+        lastAlertTime.clear()
+        linkDisconnected = false
+    }
+
+    /**
+     * 释放TTS
+     */
+    fun shutdown() {
+
+        try {
+
+            tts?.stop()
+            tts?.shutdown()
+
+        } catch (e: Exception) {
+
+            Log.e(
+                "VoiceAlert",
+                "TTS关闭异常",
+                e
+            )
+        }
+
+        tts = null
+        initialized = false
+    }
+}
