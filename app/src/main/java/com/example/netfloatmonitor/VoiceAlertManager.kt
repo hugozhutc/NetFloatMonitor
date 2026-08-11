@@ -12,76 +12,101 @@ class VoiceAlertManager(
     private val appContext = context.applicationContext
 
     private var tts: TextToSpeech? = null
+
     private var initialized = false
 
+    // 同一种告警30秒内只播报一次
     private val cooldownMs = 30_000L
 
-    private val lastAlertTime = mutableMapOf<String, Long>()
+    private val lastAlertTime =
+        mutableMapOf<String, Long>()
 
-    // 当前链路是否处于断开状态
+    // 链路是否已经进入断开状态
     private var linkDisconnected = false
 
     init {
-        tts = TextToSpeech(appContext, this)
+        tts = TextToSpeech(
+            appContext,
+            this
+        )
     }
 
     override fun onInit(status: Int) {
 
-        if (status == TextToSpeech.SUCCESS) {
-
-            val result = tts?.setLanguage(Locale.CHINA)
-
-            initialized =
-                result != TextToSpeech.LANG_MISSING_DATA &&
-                result != TextToSpeech.LANG_NOT_SUPPORTED
-
-            if (initialized) {
-
-                tts?.setSpeechRate(1.0f)
-                tts?.setPitch(1.0f)
-
-                Log.d(
-                    "VoiceAlert",
-                    "TTS 初始化成功"
-                )
-
-            } else {
-
-                Log.e(
-                    "VoiceAlert",
-                    "中文语音不支持"
-                )
-            }
-
-        } else {
+        if (status != TextToSpeech.SUCCESS) {
 
             Log.e(
                 "VoiceAlert",
-                "TTS 初始化失败"
+                "TTS初始化失败，status=$status"
             )
+
+            return
         }
+
+        val result =
+            tts?.setLanguage(Locale.CHINA)
+
+        initialized =
+            result != TextToSpeech.LANG_MISSING_DATA &&
+            result != TextToSpeech.LANG_NOT_SUPPORTED
+
+        if (!initialized) {
+
+            Log.e(
+                "VoiceAlert",
+                "设备不支持中文TTS"
+            )
+
+            return
+        }
+
+        // 语速
+        tts?.setSpeechRate(1.0f)
+
+        // 音调
+        tts?.setPitch(1.0f)
+
+        Log.d(
+            "VoiceAlert",
+            "TTS初始化成功"
+        )
     }
 
     /**
-     * 播报普通告警
+     * 普通告警
+     *
+     * key：
+     * air_rssi
+     * gnd_rssi
+     * air_snr
+     * gnd_snr
      */
     fun speakAlert(
         key: String,
         text: String
     ) {
 
-        if (!initialized) return
+        if (!initialized) {
+            return
+        }
 
-        val now = System.currentTimeMillis()
+        val now =
+            System.currentTimeMillis()
 
         val lastTime =
             lastAlertTime[key] ?: 0L
 
+        // 冷却时间
         if (now - lastTime < cooldownMs) {
             return
         }
 
         lastAlertTime[key] = now
+
+        Log.d(
+            "VoiceAlert",
+            "语音播报：$text"
+        )
 
         tts?.speak(
             text,
@@ -94,7 +119,7 @@ class VoiceAlertManager(
     /**
      * 链路断开
      *
-     * 只播报一次，避免3秒一次重复播报。
+     * 只播报一次
      */
     fun onLinkDisconnected() {
 
@@ -104,7 +129,14 @@ class VoiceAlertManager(
 
         linkDisconnected = true
 
-        if (!initialized) return
+        if (!initialized) {
+            return
+        }
+
+        Log.d(
+            "VoiceAlert",
+            "语音播报：警告，链路已断开"
+        )
 
         tts?.speak(
             "警告，链路已断开",
@@ -117,8 +149,7 @@ class VoiceAlertManager(
     /**
      * 链路恢复
      *
-     * 只有之前确实处于断开状态，
-     * 恢复以后才播报。
+     * 只有之前断开过才播报
      */
     fun onLinkRecovered() {
 
@@ -128,7 +159,14 @@ class VoiceAlertManager(
 
         linkDisconnected = false
 
-        if (!initialized) return
+        if (!initialized) {
+            return
+        }
+
+        Log.d(
+            "VoiceAlert",
+            "语音播报：链路已恢复"
+        )
 
         tts?.speak(
             "链路已恢复",
@@ -139,11 +177,12 @@ class VoiceAlertManager(
     }
 
     /**
-     * 清除告警状态
+     * 重置状态
      */
     fun reset() {
 
         lastAlertTime.clear()
+
         linkDisconnected = false
     }
 
@@ -155,6 +194,7 @@ class VoiceAlertManager(
         try {
 
             tts?.stop()
+
             tts?.shutdown()
 
         } catch (e: Exception) {
@@ -167,6 +207,7 @@ class VoiceAlertManager(
         }
 
         tts = null
+
         initialized = false
     }
 }
