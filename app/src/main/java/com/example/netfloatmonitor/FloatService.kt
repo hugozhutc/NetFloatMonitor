@@ -1,8 +1,10 @@
 package com.example.netfloatmonitor
 
 import android.app.*
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.ServiceInfo
 import android.graphics.PixelFormat
 import android.os.Build
@@ -23,7 +25,6 @@ class FloatService : Service() {
     private var receiver: UdpReceiver? = null
     private lateinit var logger: LogManager
 
-    // 使用 AtomicInteger 确保 UDP 接收线程与状态 Timer 线程之间的高频原子操作安全
     private val totalPackets = AtomicInteger(0)
     private val packetsInLastSecond = AtomicInteger(0)
     
@@ -32,13 +33,26 @@ class FloatService : Service() {
 
     private val mainHandler = Handler(Looper.getMainLooper())
 
+    // 广播接收器：监听来自 MainActivity 的配置修改通知
+    private val configReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            floatView?.postInvalidate()
+        }
+    }
+
     override fun onCreate() {
         super.onCreate()
         logger = LogManager(this)
         Log.d("FloatService", "Service onCreate 触发")
         createNotificationChannel()
-        
-        // 兼容 Android 14 (API 34) 前台服务类型规范
+
+        // 注册配置变动广播
+        LocalBroadcastManager.getInstance(this).registerReceiver(
+            configReceiver,
+            IntentFilter("com.example.netfloatmonitor.CONFIG_CHANGED")
+        )
+
+        // 兼容 Android 14 前台服务类型规范
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             startForeground(
                 1001, 
@@ -79,14 +93,11 @@ class FloatService : Service() {
 
         receiver = UdpReceiver(port) { data ->
             try {
-                // 1. 高频多线程安全的原子计数
                 totalPackets.incrementAndGet()
                 packetsInLastSecond.incrementAndGet()
 
-                // 2. 异步落盘，完全不阻塞 UDP 接收子线程
                 logger.save(data)
 
-                // 3. 分发给主线程悬浮窗：内部已包含 isShown 检查与 UI 增量更新逻辑
                 mainHandler.post {
                     floatView?.updateJsonDynamic(data)
                 }
@@ -102,7 +113,6 @@ class FloatService : Service() {
         statusTimer = Timer()
         statusTimer?.scheduleAtFixedRate(object : TimerTask() {
             override fun run() {
-                // 提取并重置上一秒的报文统计
                 currentHz = packetsInLastSecond.getAndSet(0)
                 sendStatusBroadcast()
             }
@@ -145,6 +155,9 @@ class FloatService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
+
+        LocalBroadcastManager.getInstance(this).unregisterReceiver(configReceiver)
+
         statusTimer?.cancel()
         statusTimer = null
 
