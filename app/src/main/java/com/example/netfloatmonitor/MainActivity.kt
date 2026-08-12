@@ -10,43 +10,45 @@ import android.os.Bundle
 import android.provider.Settings
 import android.widget.Button
 import android.widget.EditText
+import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import androidx.appcompat.widget.SwitchCompat
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
-import com.example.netfloatmonitor.R
 
 class MainActivity : AppCompatActivity() {
 
-    private lateinit var etPort: EditText
-    private lateinit var btnToggleService: Button
-    private lateinit var switchChartAir: SwitchCompat
-    private lateinit var switchChartGnd: SwitchCompat
-    private lateinit var tvStatus: TextView
+    private lateinit var editIp: EditText
+    private lateinit var editPort: EditText
+    private lateinit var switchFloat: Switch
+    private lateinit var switchChart: Switch
+    private lateinit var switchLogging: Switch
+    private lateinit var startBtn: Button
+    private lateinit var stopBtn: Button
+    private lateinit var clearBtn: Button
+    private lateinit var tvStatusInfo: TextView
+    private lateinit var logPath: TextView
 
     private var isServiceRunning = false
 
+    // 接收来自 FloatService 的状态广播更新 UI 面板
     private val statusReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             val isStopped = intent?.getBooleanExtra("IS_STOPPED", false) ?: false
             if (isStopped) {
                 isServiceRunning = false
-                btnToggleService.text = "启动悬浮窗服务"
-                tvStatus.text = "状态：已停止"
+                tvStatusInfo.text = "链路状态: 待机\n当前文件: 未开启监控\n已收数据: 0 包 | 速率: 0 Hz"
                 return
             }
 
             val totalPackets = intent?.getIntExtra("TOTAL_PACKETS", 0) ?: 0
             val hz = intent?.getIntExtra("HZ", 0) ?: 0
             isServiceRunning = true
-            btnToggleService.text = "停止悬浮窗服务"
-            tvStatus.text = "状态：运行中 | 总包数: $totalPackets | 速率: ${hz}Hz"
+            tvStatusInfo.text = "链路状态: 接收中\n当前文件: 实时日志记录中\n已收数据: $totalPackets 包 | 速率: ${hz} Hz"
         }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        // 修复点 1：传入 savedInstanceState 参数
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
@@ -61,29 +63,46 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun initViews() {
-        etPort = findViewById(R.id.etPort)
-        btnToggleService = findViewById(R.id.btnToggleService)
-        switchChartAir = findViewById(R.id.switchChartAir)
-        switchChartGnd = findViewById(R.id.switchChartGnd)
-        tvStatus = findViewById(R.id.tvStatus)
+        editIp = findViewById(R.id.editIp)
+        editPort = findViewById(R.id.editPort)
+        switchFloat = findViewById(R.id.switchFloat)
+        switchChart = findViewById(R.id.switchChart)
+        switchLogging = findViewById(R.id.switchLogging)
+        startBtn = findViewById(R.id.startBtn)
+        stopBtn = findViewById(R.id.stopBtn)
+        clearBtn = findViewById(R.id.clearBtn)
+        tvStatusInfo = findViewById(R.id.tvStatusInfo)
+        logPath = findViewById(R.id.logPath)
     }
 
     private fun setupListeners() {
-        btnToggleService.setOnClickListener {
-            if (isServiceRunning) {
-                stopFloatService()
-            } else {
-                startFloatService()
-            }
+        startBtn.setOnClickListener {
+            startFloatService()
         }
 
-        switchChartAir.setOnCheckedChangeListener { _, isChecked ->
-            saveConfig("SHOW_AIR_CHART", isChecked)
+        stopBtn.setOnClickListener {
+            stopFloatService()
+        }
+
+        clearBtn.setOnClickListener {
+            Toast.makeText(this, "缓存日志已清理", Toast.LENGTH_SHORT).show()
+        }
+
+        // 悬浮窗显示/隐藏开关
+        switchFloat.setOnCheckedChangeListener { _, isChecked ->
+            saveConfig("SHOW_FLOAT_WINDOW", isChecked)
             notifyConfigChanged()
         }
 
-        switchChartGnd.setOnCheckedChangeListener { _, isChecked ->
-            saveConfig("SHOW_GND_CHART", isChecked)
+        // 实时图表开关
+        switchChart.setOnCheckedChangeListener { _, isChecked ->
+            saveConfig("SHOW_CHART", isChecked)
+            notifyConfigChanged()
+        }
+
+        // CSV 日志导出开关
+        switchLogging.setOnCheckedChangeListener { _, isChecked ->
+            saveConfig("ENABLE_LOGGING", isChecked)
             notifyConfigChanged()
         }
     }
@@ -105,10 +124,12 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        val portStr = etPort.text.toString().trim()
-        val port = if (portStr.isNotEmpty()) portStr.toInt() else 16789
+        val ip = editIp.text.toString().trim()
+        val portStr = editPort.text.toString().trim()
+        val port = if (portStr.isNotEmpty()) portStr.toInt() else 14550
 
         val intent = Intent(this, FloatService::class.java).apply {
+            putExtra("IP", ip)
             putExtra("PORT", port)
         }
 
