@@ -20,6 +20,11 @@ class MainActivity : AppCompatActivity() {
     private lateinit var logManager: LogManager
     private lateinit var tvStatusInfo: TextView
 
+    // 功能开关控件
+    private lateinit var switchFloat: Switch
+    private lateinit var switchChart: Switch
+    private lateinit var switchLogging: Switch
+
     private val statusReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             if (intent == null) return
@@ -46,12 +51,20 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
+        // 1. 初始化全局开关配置单例
+        MonitorConfig.init(this)
+
         logManager = LogManager(this)
 
         ipEdit = findViewById(R.id.editIp)
         portEdit = findViewById(R.id.editPort)
         logPath = findViewById(R.id.logPath)
         tvStatusInfo = findViewById(R.id.tvStatusInfo)
+
+        // 2. 绑定新增的 Switch 控件
+        switchFloat = findViewById(R.id.switchFloat)
+        switchChart = findViewById(R.id.switchChart)
+        switchLogging = findViewById(R.id.switchLogging)
 
         val startBtn = findViewById<Button>(R.id.startBtn)
         val stopBtn = findViewById<Button>(R.id.stopBtn)
@@ -60,12 +73,16 @@ class MainActivity : AppCompatActivity() {
         loadConfig()
         showLogPath()
         
+        // 3. 同步开关状态并绑定监听器
+        initSwitchListeners()
+
         tvStatusInfo.text = "链路状态: 待机\n当前文件: 未开启监控\n已收数据: 0 包 | 速率: 0 Hz"
 
         startBtn.setOnClickListener {
             saveConfig()
 
-            if (!Settings.canDrawOverlays(this)) {
+            // 开启了悬浮窗开关时，才强校验悬浮窗 overlay 权限
+            if (MonitorConfig.isFloatEnabled && !Settings.canDrawOverlays(this)) {
                 val intent = Intent(
                     Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
                     Uri.parse("package:$packageName")
@@ -77,8 +94,8 @@ class MainActivity : AppCompatActivity() {
 
             val port = portEdit.text.toString().toIntOrNull() ?: 16789
 
-            // 【核心优化】点击启动时，不等服务广播，前台先行本地刷新 UI，防止显示滞后
-            logManager.startNewSession() // 预先触发一次 session 获取文件名
+            // 点击启动时前台先行刷新 UI，防止广播延迟
+            logManager.startNewSession()
             val previewFile = logManager.getCurrentFileName()
             tvStatusInfo.text = """
                 链路状态: 正在初始化...
@@ -107,6 +124,36 @@ class MainActivity : AppCompatActivity() {
 
         clearBtn.setOnClickListener {
             clearLog()
+        }
+    }
+
+    /**
+     * 初始化开关状态回显与实时切换监听
+     */
+    private fun initSwitchListeners() {
+        // 回显存储的值
+        switchFloat.isChecked = MonitorConfig.isFloatEnabled
+        switchChart.isChecked = MonitorConfig.isChartEnabled
+        switchLogging.isChecked = MonitorConfig.isLoggingEnabled
+
+        // 1. 悬浮窗总开关
+        switchFloat.setOnCheckedChangeListener { _, isChecked ->
+            MonitorConfig.isFloatEnabled = isChecked
+            MonitorConfig.save(this)
+            FloatService.notifyConfigChanged(this)
+        }
+
+        // 2. 实时曲线图总开关
+        switchChart.setOnCheckedChangeListener { _, isChecked ->
+            MonitorConfig.isChartEnabled = isChecked
+            MonitorConfig.save(this)
+            FloatService.notifyConfigChanged(this)
+        }
+
+        // 3. CSV日志导出总开关
+        switchLogging.setOnCheckedChangeListener { _, isChecked ->
+            MonitorConfig.isLoggingEnabled = isChecked
+            MonitorConfig.save(this)
         }
     }
 
