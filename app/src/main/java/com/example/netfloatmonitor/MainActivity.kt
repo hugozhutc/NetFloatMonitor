@@ -15,6 +15,7 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.SwitchCompat
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
+import com.example.netfloatmonitor.R
 
 class MainActivity : AppCompatActivity() {
 
@@ -26,7 +27,6 @@ class MainActivity : AppCompatActivity() {
 
     private var isServiceRunning = false
 
-    // 接收来自 FloatService 的状态广播更新 UI
     private val statusReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             val isStopped = intent?.getBooleanExtra("IS_STOPPED", false) ?: false
@@ -46,7 +46,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate()
+        // 修复点 1：传入 savedInstanceState 参数
+        super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
         initViews()
@@ -76,7 +77,6 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // 修改点：开关变动时通过 LocalBroadcastManager 发送解耦广播
         switchChartAir.setOnCheckedChangeListener { _, isChecked ->
             saveConfig("SHOW_AIR_CHART", isChecked)
             notifyConfigChanged()
@@ -88,9 +88,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    /**
-     * 发送配置变动广播（替换原 notifyConfigChanged 报错方法）
-     */
     private fun notifyConfigChanged() {
         val intent = Intent("com.example.netfloatmonitor.CONFIG_CHANGED")
         LocalBroadcastManager.getInstance(this).sendBroadcast(intent)
