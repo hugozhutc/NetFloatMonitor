@@ -6,9 +6,6 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
-import android.os.Handler
-import android.os.Looper
-import android.util.Log
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
@@ -29,7 +26,7 @@ class FloatView(
 ) : LinearLayout(context) {
 
     // ==========================================
-    // 尺寸常量定义 (天空/地面双竖列布局宽度 220)
+    // 尺寸常量定义 (天空地面双栏已同步收窄为 220)
     // ==========================================
     private val TEXT_COL_WIDTH = 220      // 单个文本数据列宽度
     private val CHART_COL_WIDTH = 480     // 单个图表曲线列宽度
@@ -38,10 +35,10 @@ class FloatView(
     private val collapsedHeight = 130
     private var lastExpandedHeight = 650 
 
-    // 核心状态控制：独立区分两张图表的收纳与展开
-    private var isExpanded = true             // 悬浮窗整体展开/收起
-    private var isWaveformExpanded = true     // 实时波形曲线列展开/收起
-    private var isNoiseExpanded = true        // 底噪频谱曲线列展开/收起
+    // 核心状态控制：完全独立区分开两张图表的收纳与展开
+    private var isExpanded = true             // 整体悬浮窗是否展开 (false 为右下角小图标状态)
+    private var isWaveformExpanded = true     // 实时波形曲线图列是否展开
+    private var isNoiseExpanded = true        // 底噪频谱曲线图列是否展开
 
     private var startWidth = 0
     private var startHeight = 0
@@ -52,13 +49,13 @@ class FloatView(
     private var resize = false
 
     // =========================================================================
-    // 状态追踪变量：用于 support fail 字段变红、5秒恢复原色
+    // 用于支持 failed 字段动态变红、无闪烁保持、5秒自动恢复原色的状态追踪变量
     // =========================================================================
-    private val lastValues = HashMap<String, String>()
-    private val redTimerRunnables = HashMap<String, Runnable>()
-    private val mainHandler = Handler(Looper.getMainLooper())
+    private val lastValues = HashMap<String, String>()                    // 记录上一次的数值快照
+    private val redTimerRunnables = HashMap<String, Runnable>()           // 存放每个 key 专属的定时恢复任务
+    private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper()) // 主线程路由驱动
 
-    // 统一底噪曲线调色板
+    // 统一底噪曲线颜色调色板（供文本与频谱图表共享匹配）
     private val noiseCurveColors = intArrayOf(
         Color.parseColor("#E74C3C"), // ch1: 红
         Color.parseColor("#F1C40F"), // ch2: 黄
@@ -77,7 +74,7 @@ class FloatView(
     private val waveformCol = LinearLayout(context)
     private val noiseCol = LinearLayout(context)
 
-    // 数据列表容器 (天空/地面 2 竖列)
+    // 数据列表容器
     private val airLayout = LinearLayout(context)
     private val gndLayout = LinearLayout(context)
     
@@ -114,7 +111,7 @@ class FloatView(
         }
     }
 
-    // 单独控制【实时波形图】独立开关
+    // 单独控制【实时波形图】的独立开关
     private val waveformToggleBtn = Button(context).apply {
         text = "Link Curve"
         textSize = 11f
@@ -127,7 +124,7 @@ class FloatView(
         }
     }
 
-    // 单独控制【底噪频谱图】独立开关
+    // 单独控制【底噪频谱图】的独立开关
     private val noiseToggleBtn = Button(context).apply {
         text = "Noise Floor"
         textSize = 11f
@@ -159,7 +156,7 @@ class FloatView(
         collapsedPanel.addView(gndSignalIconView, iconLp)
         addView(collapsedPanel)
 
-        // 2. 初始化顶部控制状态栏
+        // 2. 初始化顶部控制状态栏 (加入双图表独立控制开关)
         topBar.orientation = LinearLayout.HORIZONTAL
         topBar.gravity = Gravity.END or Gravity.CENTER_VERTICAL
         topBar.setPadding(0, 0, 4, 6)
@@ -170,36 +167,36 @@ class FloatView(
         topBar.addView(toggleBtn, LinearLayout.LayoutParams(48, 48))
         addView(topBar)
 
-        // 3. 构建主内容区 (横向平铺架构)
+        // 3. 构建主内容区 (经典的横向平铺串联架构)
         contentPanel.orientation = LinearLayout.HORIZONTAL
         airLayout.orientation = LinearLayout.VERTICAL
         gndLayout.orientation = LinearLayout.VERTICAL
         
-        // 第 1 列：空中数传文本面板 (左侧)
+        // 第 1 列：空中数传文本面板
         contentPanel.addView(createPanel("AIR", airLayout), LinearLayout.LayoutParams(TEXT_COL_WIDTH, LinearLayout.LayoutParams.MATCH_PARENT))
         
-        // 第 2 列：地面数传文本面板 (右侧，2 竖列分隔)
+        // 第 2 列：地面数传文本面板
         val gndTextLp = LinearLayout.LayoutParams(TEXT_COL_WIDTH, LinearLayout.LayoutParams.MATCH_PARENT).apply { leftMargin = 12 }
         contentPanel.addView(createPanel("GND", gndLayout), gndTextLp)
 
         val subChartLp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f).apply { bottomMargin = 6 }
         val lastChartLp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f)
 
-        // 第 3 列：实时波形网格图层
+        // 第 3 列：实时波形网格图层 (完全拆分为独立列容器)
         waveformCol.orientation = LinearLayout.VERTICAL
         waveformCol.addView(airChartView, subChartLp)
         waveformCol.addView(gndChartView, lastChartLp)
         val waveColLp = LinearLayout.LayoutParams(CHART_COL_WIDTH, LinearLayout.LayoutParams.MATCH_PARENT).apply { leftMargin = 16 }
         contentPanel.addView(waveformCol, waveColLp)
 
-        // 第 4 列：底噪频谱网格图层
+        // 第 4 列：底噪频谱网格图层 (完全拆分为独立列容器)
         noiseCol.orientation = LinearLayout.VERTICAL
         noiseCol.addView(airNoiseChartView, subChartLp)
         noiseCol.addView(gndNoiseChartView, lastChartLp)
         val noiseColLp = LinearLayout.LayoutParams(CHART_COL_WIDTH, LinearLayout.LayoutParams.MATCH_PARENT).apply { leftMargin = 16 }
         contentPanel.addView(noiseCol, noiseColLp)
         
-        // 4. 组装外层容器与边缘拖拽指示块
+        // 4. 组装外层容器与边缘边界拉伸片
         contentFrame.addView(contentPanel, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
         contentFrame.addView(resizeIndicator, FrameLayout.LayoutParams(18, 18).apply { 
             gravity = Gravity.BOTTOM or Gravity.END
@@ -207,10 +204,11 @@ class FloatView(
         })
         addView(contentFrame, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.MATCH_PARENT))
 
+        // 动态计算并应用初始窗口总宽度
         updateWindowLayoutWidth()
         params.height = lastExpandedHeight
 
-        // 5. 事件绑定与独立显示切换（展开时触发绘制补刷）
+        // 5. 事件监听绑定与独立状态切换
         waveformToggleBtn.setOnClickListener {
             isWaveformExpanded = !isWaveformExpanded
             waveformCol.visibility = if (isWaveformExpanded) View.VISIBLE else View.GONE
@@ -218,10 +216,6 @@ class FloatView(
             waveformToggleBtn.background = GradientDrawable().apply {
                 setColor(Color.parseColor(if (isWaveformExpanded) "#2980B9" else "#7F8C8D"))
                 cornerRadius = 6f
-            }
-            if (isWaveformExpanded) {
-                airChartView.postInvalidate()
-                gndChartView.postInvalidate()
             }
             updateWindowLayoutWidth()
         }
@@ -234,10 +228,6 @@ class FloatView(
                 setColor(Color.parseColor(if (isNoiseExpanded) "#27AE60" else "#7F8C8D"))
                 cornerRadius = 6f
             }
-            if (isNoiseExpanded) {
-                airNoiseChartView.postInvalidate()
-                gndNoiseChartView.postInvalidate()
-            }
             updateWindowLayoutWidth()
         }
 
@@ -248,12 +238,23 @@ class FloatView(
         setupTouchInteraction()
     }
 
+    /**
+     * 根据当前波形图、底噪图的独立展开状态，动态计算并更新悬浮窗的最佳物理宽度
+     */
     private fun updateWindowLayoutWidth() {
         if (!isAttachedToWindow || !isExpanded) return
         
+        // 基础两列文本宽度 + 必要的内外边距兜底
         var dynamicWidth = TEXT_COL_WIDTH * 2 + 50
-        if (isWaveformExpanded) dynamicWidth += CHART_COL_WIDTH + 16
-        if (isNoiseExpanded) dynamicWidth += CHART_COL_WIDTH + 16
+        
+        // 独立加上波形图列宽与间距
+        if (isWaveformExpanded) {
+            dynamicWidth += CHART_COL_WIDTH + 16
+        }
+        // 独立加上底噪图列宽与间距
+        if (isNoiseExpanded) {
+            dynamicWidth += CHART_COL_WIDTH + 16
+        }
         
         params.width = dynamicWidth
         try {
@@ -324,6 +325,9 @@ class FloatView(
         })
     }
 
+    /**
+     * 全局最小化至极简状态面板切换逻辑 (对应右上角关闭按钮)
+     */
     private fun performGlobalToggle() {
         if (!isAttachedToWindow) return
         val panelBg = GradientDrawable()
@@ -353,16 +357,6 @@ class FloatView(
             
             updateWindowLayoutWidth()
             params.height = lastExpandedHeight
-
-            // 恢复全局展开时，立即通知当前处于显式可见状态的图表刷新最新缓存数据
-            if (isWaveformExpanded) {
-                airChartView.postInvalidate()
-                gndChartView.postInvalidate()
-            }
-            if (isNoiseExpanded) {
-                airNoiseChartView.postInvalidate()
-                gndNoiseChartView.postInvalidate()
-            }
         }
         try {
             windowManager.updateViewLayout(this@FloatView, params)
@@ -388,7 +382,7 @@ class FloatView(
     }
 
     // =========================================================================
-    // 数据动态刷新与渲染解析逻辑
+    // 数据动态刷新与高保真核心渲染逻辑
     // =========================================================================
     fun updateJsonDynamic(rawJson: String) {
         if (!isAttachedToWindow) return
@@ -408,6 +402,7 @@ class FloatView(
                     val key = keys.next()
                     val valueStr = obj.optString(key, "")
 
+                    // 噪声文本解析分支
                     if (key == "noiseFloor_a" || key == "noiseFloor_g") {
                         val isAir = key == "noiseFloor_a"
                         val targetLayout = if (isAir) airLayout else gndLayout
@@ -421,6 +416,8 @@ class FloatView(
                             val subKey = "${key}_ch${index + 1}"
                             val prefixLabel = if (isAir) "Air_ch" else "Gnd_ch"
                             val displayText = "$prefixLabel${index + 1} : ${partValue.trim()}"
+                            
+                            // 🟢 恢复核心：使文本颜色动态循环匹配调色板中对应的曲线色，同时维持 10.5f 紧凑大小
                             val chColor = noiseCurveColors[index % noiseCurveColors.size]
                             
                             val cachedTv = targetMap[subKey]
@@ -463,7 +460,7 @@ class FloatView(
                 if (gndR1 != null || gndR2 != null || gndSnr != null) gndChartView.addData(gndR1, gndR2, gndSnr)
 
             } catch (e: Exception) {
-                Log.e("FloatViewError", "数据处理渲染异常: ${e.message}")
+                android.util.Log.e("FloatViewError", "数据处理渲染异常: ${e.message}")
             }
         }
     }
@@ -471,6 +468,7 @@ class FloatView(
     private fun updateOrAddTextWithColor(layout: LinearLayout, map: HashMap<String, TextView>, key: String, value: String) {
         val cachedTv = map[key]
         
+        // 基础业务动态颜色判定
         var displayColor = when {
             key.contains("rssi", ignoreCase = true) -> {
                 val rssiVal = value.toFloatOrNull() ?: 0f
@@ -494,23 +492,27 @@ class FloatView(
             else -> Color.WHITE
         }
 
-        // 针对 LdpcFail / failed 变红，增加停止后 5秒自动恢复
-        if (key.contains("fail", ignoreCase = true) || key.contains("failed", ignoreCase = true)) {
+        // =========================================================================
+        // 针对 failed 字段的“数值出错变化触发变红，静止5秒恢复”安全隔离机制
+        // =========================================================================
+        if (key.contains("failed", ignoreCase = true)) {
             val oldValue = lastValues[key]
-            lastValues[key] = value
+            lastValues[key] = value // 实时更新历史快照
 
             if (oldValue != null && oldValue != value) {
+                // 采用安全调用符 ?.let 规避可空类型传入平台 Java 方法的编译问题
                 redTimerRunnables[key]?.let { mainHandler.removeCallbacks(it) }
                 
                 val resetRunnable = Runnable {
-                    map[key]?.setTextColor(Color.WHITE)
+                    map[key]?.setTextColor(Color.WHITE) // 倒计时结束恢复纯白
                     redTimerRunnables.remove(key)
                 }
                 redTimerRunnables[key] = resetRunnable
-                mainHandler.postDelayed(resetRunnable, 5000)
+                mainHandler.postDelayed(resetRunnable, 5000) // 5秒倒计时
                 
-                displayColor = Color.parseColor("#E74C3C")
+                displayColor = Color.parseColor("#E74C3C") // 触发警报红
             } else {
+                // 若数值不变，校验是否处于倒计时冻结状态中，保持高亮红色隔离
                 displayColor = if (redTimerRunnables.containsKey(key)) {
                     Color.parseColor("#E74C3C")
                 } else {
@@ -526,23 +528,17 @@ class FloatView(
         } else {
             val tv = TextView(context).apply {
                 text = displayText
-                textSize = 10.5f
+                textSize = 10.5f // 统一收紧字号至 10.5f
                 setTextColor(displayColor)
                 setPadding(6, 4, 6, 4)
             }
-            
-            // 确保 LdpcPass 布局置于文本面板第一栏 (Index 0)
-            if (key.contains("ldpcpass", ignoreCase = true) || key.contains("pass", ignoreCase = true)) {
-                layout.addView(tv, 0)
-            } else {
-                layout.addView(tv)
-            }
+            layout.addView(tv)
             map[key] = tv
         }
     }
 
     // ==========================================
-    // 自定义 View 组件绘制逻辑（加入 isShown 截断）
+    // 内部私有自定义测量 View 绘制实现
     // ==========================================
 
     private class SignalIconView(context: Context, private val label: String) : View(context) {
@@ -569,10 +565,7 @@ class FloatView(
             this.r1 = rssi1
             this.r2 = rssi2
             this.snr = snrVal
-            // 仅在迷你模式可见时重绘
-            if (isShown) {
-                postInvalidate()
-            }
+            postInvalidate()
         }
 
         override fun onDraw(canvas: Canvas) {
@@ -667,11 +660,7 @@ class FloatView(
             if (rssi1List.size > maxDataPoints) rssi1List.removeAt(0)
             if (rssi2List.size > maxDataPoints) rssi2List.removeAt(0)
             if (snrList.size > maxDataPoints) snrList.removeAt(0)
-
-            // 智能截断：仅在当前视图及所有父容器处于可见（VISIBLE）状态时进行重绘操作
-            if (isShown) {
-                postInvalidate()
-            }
+            postInvalidate()
         }
 
         override fun onDraw(canvas: Canvas) {
@@ -680,27 +669,47 @@ class FloatView(
             val h = height.toFloat()
             if (w <= 0 || h <= 0) return
         
-            val chartLeft = yAxisWidth
+            val chartLeft = yAxisWidth //
             val chartRight = w
             val chartWidth = chartRight - chartLeft
-            canvas.drawRect(chartLeft, 0f, chartRight, h, bgPaint)
+            canvas.drawRect(chartLeft, 0f, chartRight, h, bgPaint) //
         
+            // 1. 获取总区间范围
             val axisRssiRange = rssiMax - rssiMin
+            
+            // 2. 自定义你想显示的刻度数值和对应的文本
             val labelValues = floatArrayOf(110f, 90f, 70f, 50f, 30f, 0f)
             val rssiLabels = arrayOf("110", "90", "70", "50", "30", "0")
             val snrLabels  = arrayOf("45", "35", "25", "15", "8", "0")
         
-            for (i in labelValues.indices) {
-                val y = h * (1f - (labelValues[i] - rssiMin) / axisRssiRange)
+            // 3. 动态计算所有刻度对应的 Y 轴绝对坐标
+            val yPositions = FloatArray(labelValues.size) { i ->
+                h * (1f - (labelValues[i] - rssiMin) / axisRssiRange)
+            }
+        
+            // 4. 循环遍历绘制所有网格线与文字
+            for (i in yPositions.indices) {
+                val y = yPositions[i]
+                
+                // 确保坐标在视图内再绘制
                 if (y in 0f..h) {
+                    // 绘制横向网格线
                     canvas.drawLine(chartLeft, y, chartRight, y, gridPaint)
-                    val textY = if (i == labelValues.lastIndex) y - 6f else y + 5f
+                    
+                    // 边缘防裁剪处理（最底部的文字稍微往上提）
+                    val textY = if (i == yPositions.lastIndex) y - 6f else y + 5f
+                    
+                    // 绘制复合刻度文字
                     canvas.drawText("${rssiLabels[i]}(${snrLabels[i]})", 5f, textY, axisTextPaint)
                 }
             }
         
-            val prefix = if (isAir) "[AIR] " else "[GND] "
-            canvas.drawText(prefix, chartLeft + 15f, 22f, prefixTextPaint)
+            // =========================================================================
+            // 后续的头部文字 R1/R2/SNR 以及折线绘制逻辑保持不变即可...
+            // =========================================================================
+            val prefix = if (isAir) "[AIR] " else "[GND] " //[cite: 2]
+            canvas.drawText(prefix, chartLeft + 15f, 22f, prefixTextPaint) //[cite: 2]
+            // ... 后面原有的代码保持不动[cite: 2]
             val startX = chartLeft + 15f + prefixTextPaint.measureText(prefix)
 
             val r1Text = "R1: ${rssi1List.lastOrNull()?.toInt() ?: 0}  "
@@ -710,6 +719,8 @@ class FloatView(
             val snrText = "SNR: ${snrList.lastOrNull()?.toInt() ?: 0}"
             canvas.drawText(snrText, startX + paintTextRssi1.measureText(r1Text) + paintTextRssi2.measureText(r2Text), 22f, paintTextSnr)
 
+            // 下方的 range 依然保持原样，不会再与上方冲突了
+            val range = rssiMax - rssiMin
             drawNormalCurve(canvas, rssi1List, rssiMin, rssiMax, chartLeft, chartWidth, h, paintRssi1)
             drawNormalCurve(canvas, rssi2List, rssiMin, rssiMax, chartLeft, chartWidth, h, paintRssi2)
             drawNormalCurve(canvas, snrList, minVal = snrMin, maxVal = snrMax, leftOffset = chartLeft, cWidth = chartWidth, h = h, paint = paintSnr)
@@ -749,13 +760,8 @@ class FloatView(
             Paint().apply { color = curveColors[i]; strokeWidth = 2f; style = Paint.Style.STROKE; isAntiAlias = true }
         }
 
-        private val legendPaint = Paint().apply { isAntiAlias = true; style = Paint.Style.FILL }
-        private val legendTextPaint = Paint().apply { color = Color.parseColor("#BDC3C7"); textSize = 11f; isAntiAlias = true }
-
-        private val noiseMin = 30f
-        private val noiseMax = 120f
-        private val noiseValues = floatArrayOf(120f, 105f, 90f, 75f, 60f, 45f, 30f)
-        private val noiseLabels = arrayOf("120", "105", "90", "75", "60", "45", "30")
+        private val noiseMin = 40f
+        private val noiseMax = 140f
 
         fun addNoiseData(rawCsv: String) {
             try {
@@ -766,11 +772,7 @@ class FloatView(
                 }
                 historyList.add(floatArray)
                 if (historyList.size > maxDataPoints) historyList.removeAt(0)
-                
-                // 智能截断：仅在当前视图及所有父容器处于可见（VISIBLE）状态时进行重绘操作
-                if (isShown) {
-                    postInvalidate()
-                }
+                postInvalidate()
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -787,13 +789,24 @@ class FloatView(
             val chartWidth = chartRight - chartLeft
             canvas.drawRect(chartLeft, 0f, chartRight, h, bgPaint)
         
+            // 1. 获取底噪总区间范围
             val axisNoiseRange = noiseMax - noiseMin
+            
+            // 2. 自定义底噪的多个刻度标签和数值
+            val noiseLabels = arrayOf("120", "105", "90", "75", "60", "45", "30")
+            val noiseValues = floatArrayOf(120f, 105f, 90f, 75f, 60f, 45f, 30f)
         
-            for (i in noiseValues.indices) {
-                val y = h * (1f - (noiseValues[i] - noiseMin) / axisNoiseRange)
+            // 3. 动态计算底噪刻度的 Y 坐标
+            val yPositions = FloatArray(noiseValues.size) { i ->
+                h * (1f - (noiseValues[i] - noiseMin) / axisNoiseRange)
+            }
+        
+            // 4. 循环绘制右侧网格线与文字
+            for (i in yPositions.indices) {
+                val y = yPositions[i]
                 if (y in 0f..h) {
                     canvas.drawLine(chartLeft, y, chartRight, y, gridPaint)
-                    val textY = if (i == noiseValues.lastIndex) y - 4f else y + 5f
+                    val textY = if (i == yPositions.lastIndex) y - 4f else y + 5f
                     canvas.drawText(noiseLabels[i], 20f, textY, axisTextPaint)
                 }
             }
@@ -806,8 +819,10 @@ class FloatView(
             
             val currentChannels = historyList[historySize - 1].size
             val stepX = chartWidth / (maxDataPoints - 1)
+            
             val range = noiseMax - noiseMin
         
+            // 后续的底噪曲线折线与图例绘制逻辑保持原样...
             for (ch in 0 until currentChannels) {
                 val paint = curvePaints[ch % curvePaints.size]
                 
@@ -831,6 +846,10 @@ class FloatView(
                 }
             }
         
+            // 图例绘制部分...
+            val legendPaint = Paint().apply { isAntiAlias = true; style = Paint.Style.FILL }
+            val legendTextPaint = Paint().apply { color = Color.parseColor("#BDC3C7"); textSize = 11f; isAntiAlias = true }
+            
             var legendRightX = w - 15f
             val legendY = 22f
         
