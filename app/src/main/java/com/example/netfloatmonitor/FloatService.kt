@@ -18,6 +18,12 @@ import java.util.TimerTask
 
 class FloatService : Service() {
 
+    companion object {
+        const val ACTION_SHOW_FLOAT = "com.example.netfloatmonitor.ACTION_SHOW"
+        const val ACTION_HIDE_FLOAT = "com.example.netfloatmonitor.ACTION_HIDE"
+        const val ACTION_TOGGLE_FLOAT = "com.example.netfloatmonitor.ACTION_TOGGLE"
+    }
+
     private var floatView: FloatView? = null
     private var receiver: UdpReceiver? = null
     private lateinit var logger: LogManager
@@ -38,8 +44,25 @@ class FloatService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        val port = intent?.getIntExtra("PORT", 16789) ?: 16789
+        val action = intent?.action
         
+        when (action) {
+            ACTION_HIDE_FLOAT -> {
+                hideFloatWindow()
+                return START_STICKY
+            }
+            ACTION_SHOW_FLOAT -> {
+                showFloatWindow()
+                return START_STICKY
+            }
+            ACTION_TOGGLE_FLOAT -> {
+                if (floatView == null) showFloatWindow() else hideFloatWindow()
+                return START_STICKY
+            }
+        }
+
+        // 默认启动流程
+        val port = intent?.getIntExtra("PORT", 16789) ?: 16789
         totalPackets = 0
         currentHz = 0
         logger.startNewSession()
@@ -52,7 +75,6 @@ class FloatService : Service() {
             sendStatusBroadcast()
         }, 200)
         
-        // 修改为 START_STICKY，确保开机若被系统误杀可自动恢复
         return START_STICKY
     }
 
@@ -64,10 +86,8 @@ class FloatService : Service() {
                 totalPackets++
                 packetsInLastSecond++
 
-                // 1. 异步落盘，完全不阻塞
                 logger.save(data)
                 
-                // 2. 抛给主线程，用新编写的动态复用映射进行高保真全动态数据刷新
                 mainHandler.post {
                     floatView?.updateJsonDynamic(data)
                 }
@@ -94,6 +114,7 @@ class FloatService : Service() {
         val intent = Intent("com.example.netfloatmonitor.STATUS_UPDATE").apply {
             putExtra("TOTAL_PACKETS", totalPackets)
             putExtra("HZ", currentHz)
+            putExtra("IS_FLOAT_SHOWING", floatView != null) // 广播悬浮窗当前状态
         }
         LocalBroadcastManager.getInstance(this@FloatService).sendBroadcast(intent)
     }
@@ -101,7 +122,6 @@ class FloatService : Service() {
     private fun showFloatWindow() {
         if (floatView != null) return
 
-        // 检查悬浮窗权限，防止开机未授权或系统组件加载延迟导致崩溃
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
             Log.w("FloatService", "未授予悬浮窗权限，跳过悬浮窗显示")
             return
@@ -126,8 +146,23 @@ class FloatService : Service() {
         try {
             floatView = FloatView(this, wm, params)
             wm.addView(floatView, params)
+            sendStatusBroadcast()
         } catch (e: Exception) {
-            Log.e("FloatService", "开机添加悬浮窗异常: ${e.message}", e)
+            Log.e("FloatService", "添加悬浮窗异常: ${e.message}", e)
+        }
+    }
+
+    // 隐藏/移除悬浮窗
+    private fun hideFloatWindow() {
+        if (floatView != null) {
+            try {
+                val wm = getSystemService(WINDOW_SERVICE) as WindowManager
+                wm.removeView(floatView)
+            } catch (e: Exception) {
+                Log.e("FloatService", "移除悬浮窗异常: ${e.message}")
+            }
+            floatView = null
+            sendStatusBroadcast()
         }
     }
 
@@ -140,21 +175,14 @@ class FloatService : Service() {
         
         val intent = Intent("com.example.netfloatmonitor.STATUS_UPDATE").apply {
             putExtra("IS_STOPPED", true)
+            putExtra("IS_FLOAT_SHOWING", false)
         }
         LocalBroadcastManager.getInstance(this).sendBroadcast(intent)
 
         receiver?.stop()
         receiver = null
         
-        if (floatView != null) {
-            try {
-                val wm = getSystemService(WINDOW_SERVICE) as WindowManager
-                wm.removeView(floatView)
-            } catch (e: Exception) {
-                Log.e("FloatService", "移除悬浮窗异常: ${e.message}")
-            }
-            floatView = null
-        }
+        hideFloatWindow()
         mainHandler.removeCallbacksAndMessages(null)
     }
 
@@ -165,7 +193,7 @@ class FloatService : Service() {
             val channel = NotificationChannel(
                 "net_monitor", 
                 "NetFloat Monitor", 
-                NotificationManager.IMPORTANCE_LOW // 低优先级，静音且无横幅弹出
+                NotificationManager.IMPORTANCE_LOW
             ).apply {
                 setShowBadge(false)
                 setSound(null, null)
@@ -181,9 +209,9 @@ class FloatService : Service() {
             .setContentTitle("NetFloat Monitor")
             .setContentText("UDP监听运行中")
             .setSmallIcon(android.R.drawable.ic_menu_info_details)
-            .setPriority(NotificationCompat.PRIORITY_LOW) // 兼容旧版低优先级
-            .setSilent(true) // 设置无声静音
-            .setOngoing(true) // 设置为常驻服务通知
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setSilent(true)
+            .setOngoing(true)
             .build()
     }
 }
