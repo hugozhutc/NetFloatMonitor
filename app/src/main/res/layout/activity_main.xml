@@ -19,7 +19,7 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="16dp"
         android:hint="目标IP"
-        android:text="192.168.1.100" />
+        android:text="192.168.144.33" />
 
     <EditText
         android:id="@+id/editPort"
@@ -28,7 +28,7 @@
         android:layout_marginTop="8dp"
         android:hint="UDP端口"
         android:inputType="number"
-        android:text="14550" />
+        android:text="16789" />
 
     <Button
         android:id="@+id/startBtn"
@@ -50,6 +50,11 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="4dp"
         android:text="清除日志" />
+    <Button
+        android:id="@+id/toggleFloatBtn"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="切换/隐藏悬浮窗" />
 
     <!-- 实时状态监控区面板 -->
     <LinearLayout
