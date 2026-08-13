@@ -1,10 +1,12 @@
 package com.example.netfloatmonitor
 
+import android.Manifest
 import android.annotation.SuppressLint
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -12,6 +14,8 @@ import android.os.PowerManager
 import android.provider.Settings
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import java.io.File
 
@@ -63,14 +67,14 @@ class MainActivity : AppCompatActivity() {
         val startBtn = findViewById<Button>(R.id.startBtn)
         val stopBtn = findViewById<Button>(R.id.stopBtn)
         val clearBtn = findViewById<Button>(R.id.clearBtn)
-        // 尝试绑定悬浮窗切换按钮（若 XML 布局中已添加 toggleFloatBtn）
         val toggleFloatBtn = findViewById<Button?>(R.id.toggleFloatBtn)
 
         loadConfig()
         showLogPath()
         
-        // 自动检查电池优化白名单（保障开机后台自启不被系统杀死）
+        // 检查电池优化白名单与通知权限
         checkBatteryOptimization()
+        checkNotificationPermission()
 
         tvStatusInfo.text = "链路状态: 待机\n悬浮窗: 未启动\n当前文件: 未开启监控\n已收数据: 0 包 | 速率: 0 Hz"
 
@@ -102,7 +106,7 @@ class MainActivity : AppCompatActivity() {
                 putExtra("IP", ipEdit.text.toString())
             }
 
-            if (Build.VERSION.SDK_INT >= 26) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 startForegroundService(serviceIntent)
             } else {
                 startService(serviceIntent)
@@ -120,16 +124,12 @@ class MainActivity : AppCompatActivity() {
             clearLog()
         }
 
-        // 点击独立开关/切换悬浮窗（不影响后台 UDP 数据接收与日志落盘）
+        // 切换悬浮窗显隐（Activity 在台前时直接调用 startService 发送 Action）
         toggleFloatBtn?.setOnClickListener {
             val intent = Intent(this, FloatService::class.java).apply {
                 action = FloatService.ACTION_TOGGLE_FLOAT
             }
-            if (Build.VERSION.SDK_INT >= 26) {
-                startForegroundService(intent)
-            } else {
-                startService(intent)
-            }
+            startService(intent)
         }
     }
 
@@ -146,7 +146,16 @@ class MainActivity : AppCompatActivity() {
         LocalBroadcastManager.getInstance(this).unregisterReceiver(statusReceiver)
     }
 
-    // 申请忽略电池优化白名单，防止开机自启被国产 Rom 拦截杀死
+    // Android 13 (API 33) 动态申请 POST_NOTIFICATIONS 权限
+    private fun checkNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.POST_NOTIFICATIONS), 101)
+            }
+        }
+    }
+
+    // 申请忽略电池优化白名单，防止后台被系统杀掉
     private fun checkBatteryOptimization() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
@@ -158,7 +167,7 @@ class MainActivity : AppCompatActivity() {
                     }
                     startActivity(intent)
                 } catch (e: Exception) {
-                    // 部分机型无直接弹窗权限页，忽略处理
+                    // 部分定制 ROM 忽略无对应 Activity 产生的异常
                 }
             }
         }
