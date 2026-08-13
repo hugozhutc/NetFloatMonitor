@@ -11,6 +11,10 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 class LogManager(private val context: Context) {
 
+    companion object {
+        private const val MAX_LOG_FILES = 100 // 最大允许保留的日志文件数量
+    }
+
     private val logDir = File(context.getExternalFilesDir(null), "NetFloatLogs").apply {
         if (!exists()) {
             mkdirs()
@@ -50,6 +54,10 @@ class LogManager(private val context: Context) {
         if (isRecording.get()) {
             stopSession()
         }
+
+        // 每次创建新会话前，自动检查并清理超出上限的最旧日志
+        cleanOldLogs()
+
         csvHeaders.clear()
         dataQueue.clear()
         
@@ -163,6 +171,32 @@ class LogManager(private val context: Context) {
 
         } catch (e: Exception) {
             Log.e("LogManager", "落盘写入失败: ${e.message}")
+        }
+    }
+
+    /**
+     * 检查并自动清理超过数量上限的最旧日志文件（基于 FIFO 策略）
+     */
+    private fun cleanOldLogs() {
+        try {
+            val files = getLogFiles()
+            if (files.size >= MAX_LOG_FILES) {
+                // 按文件最后修改时间升序排列（最旧的在前面）
+                val sortedFiles = files.sortedBy { it.lastModified() }
+                
+                // 计算需要清理的文件数，预留空间给即将产生的新会话
+                val deleteCount = files.size - MAX_LOG_FILES + 1
+                for (i in 0 until deleteCount) {
+                    if (i < sortedFiles.size) {
+                        val fileToDelete = sortedFiles[i]
+                        if (fileToDelete.delete()) {
+                            Log.d("LogManager", ">>> 自动清理超限旧日志: ${fileToDelete.name}")
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("LogManager", "自动清理日志异常: ${e.message}")
         }
     }
 }
