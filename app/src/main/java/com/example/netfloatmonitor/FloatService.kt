@@ -1,16 +1,18 @@
 package com.example.netfloatmonitor
 
 import android.app.*
+import android.content.Context
 import android.content.Intent
 import android.graphics.PixelFormat
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.provider.Settings
+import android.util.Log
 import android.view.WindowManager
 import androidx.core.app.NotificationCompat
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
-import android.util.Log
 import java.util.Timer
 import java.util.TimerTask
 
@@ -50,7 +52,8 @@ class FloatService : Service() {
             sendStatusBroadcast()
         }, 200)
         
-        return START_NOT_STICKY
+        // 修改为 START_STICKY，确保开机若被系统误杀可自动恢复
+        return START_STICKY
     }
 
     private fun startUdpReceive(port: Int) {
@@ -97,23 +100,35 @@ class FloatService : Service() {
 
     private fun showFloatWindow() {
         if (floatView != null) return
-        val wm = getSystemService(WINDOW_SERVICE) as WindowManager
-        val params = WindowManager.LayoutParams()
-        
-        params.width = WindowManager.LayoutParams.WRAP_CONTENT
-        params.height = WindowManager.LayoutParams.WRAP_CONTENT
-        params.type = if (Build.VERSION.SDK_INT >= 26) {
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-        } else {
-            WindowManager.LayoutParams.TYPE_PHONE
+
+        // 检查悬浮窗权限，防止开机未授权或系统组件加载延迟导致崩溃
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
+            Log.w("FloatService", "未授予悬浮窗权限，跳过悬浮窗显示")
+            return
         }
-        params.flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
-        params.format = PixelFormat.TRANSLUCENT
-        params.x = 50
-        params.y = 200
+
+        val wm = getSystemService(WINDOW_SERVICE) as WindowManager
+        val params = WindowManager.LayoutParams().apply {
+            width = WindowManager.LayoutParams.WRAP_CONTENT
+            height = WindowManager.LayoutParams.WRAP_CONTENT
+            type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+            } else {
+                @Suppress("DEPRECATION")
+                WindowManager.LayoutParams.TYPE_PHONE
+            }
+            flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+            format = PixelFormat.TRANSLUCENT
+            x = 50
+            y = 200
+        }
         
-        floatView = FloatView(this, wm, params)
-        wm.addView(floatView, params)
+        try {
+            floatView = FloatView(this, wm, params)
+            wm.addView(floatView, params)
+        } catch (e: Exception) {
+            Log.e("FloatService", "开机添加悬浮窗异常: ${e.message}", e)
+        }
     }
 
     override fun onDestroy() {
@@ -146,14 +161,18 @@ class FloatService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     private fun createNotificationChannel() {
-        if (Build.VERSION.SDK_INT >= 26) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 "net_monitor", 
                 "NetFloat Monitor", 
-                NotificationManager.IMPORTANCE_LOW
-            )
+                NotificationManager.IMPORTANCE_LOW // 低优先级，静音且无横幅弹出
+            ).apply {
+                setShowBadge(false)
+                setSound(null, null)
+                enableVibration(false)
+            }
             val manager = getSystemService(NotificationManager::class.java)
-            manager.createNotificationChannel(channel)
+            manager?.createNotificationChannel(channel)
         }
     }
 
@@ -162,6 +181,9 @@ class FloatService : Service() {
             .setContentTitle("NetFloat Monitor")
             .setContentText("UDP监听运行中")
             .setSmallIcon(android.R.drawable.ic_menu_info_details)
+            .setPriority(NotificationCompat.PRIORITY_LOW) // 兼容旧版低优先级
+            .setSilent(true) // 设置无声静音
+            .setOngoing(true) // 设置为常驻服务通知
             .build()
-        }
+    }
 }
