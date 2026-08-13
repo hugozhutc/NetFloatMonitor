@@ -46,6 +46,7 @@ class FloatService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val action = intent?.action
         
+        // 处理显隐控制命令
         when (action) {
             ACTION_HIDE_FLOAT -> {
                 hideFloatWindow()
@@ -61,13 +62,22 @@ class FloatService : Service() {
             }
         }
 
-        // 默认启动流程
+        // 默认启动流程（开机自启或 App 启动服务）
         val port = intent?.getIntExtra("PORT", 16789) ?: 16789
+        // 允许通过 Intent 显式传参控制是否显示悬浮窗，默认值为 false（不显示）
+        val showFloat = intent?.getBooleanExtra("SHOW_FLOAT", false) ?: false
+
         totalPackets = 0
         currentHz = 0
         logger.startNewSession()
         
-        showFloatWindow()
+        // 【修改核心】：默认不调用 showFloatWindow()
+        if (showFloat) {
+            showFloatWindow()
+        } else {
+            hideFloatWindow()
+        }
+
         startUdpReceive(port)
         startStatusTimer()
 
@@ -114,7 +124,7 @@ class FloatService : Service() {
         val intent = Intent("com.example.netfloatmonitor.STATUS_UPDATE").apply {
             putExtra("TOTAL_PACKETS", totalPackets)
             putExtra("HZ", currentHz)
-            putExtra("IS_FLOAT_SHOWING", floatView != null) // 广播悬浮窗当前状态
+            putExtra("IS_FLOAT_SHOWING", floatView != null)
         }
         LocalBroadcastManager.getInstance(this@FloatService).sendBroadcast(intent)
     }
@@ -152,7 +162,6 @@ class FloatService : Service() {
         }
     }
 
-    // 隐藏/移除悬浮窗
     private fun hideFloatWindow() {
         if (floatView != null) {
             try {
